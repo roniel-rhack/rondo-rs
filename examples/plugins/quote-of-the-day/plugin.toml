@@ -1,0 +1,9 @@
+id = "quote-of-the-day"
+name = "Quote of the Day"
+version = "0.1.0"
+api = "0.1"
+capabilities = ["OverlayView", "TickHandler"]
+
+[wasi]
+allowed_paths = []
+allowed_hosts = []

@@ -1,6 +1,7 @@
 pub mod data_state;
 pub mod modals_state;
 pub mod ui_state;
+pub mod undo;
 
 pub use data_state::DataState;
 pub use modals_state::ModalsState;
@@ -26,6 +27,7 @@ pub struct AppState {
     pub status_msg: Option<String>,
     /// True when the underlying store was opened RW (so we can persist mutations).
     pub writable: bool,
+    pub undo: undo::UndoStack,
 }
 
 impl AppState {
@@ -47,6 +49,7 @@ impl AppState {
             should_quit: false,
             status_msg: None,
             writable,
+            undo: undo::UndoStack::default(),
         })
     }
 
@@ -178,7 +181,10 @@ impl AppState {
                                 *id,
                                 rondo_core::domain::task::Status::Done,
                             ) {
-                                Ok(_) => ok += 1,
+                                Ok(snap) => {
+                                    self.undo.push(snap);
+                                    ok += 1;
+                                }
                                 Err(e) => err = Some(format!("{}", e)),
                             }
                         }
@@ -343,7 +349,8 @@ impl AppState {
                 self.modals.confirm_delete_open = false;
                 if let Some(id) = self.data.selected_task_id() {
                     match self.data.store.delete_task(id) {
-                        Ok(_) => {
+                        Ok(snap) => {
+                            self.undo.push(snap);
                             self.data.refresh_tasks();
                             self.toast("task deleted");
                         }
@@ -370,7 +377,8 @@ impl AppState {
                             ..Default::default()
                         };
                         match self.data.store.update_task(id, patch) {
-                            Ok(_) => {
+                            Ok(snap) => {
+                                self.undo.push(snap);
                                 self.data.refresh_tasks();
                                 self.toast("title updated");
                             }
@@ -386,6 +394,23 @@ impl AppState {
                 self.modals.edit_title_open = false;
                 self.modals.edit_title_buf.clear();
                 self.ui.mode = Mode::Normal;
+            }
+            Action::Undo => {
+                if !self.writable {
+                    self.toast("undo: read-only");
+                } else {
+                    match self.undo.pop() {
+                        None => self.toast("nothing to undo"),
+                        Some(snap) => {
+                            if let Err(e) = self.apply_undo(snap) {
+                                self.toast(format!("undo failed: {}", e));
+                            } else {
+                                self.data.refresh_tasks();
+                                self.toast("undone");
+                            }
+                        }
+                    }
+                }
             }
             Action::ToggleFocusedSubtask => {
                 if self.ui.focus.pane == Pane::Detail
@@ -437,6 +462,98 @@ impl AppState {
         if let Some(next) = follow_up.take() {
             self.update(next);
         }
+    }
+
+    /// Apply the inverse of a captured mutation. Called from the `Undo`
+    /// action handler; never pushes onto the undo stack itself.
+    ///
+    /// Known limitation: `Delete` undo re-creates the row via
+    /// `create_task`, which produces a **new** id. Subtasks, tags
+    /// beyond the initial set, time logs, and notes attached to the
+    /// original are NOT restored — only the core task plus initial
+    /// tags from `NewTask`. Dependency edges are also lost.
+    fn apply_undo(&mut self, snap: rondo_core::domain::task::UndoSnapshot) -> rondo_core::Result<()> {
+        use rondo_core::domain::task::{NewTask, TaskPatch, UndoKind};
+        match snap.kind {
+            UndoKind::Create => {
+                if let Some(id) = snap.created_id {
+                    self.data.store.delete_task(id)?;
+                }
+            }
+            UndoKind::Update => {
+                if let Some(before) = snap.task_before {
+                    let patch = TaskPatch {
+                        title: Some(before.title.clone()),
+                        description: Some(before.description.clone()),
+                        status: Some(before.status),
+                        priority: Some(before.priority),
+                        due_date: Some(before.due_date),
+                        recur_freq: Some(before.recur_freq),
+                        recur_interval: Some(before.recur_interval),
+                    };
+                    self.data.store.update_task(before.id, patch)?;
+                }
+            }
+            UndoKind::Delete => {
+                if let Some(before) = snap.task_before {
+                    let new = NewTask {
+                        title: before.title.clone(),
+                        description: before.description.clone(),
+                        status: before.status,
+                        priority: before.priority,
+                        due_date: before.due_date,
+                        recur_freq: before.recur_freq,
+                        recur_interval: before.recur_interval,
+                        tags: before.tags.clone(),
+                    };
+                    self.data.store.create_task(new)?;
+                }
+            }
+            UndoKind::SetStatus => {
+                if let Some(before) = snap.task_before {
+                    self.data.store.set_status(before.id, before.status)?;
+                }
+            }
+            UndoKind::AddSubtask => {
+                if let Some(id) = snap.created_id {
+                    self.data.store.delete_subtask(id)?;
+                }
+            }
+            UndoKind::ToggleSubtask => {
+                if let Some(before) = snap.task_before {
+                    let after = self.data.store.task_by_id(before.id)?;
+                    for (bs, as_) in before.subtasks.iter().zip(after.subtasks.iter()) {
+                        if bs.completed != as_.completed {
+                            self.data.store.toggle_subtask(as_.id)?;
+                            break;
+                        }
+                    }
+                }
+            }
+            UndoKind::AddTag => {
+                if let Some(before) = snap.task_before {
+                    let after = self.data.store.task_by_id(before.id)?;
+                    for tag in after.tags.iter() {
+                        if !before.tags.contains(tag) {
+                            self.data.store.remove_tag(before.id, tag)?;
+                            break;
+                        }
+                    }
+                }
+            }
+            UndoKind::RemoveTag => {
+                if let Some(before) = snap.task_before {
+                    let after = self.data.store.task_by_id(before.id)?;
+                    for tag in before.tags.iter() {
+                        if !after.tags.contains(tag) {
+                            self.data.store.add_tag(before.id, tag)?;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     fn jump_selection(&mut self, idx: usize) {
@@ -613,7 +730,8 @@ impl AppState {
         };
         if self.writable {
             match self.data.store.toggle_subtask(subtask_id) {
-                Ok(_) => {
+                Ok((_, snap)) => {
+                    self.undo.push(snap);
                     self.data.refresh_tasks();
                     self.ui.flash = Some((FlashTarget::Subtask(subtask_id), Instant::now()));
                     self.toast(format!("subtask #{} toggled", subtask_id));
@@ -668,7 +786,8 @@ impl AppState {
             tags: parsed.tags.clone(),
         };
         match self.data.store.create_task(new_task) {
-            Ok(_) => {
+            Ok((_id, snap)) => {
+                self.undo.push(snap);
                 self.data.refresh_tasks();
                 if self.ui.last_task_list_rect.width > 0 {
                     let eff = crate::fx::presets::quick_add_slide(self.theme.bg);

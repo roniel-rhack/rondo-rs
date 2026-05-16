@@ -205,6 +205,12 @@ impl SqliteStore {
         ))
     }
 
+    pub fn delete_subtask(&self, id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(super::queries::DELETE_SUBTASK, params![id])?;
+        Ok(())
+    }
+
     pub fn toggle_subtask(&self, id: i64) -> Result<(bool, UndoSnapshot)> {
         let task_id: i64;
         let new_completed: i64;

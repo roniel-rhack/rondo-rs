@@ -35,6 +35,7 @@ pub struct AppState {
     pub search_open: bool,
     pub search_buf: String,
     pub selection: std::collections::HashSet<i64>,
+    pub quick_actions_open: bool,
     pub quick_add_open: bool,
     pub quick_add_buf: String,
     pub should_quit: bool,
@@ -121,6 +122,7 @@ impl AppState {
             search_open: false,
             search_buf: String::new(),
             selection: std::collections::HashSet::new(),
+            quick_actions_open: false,
             quick_add_open: false,
             quick_add_buf: String::new(),
             should_quit: false,
@@ -200,6 +202,8 @@ impl AppState {
                 }
             }
             Action::ToggleSelected => self.handle_space(),
+            Action::ToggleQuickActions => self.quick_actions_open = !self.quick_actions_open,
+            Action::CloseQuickActions => self.quick_actions_open = false,
             Action::EnterVisual => {
                 if self.focus.pane == Pane::List && self.page == Page::Tasks {
                     self.mode = Mode::Visual;
@@ -297,6 +301,8 @@ impl AppState {
             Action::EscapeContext => {
                 if self.help_open {
                     self.help_open = false;
+                } else if self.quick_actions_open {
+                    self.quick_actions_open = false;
                 } else if self.quick_add_open {
                     self.quick_add_open = false;
                     self.quick_add_buf.clear();

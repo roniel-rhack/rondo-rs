@@ -125,6 +125,7 @@ fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
         KeyCode::Char(':') => Action::OpenCommandPalette,
         KeyCode::Char('/') => Action::OpenSearch,
         KeyCode::Char('?') => Action::ToggleHelp,
+        KeyCode::Char('.') => Action::ToggleQuickActions,
         KeyCode::Char('<') => Action::ResizeSplit { delta: -5 },
         KeyCode::Char('>') => Action::ResizeSplit { delta: 5 },
         KeyCode::Char('=') => Action::ResetSplit,

@@ -43,6 +43,9 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
     if app.help_open {
         components::help::draw(app, f, centered(56, 28, area));
     }
+    if app.quick_actions_open {
+        components::quick_actions::draw(app, f, centered(72, 7, area));
+    }
 }
 
 fn body_with_sidebar(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {

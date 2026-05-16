@@ -135,6 +135,14 @@ fn visual_mode_multi_select() {
 }
 
 #[test]
+fn quick_actions_overlay() {
+    let s = snapshot("quick_actions_overlay", 140, 32, |a| {
+        a.quick_actions_open = true;
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
 fn quick_add_overlay() {
     let s = snapshot("quick_add_overlay", 120, 32, |a| {
         a.quick_add_open = true;

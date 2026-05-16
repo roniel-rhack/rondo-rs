@@ -42,6 +42,8 @@ pub enum Action {
     SubmitCommand(String),
     EscapeContext,
 
+    ToggleQuickActions,
+    CloseQuickActions,
     EnterVisual,
     BulkDone,
     BulkPriority,

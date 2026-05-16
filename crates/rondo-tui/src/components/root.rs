@@ -17,7 +17,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
     body(app, f, chunks[1]);
     components::footer::draw(app, f, chunks[2]);
     if app.pomodoro_open {
-        components::pomodoro::draw(app, f, centered(44, 11, f.area()));
+        components::pomodoro::draw(app, f, centered(60, 14, f.area()));
     }
     if app.search_open {
         components::search::draw(app, f, search_rect(f.area()));

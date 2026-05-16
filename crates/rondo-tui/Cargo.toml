@@ -1,0 +1,36 @@
+[package]
+name = "rondo-tui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+default-run = "rondo-tui"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "rondo-tui"
+path = "src/main.rs"
+
+[dependencies]
+rondo-core = { path = "../rondo-core" }
+rondo-plugin-api = { path = "../rondo-plugin-api" }
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+clap = { workspace = true }
+color-eyre = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tui-textarea = { workspace = true }
+tui-input = { workspace = true }
+throbber-widgets-tui = { workspace = true }
+strum = { workspace = true }
+pulldown-cmark = { workspace = true }
+serde = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+insta = { version = "1.40", features = ["yaml"] }
+tempfile = "3.10"
+rusqlite = { workspace = true }

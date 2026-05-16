@@ -138,6 +138,31 @@ fn visual_mode_multi_select() {
 }
 
 #[test]
+fn sidebar_focused() {
+    let s = snapshot("sidebar_focused", 140, 32, |a| {
+        a.focus.pane = rondo_tui::focus::Pane::Sidebar;
+        a.focus.sidebar_item = 1; // HOY
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn filter_today_applied() {
+    let s = snapshot("filter_today_applied", 140, 32, |a| {
+        a.active_filter = rondo_tui::filter::Filter::Today;
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn filter_completed_applied() {
+    let s = snapshot("filter_completed_applied", 140, 32, |a| {
+        a.active_filter = rondo_tui::filter::Filter::Completed;
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
 fn quick_actions_overlay() {
     let s = snapshot("quick_actions_overlay", 140, 32, |a| {
         a.quick_actions_open = true;

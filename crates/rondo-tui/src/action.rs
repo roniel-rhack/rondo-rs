@@ -44,6 +44,7 @@ pub enum Action {
 
     ToggleQuickActions,
     CloseQuickActions,
+    ApplySidebarSelection,
     EnterVisual,
     BulkDone,
     BulkPriority,

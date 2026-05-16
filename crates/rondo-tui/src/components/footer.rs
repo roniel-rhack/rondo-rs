@@ -98,6 +98,13 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
         ];
     }
     match app.focus.pane {
+        Pane::Sidebar => vec![
+            ("j/k", "move"),
+            ("Enter", "aplicar filtro"),
+            ("l", "list"),
+            ("Esc", "cancel"),
+            (":", "cmd"),
+        ],
         Pane::List => vec![
             ("j/k", "move"),
             ("l", "detail"),

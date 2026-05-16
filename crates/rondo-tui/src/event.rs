@@ -101,7 +101,9 @@ fn quick_add_key(ev: Event, app: &AppState) -> Option<Action> {
 fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
     let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
     let in_visual = app.mode == crate::focus::Mode::Visual;
+    let in_sidebar = app.focus.pane == crate::focus::Pane::Sidebar;
     Some(match k.code {
+        KeyCode::Enter if in_sidebar => Action::ApplySidebarSelection,
         KeyCode::Char('q') if !ctrl => Action::Quit,
         KeyCode::Char('c') if ctrl => Action::Quit,
         KeyCode::Char('d') if ctrl => Action::HalfPageDown,

@@ -12,26 +12,32 @@ use rondo_core::domain::task::{Status, Task};
 
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
-    let title = format!("inbox · {} tareas", app.tasks.len());
-    let panel = BracketPanel::new(&title, t).active(app.focus_left());
+    let visible: Vec<usize> = app.visible_task_indices();
+    let filter_label = app.active_filter.label().to_lowercase();
+    let title = format!("{} · {} tareas", filter_label, visible.len());
+    let panel = BracketPanel::new(&title, t)
+        .active(app.focus.pane == crate::focus::Pane::List);
     let inner = panel.inner(area);
     panel.render(area, f.buffer_mut());
 
-    if app.tasks.is_empty() {
+    if visible.is_empty() {
         let lines = vec![
             Line::raw(""),
             Line::raw(""),
-            Line::from(Span::styled("  No tasks yet", t.muted())),
+            Line::from(Span::styled(
+                format!("  Sin tareas para '{}'", filter_label),
+                t.muted(),
+            )),
             Line::raw(""),
             Line::from(vec![
                 Span::raw("  "),
+                Span::styled("h", t.kbd()),
+                Span::raw(" "),
+                Span::styled("cambiar filtro", t.muted()),
+                Span::raw("    "),
                 Span::styled("?", t.kbd()),
                 Span::raw(" "),
-                Span::styled("for help", t.muted()),
-                Span::raw("    "),
-                Span::styled(":", t.kbd()),
-                Span::raw(" "),
-                Span::styled("commands", t.muted()),
+                Span::styled("ayuda", t.muted()),
             ]),
         ];
         f.render_widget(Paragraph::new(lines), inner);
@@ -50,14 +56,9 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
 
     draw_column_header(f, layout[0], t);
 
-    let selected = app.task_list_state.selected();
-    let items: Vec<ListItem> = app
-        .tasks
-        .iter()
-        .enumerate()
-        .map(|(idx, task)| build_row(task, idx, selected, app, t))
-        .collect();
-    let list = List::new(items).highlight_style(t.selection());
+    let items = render_items(app, &visible);
+    let highlight = app.theme.selection();
+    let list = List::new(items).highlight_style(highlight);
     f.render_stateful_widget(list, layout[1], &mut app.task_list_state);
 
     draw_progress_bar(app, f, layout[2], t);
@@ -74,13 +75,21 @@ fn draw_column_header(f: &mut Frame<'_>, area: Rect, t: &Theme) {
     f.render_widget(Paragraph::new(header), area);
 }
 
-fn build_row<'a>(
-    task: &'a Task,
+fn render_items(app: &AppState, visible: &[usize]) -> Vec<ListItem<'static>> {
+    let selected = app.task_list_state.selected();
+    visible
+        .iter()
+        .map(|&idx| build_row(&app.tasks[idx], idx, selected, app, &app.theme))
+        .collect()
+}
+
+fn build_row(
+    task: &Task,
     idx: usize,
     selected: Option<usize>,
     app: &AppState,
     t: &Theme,
-) -> ListItem<'a> {
+) -> ListItem<'static> {
     let is_selected = Some(idx) == selected;
     let in_visual = app.selection.contains(&task.id);
     let flashing = app.is_flashing(FlashTarget::Task(task.id));

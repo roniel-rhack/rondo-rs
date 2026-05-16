@@ -3,6 +3,7 @@ use strum::{Display, EnumIter, IntoEnumIterator};
 /// Top-level pane that has user focus inside the current page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
 pub enum Pane {
+    Sidebar,
     List,
     Detail,
 }
@@ -44,6 +45,8 @@ pub struct FocusState {
     pub section: DetailSection,
     /// Cursor within the active section's collection (subtask idx, note idx, dep idx).
     pub section_item: usize,
+    /// Cursor within the sidebar item list (0..NAV_ITEMS.len() + filters).
+    pub sidebar_item: usize,
 }
 
 impl Default for FocusState {
@@ -52,6 +55,7 @@ impl Default for FocusState {
             pane: Pane::List,
             section: DetailSection::Header,
             section_item: 0,
+            sidebar_item: 0,
         }
     }
 }

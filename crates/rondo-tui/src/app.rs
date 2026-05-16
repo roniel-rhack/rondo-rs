@@ -1,4 +1,5 @@
 use crate::action::{Action, Page};
+use crate::filter::Filter;
 use crate::focus::{DetailSection, FocusState, Mode, Pane};
 use crate::theme::Theme;
 use color_eyre::eyre::Result;
@@ -43,6 +44,7 @@ pub struct AppState {
     pub plugins: PluginRegistry,
     pub store: Arc<rondo_core::store::sqlite::SqliteStore>,
     pub flash: Option<(FlashTarget, Instant)>,
+    pub active_filter: Filter,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,6 +59,24 @@ impl AppState {
     /// Returns true when an animation requires periodic redraw without user input.
     pub fn needs_animation_tick(&self) -> bool {
         self.pomodoro_open || self.flash.is_some()
+    }
+
+    /// Indices of tasks that pass the current filter, in the order they appear in `tasks`.
+    pub fn visible_task_indices(&self) -> Vec<usize> {
+        self.tasks
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| self.active_filter.applies_to(t))
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Number of tasks passing the current filter.
+    pub fn visible_count(&self) -> usize {
+        self.tasks
+            .iter()
+            .filter(|t| self.active_filter.applies_to(t))
+            .count()
     }
 
     /// Is `target` currently flashing? Clears the flash if expired.
@@ -78,7 +98,7 @@ impl AppState {
 
     /// Backward-compat shim — still used by some pane-render code paths to color borders.
     pub fn focus_left(&self) -> bool {
-        self.focus.pane == Pane::List
+        matches!(self.focus.pane, Pane::List | Pane::Sidebar)
     }
 }
 
@@ -130,6 +150,7 @@ impl AppState {
             plugins: PluginRegistry::new(),
             store,
             flash: None,
+            active_filter: Filter::Inbox,
         })
     }
 
@@ -141,11 +162,17 @@ impl AppState {
             Action::HalfPageDown => self.move_selection(10),
             Action::HalfPageUp => self.move_selection(-10),
             Action::FocusLeft => {
-                self.focus.pane = Pane::List;
+                self.focus.pane = match self.focus.pane {
+                    Pane::Detail => Pane::List,
+                    Pane::List | Pane::Sidebar => Pane::Sidebar,
+                };
                 self.focus.section_item = 0;
             }
             Action::FocusRight => {
-                self.focus.pane = Pane::Detail;
+                self.focus.pane = match self.focus.pane {
+                    Pane::Sidebar => Pane::List,
+                    Pane::List | Pane::Detail => Pane::Detail,
+                };
                 self.focus.section_item = 0;
             }
             Action::ResetSplit => self.split_ratio = 50,
@@ -184,8 +211,9 @@ impl AppState {
             }
             Action::FocusNext => {
                 self.focus.pane = match self.focus.pane {
+                    Pane::Sidebar => Pane::List,
                     Pane::List => Pane::Detail,
-                    Pane::Detail => Pane::List,
+                    Pane::Detail => Pane::Sidebar,
                 };
                 self.focus.section_item = 0;
             }
@@ -204,6 +232,11 @@ impl AppState {
             Action::ToggleSelected => self.handle_space(),
             Action::ToggleQuickActions => self.quick_actions_open = !self.quick_actions_open,
             Action::CloseQuickActions => self.quick_actions_open = false,
+            Action::ApplySidebarSelection => {
+                if self.focus.pane == Pane::Sidebar {
+                    self.apply_sidebar_selection();
+                }
+            }
             Action::EnterVisual => {
                 if self.focus.pane == Pane::List && self.page == Page::Tasks {
                     self.mode = Mode::Visual;
@@ -362,17 +395,27 @@ impl AppState {
     fn move_selection(&mut self, delta: i32) {
         match self.page {
             Page::Tasks => {
+                if self.focus.pane == Pane::Sidebar {
+                    self.move_sidebar(delta);
+                    return;
+                }
                 if self.focus.pane == Pane::Detail {
                     self.move_detail_section_item(delta);
                     return;
                 }
-                if self.tasks.is_empty() {
+                let visible = self.visible_task_indices();
+                if visible.is_empty() {
                     return;
                 }
-                let len = self.tasks.len() as i32;
-                let next = (self.selected_task as i32 + delta).rem_euclid(len);
-                self.selected_task = next as usize;
-                self.task_list_state.select(Some(self.selected_task));
+                let cur = visible
+                    .iter()
+                    .position(|&i| i == self.selected_task)
+                    .unwrap_or(0);
+                let len = visible.len() as i32;
+                let next = (cur as i32 + delta).rem_euclid(len) as usize;
+                self.selected_task = visible[next];
+                // ListState position is relative to visible slice, not full tasks.
+                self.task_list_state.select(Some(next));
                 self.focus.section_item = 0;
                 if self.mode == Mode::Visual {
                     if let Some(t) = self.tasks.get(self.selected_task) {
@@ -396,6 +439,29 @@ impl AppState {
                 }
             }
         }
+    }
+
+    fn move_sidebar(&mut self, delta: i32) {
+        let total = crate::filter::SIDEBAR_ITEMS.len() as i32;
+        let next = (self.focus.sidebar_item as i32 + delta).rem_euclid(total);
+        self.focus.sidebar_item = next as usize;
+    }
+
+    /// Apply currently-highlighted sidebar item as the active filter.
+    pub fn apply_sidebar_selection(&mut self) {
+        let idx = self.focus.sidebar_item.min(crate::filter::SIDEBAR_ITEMS.len() - 1);
+        let new_filter = crate::filter::SIDEBAR_ITEMS[idx];
+        self.active_filter = new_filter;
+        self.status_msg = Some(format!("filter: {}", new_filter.label()));
+        // Reset cursor to first visible task.
+        let visible = self.visible_task_indices();
+        if let Some(&first) = visible.first() {
+            self.selected_task = first;
+            self.task_list_state.select(Some(0));
+        } else {
+            self.task_list_state.select(None);
+        }
+        self.focus.pane = Pane::List;
     }
 
     fn move_detail_section_item(&mut self, delta: i32) {

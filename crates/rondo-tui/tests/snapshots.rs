@@ -88,3 +88,18 @@ fn wide_terminal() {
     let s = snapshot("wide_terminal", 160, 40, |_| {});
     assert_snapshot!(s);
 }
+
+#[test]
+fn help_overlay() {
+    let s = snapshot("help_overlay", 120, 32, |a| a.help_open = true);
+    assert_snapshot!(s);
+}
+
+#[test]
+fn search_overlay() {
+    let s = snapshot("search_overlay", 120, 32, |a| {
+        a.search_open = true;
+        a.search_buf = "deploy".to_string();
+    });
+    assert_snapshot!(s);
+}

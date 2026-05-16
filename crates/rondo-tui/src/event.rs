@@ -3,8 +3,14 @@ use crate::app::AppState;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 pub fn map(ev: Event, app: &AppState) -> Option<Action> {
+    if app.help_open {
+        return help_key(ev);
+    }
     if app.command_palette_open {
         return palette_key(ev, app);
+    }
+    if app.search_open {
+        return search_key(ev, app);
     }
     match ev {
         Event::Key(k) => key_to_action(k),
@@ -14,6 +20,16 @@ pub fn map(ev: Event, app: &AppState) -> Option<Action> {
         }),
         _ => None,
     }
+}
+
+fn help_key(ev: Event) -> Option<Action> {
+    let Event::Key(k) = ev else {
+        return None;
+    };
+    Some(match k.code {
+        KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('?') => Action::CloseHelp,
+        _ => return None,
+    })
 }
 
 fn palette_key(ev: Event, app: &AppState) -> Option<Action> {
@@ -37,20 +53,51 @@ fn palette_key(ev: Event, app: &AppState) -> Option<Action> {
     })
 }
 
+fn search_key(ev: Event, app: &AppState) -> Option<Action> {
+    let Event::Key(k) = ev else {
+        return None;
+    };
+    Some(match k.code {
+        KeyCode::Esc => Action::CloseSearch,
+        KeyCode::Enter => Action::CloseSearch,
+        KeyCode::Backspace => Action::SearchUpdate({
+            let mut s = app.search_buf.clone();
+            s.pop();
+            s
+        }),
+        KeyCode::Char(c) => Action::SearchUpdate({
+            let mut s = app.search_buf.clone();
+            s.push(c);
+            s
+        }),
+        _ => return None,
+    })
+}
+
 fn key_to_action(k: KeyEvent) -> Option<Action> {
     let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
     Some(match k.code {
         KeyCode::Char('q') if !ctrl => Action::Quit,
         KeyCode::Char('c') if ctrl => Action::Quit,
+        KeyCode::Char('d') if ctrl => Action::HalfPageDown,
+        KeyCode::Char('u') if ctrl => Action::HalfPageUp,
         KeyCode::Char('j') | KeyCode::Down => Action::NextItem,
         KeyCode::Char('k') | KeyCode::Up => Action::PrevItem,
-        KeyCode::Tab => Action::FocusNext,
+        KeyCode::Char('g') => Action::JumpTop,
+        KeyCode::Char('G') => Action::JumpBottom,
+        KeyCode::Char('h') => Action::FocusLeft,
+        KeyCode::Char('l') => Action::FocusRight,
+        KeyCode::Tab => Action::NextTab,
+        KeyCode::BackTab => Action::PrevTab,
         KeyCode::Char('1') => Action::TogglePage(Page::Tasks),
         KeyCode::Char('2') => Action::TogglePage(Page::Journal),
         KeyCode::Char('p') => Action::TogglePomodoro,
         KeyCode::Char(':') => Action::OpenCommandPalette,
-        KeyCode::Char('<') => Action::ResizeSplit { delta: -2 },
-        KeyCode::Char('>') => Action::ResizeSplit { delta: 2 },
+        KeyCode::Char('/') => Action::OpenSearch,
+        KeyCode::Char('?') => Action::ToggleHelp,
+        KeyCode::Char('<') => Action::ResizeSplit { delta: -5 },
+        KeyCode::Char('>') => Action::ResizeSplit { delta: 5 },
+        KeyCode::Char('=') => Action::ResetSplit,
         KeyCode::Esc => Action::EscapeContext,
         _ => return None,
     })

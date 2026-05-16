@@ -19,9 +19,24 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
     if app.pomodoro_open {
         components::pomodoro::draw(app, f, centered(44, 11, f.area()));
     }
+    if app.search_open {
+        components::search::draw(app, f, search_rect(f.area()));
+    }
     if app.command_palette_open {
         components::command_palette::draw(app, f, palette_rect(f.area()));
     }
+    if app.help_open {
+        components::help::draw(app, f, centered(56, 28, f.area()));
+    }
+}
+
+fn search_rect(area: Rect) -> Rect {
+    let h = 3u16.min(area.height.saturating_sub(4));
+    let [_, anchored] = Layout::vertical([Constraint::Min(0), Constraint::Length(h)])
+        .flex(Flex::End)
+        .margin(2)
+        .areas(area);
+    anchored
 }
 
 fn body(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {

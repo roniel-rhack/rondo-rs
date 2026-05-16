@@ -29,6 +29,9 @@ pub struct AppState {
     pub pomodoro_throbber: ThrobberState,
     pub command_palette_open: bool,
     pub command_buf: String,
+    pub help_open: bool,
+    pub search_open: bool,
+    pub search_buf: String,
     pub should_quit: bool,
     pub status_msg: Option<String>,
     pub plugins: PluginRegistry,
@@ -77,6 +80,9 @@ impl AppState {
             pomodoro_throbber: ThrobberState::default(),
             command_palette_open: false,
             command_buf: String::new(),
+            help_open: false,
+            search_open: false,
+            search_buf: String::new(),
             should_quit: false,
             status_msg: None,
             plugins: PluginRegistry::new(),
@@ -87,6 +93,24 @@ impl AppState {
     pub fn update(&mut self, action: Action) {
         match action {
             Action::Quit => self.should_quit = true,
+            Action::JumpTop => self.jump_selection(0),
+            Action::JumpBottom => self.jump_selection_end(),
+            Action::HalfPageDown => self.move_selection(10),
+            Action::HalfPageUp => self.move_selection(-10),
+            Action::FocusLeft => self.focus_left = true,
+            Action::FocusRight => self.focus_left = false,
+            Action::ResetSplit => self.split_ratio = 50,
+            Action::OpenHelp | Action::ToggleHelp => self.help_open = !self.help_open,
+            Action::CloseHelp => self.help_open = false,
+            Action::OpenSearch => {
+                self.search_open = true;
+                self.search_buf.clear();
+            }
+            Action::CloseSearch => {
+                self.search_open = false;
+                self.search_buf.clear();
+            }
+            Action::SearchUpdate(s) => self.search_buf = s,
             Action::Tick => {
                 if self.pomodoro_open {
                     self.pomodoro_throbber.calc_next();
@@ -96,6 +120,18 @@ impl AppState {
             Action::NextItem => self.move_selection(1),
             Action::PrevItem => self.move_selection(-1),
             Action::TogglePage(p) => self.page = p,
+            Action::NextTab => {
+                self.page = match self.page {
+                    Page::Tasks => Page::Journal,
+                    Page::Journal => Page::Tasks,
+                };
+            }
+            Action::PrevTab => {
+                self.page = match self.page {
+                    Page::Tasks => Page::Journal,
+                    Page::Journal => Page::Tasks,
+                };
+            }
             Action::FocusNext => self.focus_left = !self.focus_left,
             Action::ResizeSplit { delta } => {
                 let new = self.split_ratio as i32 + delta as i32;
@@ -124,8 +160,13 @@ impl AppState {
             Action::SearchInput(s) => self.command_buf = s,
             Action::SubmitCommand(cmd) => self.handle_command(cmd),
             Action::EscapeContext => {
-                if self.command_palette_open {
+                if self.help_open {
+                    self.help_open = false;
+                } else if self.command_palette_open {
                     self.command_palette_open = false;
+                } else if self.search_open {
+                    self.search_open = false;
+                    self.search_buf.clear();
                 } else if self.pomodoro_open {
                     self.pomodoro_open = false;
                     self.pomodoro_started = None;
@@ -134,6 +175,39 @@ impl AppState {
                 }
             }
             _ => {}
+        }
+    }
+
+    fn jump_selection(&mut self, idx: usize) {
+        match self.page {
+            Page::Tasks if !self.tasks.is_empty() => {
+                self.selected_task = idx.min(self.tasks.len() - 1);
+                self.task_list_state.select(Some(self.selected_task));
+            }
+            Page::Journal if !self.journal_notes.is_empty() => {
+                self.selected_journal = idx.min(self.journal_notes.len() - 1);
+                self.journal_list_state.select(Some(self.selected_journal));
+                self.reload_journal_entries();
+            }
+            _ => {}
+        }
+    }
+
+    fn jump_selection_end(&mut self) {
+        match self.page {
+            Page::Tasks if !self.tasks.is_empty() => self.jump_selection(self.tasks.len() - 1),
+            Page::Journal if !self.journal_notes.is_empty() => {
+                self.jump_selection(self.journal_notes.len() - 1)
+            }
+            _ => {}
+        }
+    }
+
+    fn reload_journal_entries(&mut self) {
+        if let Some(n) = self.journal_notes.get(self.selected_journal) {
+            if let Ok(e) = self.store.entries_for_note(n.id) {
+                self.journal_entries = e;
+            }
         }
     }
 

@@ -1,4 +1,5 @@
 use crate::action::{Action, Page};
+use crate::focus::{DetailSection, FocusState, Mode, Pane};
 use crate::theme::Theme;
 use color_eyre::eyre::Result;
 use ratatui::widgets::ListState;
@@ -17,7 +18,8 @@ pub struct AppState {
     pub tasks: Vec<Task>,
     pub selected_task: usize,
     pub task_list_state: ListState,
-    pub focus_left: bool,
+    pub focus: FocusState,
+    pub mode: Mode,
     pub split_ratio: u16,
     pub journal_notes: Vec<Note>,
     pub journal_entries: Vec<Entry>,
@@ -42,6 +44,11 @@ impl AppState {
     /// Returns true when an animation requires periodic redraw without user input.
     pub fn needs_animation_tick(&self) -> bool {
         self.pomodoro_open
+    }
+
+    /// Backward-compat shim — still used by some pane-render code paths to color borders.
+    pub fn focus_left(&self) -> bool {
+        self.focus.pane == Pane::List
     }
 }
 
@@ -68,7 +75,8 @@ impl AppState {
             tasks,
             selected_task: 0,
             task_list_state,
-            focus_left: true,
+            focus: FocusState::default(),
+            mode: Mode::Normal,
             split_ratio: 50,
             journal_notes,
             journal_entries,
@@ -97,8 +105,14 @@ impl AppState {
             Action::JumpBottom => self.jump_selection_end(),
             Action::HalfPageDown => self.move_selection(10),
             Action::HalfPageUp => self.move_selection(-10),
-            Action::FocusLeft => self.focus_left = true,
-            Action::FocusRight => self.focus_left = false,
+            Action::FocusLeft => {
+                self.focus.pane = Pane::List;
+                self.focus.section_item = 0;
+            }
+            Action::FocusRight => {
+                self.focus.pane = Pane::Detail;
+                self.focus.section_item = 0;
+            }
             Action::ResetSplit => self.split_ratio = 50,
             Action::OpenHelp | Action::ToggleHelp => self.help_open = !self.help_open,
             Action::CloseHelp => self.help_open = false,
@@ -132,7 +146,26 @@ impl AppState {
                     Page::Journal => Page::Tasks,
                 };
             }
-            Action::FocusNext => self.focus_left = !self.focus_left,
+            Action::FocusNext => {
+                self.focus.pane = match self.focus.pane {
+                    Pane::List => Pane::Detail,
+                    Pane::Detail => Pane::List,
+                };
+                self.focus.section_item = 0;
+            }
+            Action::NextSection => {
+                if self.focus.pane == Pane::Detail {
+                    self.focus.section = self.focus.section.next();
+                    self.focus.section_item = 0;
+                }
+            }
+            Action::PrevSection => {
+                if self.focus.pane == Pane::Detail {
+                    self.focus.section = self.focus.section.prev();
+                    self.focus.section_item = 0;
+                }
+            }
+            Action::ToggleSelected => self.handle_space(),
             Action::ResizeSplit { delta } => {
                 let new = self.split_ratio as i32 + delta as i32;
                 self.split_ratio = new.clamp(20, 80) as u16;
@@ -214,6 +247,10 @@ impl AppState {
     fn move_selection(&mut self, delta: i32) {
         match self.page {
             Page::Tasks => {
+                if self.focus.pane == Pane::Detail {
+                    self.move_detail_section_item(delta);
+                    return;
+                }
                 if self.tasks.is_empty() {
                     return;
                 }
@@ -221,6 +258,7 @@ impl AppState {
                 let next = (self.selected_task as i32 + delta).rem_euclid(len);
                 self.selected_task = next as usize;
                 self.task_list_state.select(Some(self.selected_task));
+                self.focus.section_item = 0;
             }
             Page::Journal => {
                 if self.journal_notes.is_empty() {
@@ -235,6 +273,53 @@ impl AppState {
                     .entries_for_note(self.journal_notes[self.selected_journal].id)
                 {
                     self.journal_entries = e;
+                }
+            }
+        }
+    }
+
+    fn move_detail_section_item(&mut self, delta: i32) {
+        let len = self.detail_section_len();
+        if len == 0 {
+            return;
+        }
+        let len_i = len as i32;
+        let next = (self.focus.section_item as i32 + delta).rem_euclid(len_i);
+        self.focus.section_item = next as usize;
+    }
+
+    fn detail_section_len(&self) -> usize {
+        let Some(task) = self.tasks.get(self.selected_task) else {
+            return 0;
+        };
+        match self.focus.section {
+            DetailSection::Header => 0,
+            DetailSection::Subtasks => task.subtasks.len(),
+            DetailSection::Dependencies => task.blocked_by_ids.len() + task.blocks_ids.len(),
+            DetailSection::Notes => task.notes.len(),
+        }
+    }
+
+    /// Space-bar action: meaning depends on focus context.
+    fn handle_space(&mut self) {
+        if self.focus.pane != Pane::Detail {
+            return;
+        }
+        // Subtask toggle is the headline interaction.
+        if self.focus.section == DetailSection::Subtasks {
+            let task_id = match self.tasks.get(self.selected_task) {
+                Some(t) => t.id,
+                None => return,
+            };
+            let item_idx = self.focus.section_item;
+            if let Some(task) = self.tasks.get_mut(self.selected_task) {
+                if let Some(st) = task.subtasks.get_mut(item_idx) {
+                    st.completed = !st.completed;
+                    self.status_msg = Some(format!(
+                        "toggled subtask #{} (in-memory; read-only store)",
+                        st.id
+                    ));
+                    let _ = task_id;
                 }
             }
         }

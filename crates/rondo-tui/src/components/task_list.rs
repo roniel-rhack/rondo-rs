@@ -12,7 +12,7 @@ use rondo_core::domain::task::Status;
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
     let title = format!("Tasks ({})", app.tasks.len());
-    let block = t.panel(&title, app.focus_left);
+    let block = t.panel(&title, app.focus_left());
 
     if app.tasks.is_empty() {
         let lines = vec![

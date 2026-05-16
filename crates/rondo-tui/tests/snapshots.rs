@@ -117,6 +117,18 @@ fn empty_tasks() {
 }
 
 #[test]
+fn detail_focused_subtasks_section() {
+    let s = snapshot("detail_focused_subtasks_section", 120, 32, |a| {
+        a.focus.pane = rondo_tui::focus::Pane::Detail;
+        a.focus.section = rondo_tui::focus::DetailSection::Subtasks;
+        a.focus.section_item = 1;
+        a.selected_task = 2; // Review API spec has 5 subtasks
+        a.task_list_state.select(Some(2));
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
 fn empty_journal() {
     let s = snapshot("empty_journal", 120, 32, |a| {
         a.page = Page::Journal;

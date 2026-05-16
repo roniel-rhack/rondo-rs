@@ -49,7 +49,7 @@ fn body(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         Page::Tasks => {
             if narrow {
                 // Single-pane: show whichever side has focus.
-                if app.focus_left {
+                if app.focus_left() {
                     components::task_list::draw(app, f, area);
                 } else {
                     components::task_detail::draw(app, f, area);

@@ -21,6 +21,9 @@ pub enum Action {
     FocusNext,
     FocusLeft,
     FocusRight,
+    NextSection,
+    PrevSection,
+    ToggleSelected,
     ResizeSplit { delta: i16 },
     ResetSplit,
 

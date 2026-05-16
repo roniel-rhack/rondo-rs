@@ -1,4 +1,5 @@
 use crate::app::AppState;
+use crate::focus::{DetailSection, Pane};
 use crate::widgets::{due_badge, markdown, priority_badge, progress_bar};
 use ratatui::{
     layout::Rect,
@@ -11,7 +12,7 @@ use rondo_core::domain::task::Status;
 
 pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
-    let active = !app.focus_left;
+    let active = !app.focus_left();
 
     let task = match app.tasks.get(app.selected_task) {
         Some(x) => x,
@@ -115,12 +116,17 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
     let (done, total) = task.subtask_progress();
     if total > 0 {
-        lines.push(Line::from(Span::styled(
-            format!("Subtasks ({}/{})", done, total),
-            t.accent_style(),
-        )));
+        let section_active = app.focus.pane == Pane::Detail
+            && app.focus.section == DetailSection::Subtasks;
+        lines.push(section_header("Subtasks", &format!("{}/{}", done, total), section_active, t));
         lines.push(progress_bar::line(done, total, 30, t));
-        for st in &task.subtasks {
+        for (i, st) in task.subtasks.iter().enumerate() {
+            let cursor_here = section_active && app.focus.section_item == i;
+            let gutter = if cursor_here {
+                Span::styled("▌ ", Style::default().fg(t.accent))
+            } else {
+                Span::raw("  ")
+            };
             let (icon, st_style) = if st.completed {
                 (
                     "✓",
@@ -132,7 +138,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
                 ("○", Style::default().fg(t.fg))
             };
             lines.push(Line::from(vec![
-                Span::raw("  "),
+                gutter,
                 Span::styled(
                     icon,
                     Style::default().fg(if st.completed {
@@ -193,6 +199,27 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         Paragraph::new(lines).wrap(Wrap { trim: false }).block(block),
         area,
     );
+}
+
+fn section_header(name: &str, count: &str, active: bool, t: &crate::theme::Theme) -> Line<'static> {
+    let underline = if active {
+        Modifier::BOLD | Modifier::UNDERLINED
+    } else {
+        Modifier::BOLD
+    };
+    Line::from(vec![
+        Span::styled(
+            format!("── {} ", name),
+            Style::default()
+                .fg(if active { t.accent } else { t.fg_muted })
+                .add_modifier(underline),
+        ),
+        Span::styled(
+            count.to_string(),
+            Style::default().fg(t.fg_muted),
+        ),
+        Span::styled(" ──", Style::default().fg(t.border_inactive)),
+    ])
 }
 
 fn format_duration(secs: i64) -> String {

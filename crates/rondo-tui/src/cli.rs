@@ -146,21 +146,25 @@ fn cli_done(db_path: &Path, opts: &CliOpts, id: i64) -> Result<()> {
 fn cli_export(db_path: &Path, _opts: &CliOpts, format: &str) -> Result<()> {
     let store = SqliteStore::open_readonly(db_path)?;
     let tasks = store.list_tasks()?;
-    match format {
-        "md" | "markdown" => {
-            print!("{}", rondo_core::export::to_markdown(&tasks));
-        }
-        "json" => {
-            println!("{}", rondo_core::export::to_json(&tasks)?);
-        }
-        "ndjson" => {
-            let mut stdout = std::io::stdout().lock();
-            rondo_core::export::to_ndjson(&tasks, &mut stdout)?;
-        }
-        other => {
-            eprintln!("error: unknown export format `{other}` (expected md|json|ndjson)");
-            std::process::exit(2);
-        }
+    let reg = rondo_core::export::ExporterRegistry::with_builtins();
+    let key = if format == "markdown" { "md" } else { format };
+    let Some(exp) = reg.get(key) else {
+        let ids = reg
+            .list()
+            .iter()
+            .map(|(id, _)| *id)
+            .collect::<Vec<_>>()
+            .join("|");
+        eprintln!("error: unknown export format `{format}` (expected {ids})");
+        std::process::exit(2);
+    };
+    let out = exp.export(&tasks)?;
+    if exp.format_id() == "ndjson" {
+        print!("{}", out);
+    } else if exp.format_id() == "json" {
+        println!("{}", out);
+    } else {
+        print!("{}", out);
     }
     Ok(())
 }

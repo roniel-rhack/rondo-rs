@@ -44,6 +44,7 @@ impl AppState {
         plugins.register(Box::new(
             crate::plugins::builtin::dep_graph::DepGraphPlugin::new(Arc::clone(&store)),
         ));
+        plugins.register(Box::new(crate::plugins::builtin::analytics::AnalyticsPlugin));
         Ok(Self {
             data: DataState::new(store)?,
             ui: UiState::default(),

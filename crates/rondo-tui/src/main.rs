@@ -126,6 +126,9 @@ fn register_builtin_plugins(app: &mut AppState) {
     app.plugins.register(Box::new(
         rondo_tui::plugins::builtin::focus_page::FocusPagePlugin::new(app.data.store.clone()),
     ));
+    app.plugins.register(Box::new(
+        rondo_tui::plugins::builtin::calendar::CalendarPlugin::new(app.data.store.clone()),
+    ));
 }
 
 fn run(terminal: &mut tui::Tui, app: &mut AppState) -> Result<()> {

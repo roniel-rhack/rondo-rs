@@ -13,7 +13,7 @@ use std::path::Path;
 use std::sync::Mutex;
 
 pub struct SqliteStore {
-    conn: Mutex<Connection>,
+    pub(super) conn: Mutex<Connection>,
 }
 
 impl SqliteStore {

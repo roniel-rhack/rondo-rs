@@ -124,3 +124,15 @@ pub const LIST_ALL_JOURNAL_NOTES: &str = r#"
 SELECT id, date, hidden, created_at, updated_at
 FROM journal_notes ORDER BY date DESC LIMIT 365
 "#;
+
+pub const KV_GET: &str = "SELECT value FROM plugin_kv WHERE plugin_id = ?1 AND key = ?2";
+
+pub const KV_SET: &str = r#"
+INSERT INTO plugin_kv (plugin_id, key, value, updated_at) VALUES (?1, ?2, ?3, ?4)
+ON CONFLICT (plugin_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+"#;
+
+pub const KV_DELETE: &str = "DELETE FROM plugin_kv WHERE plugin_id = ?1 AND key = ?2";
+
+pub const KV_LIST_FOR_PLUGIN: &str =
+    "SELECT key FROM plugin_kv WHERE plugin_id = ?1 ORDER BY key";

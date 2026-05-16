@@ -1,6 +1,6 @@
 use rusqlite::Connection;
 
-pub const CURRENT_VERSION: u32 = 2;
+pub const CURRENT_VERSION: u32 = 3;
 
 #[derive(Debug, thiserror::Error)]
 pub enum MigrationError {
@@ -31,6 +31,9 @@ pub fn migrate(conn: &Connection) -> Result<u32, MigrationError> {
     if from < 2 {
         migrate_to_v2(conn)?;
     }
+    if from < 3 {
+        migrate_to_v3(conn)?;
+    }
     set_user_version(conn, CURRENT_VERSION)?;
     Ok(CURRENT_VERSION)
 }
@@ -60,6 +63,25 @@ fn migrate_to_v2(conn: &Connection) -> Result<(), MigrationError> {
           FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
         );
         CREATE INDEX IF NOT EXISTS idx_focus_sessions_started_at ON focus_sessions(started_at);
+        "#,
+    )?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// v2 → v3: create `plugin_kv` table for plugin-scoped key/value blobs.
+fn migrate_to_v3(conn: &Connection) -> Result<(), MigrationError> {
+    let tx = conn.unchecked_transaction()?;
+    tx.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS plugin_kv (
+          plugin_id TEXT NOT NULL,
+          key TEXT NOT NULL,
+          value BLOB NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (plugin_id, key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_plugin_kv_plugin ON plugin_kv(plugin_id);
         "#,
     )?;
     tx.commit()?;

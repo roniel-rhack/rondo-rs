@@ -18,6 +18,9 @@ struct Cli {
     /// Disable all animations
     #[arg(long)]
     reduced_motion: bool,
+    /// Enable write access. Default: read-only (safer during M1-M3).
+    #[arg(long)]
+    write: bool,
 }
 
 fn main() -> Result<()> {
@@ -39,9 +42,21 @@ fn main() -> Result<()> {
         );
         std::process::exit(2);
     }
-    let store = Arc::new(rondo_core::store::sqlite::SqliteStore::open_readonly(
-        &db_path,
-    )?);
+    let store = if cli.write {
+        let backup_dir = rondo_core::store::backup::default_backup_dir();
+        rondo_core::store::backup::rotate(&backup_dir, 30);
+        match rondo_core::store::backup::snapshot(&db_path, &backup_dir) {
+            Ok(p) => tracing::info!("backup snapshot: {}", p.display()),
+            Err(e) => tracing::warn!("backup failed (continuing without): {}", e),
+        }
+        Arc::new(rondo_core::store::sqlite::SqliteStore::open_readwrite(
+            &db_path,
+        )?)
+    } else {
+        Arc::new(rondo_core::store::sqlite::SqliteStore::open_readonly(
+            &db_path,
+        )?)
+    };
     let no_color_active = a11y::no_color() || cli.no_color;
     let reduced = a11y::reduced_motion(cli.reduced_motion);
     let mut app = AppState::new(store)?;

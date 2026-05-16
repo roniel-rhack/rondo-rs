@@ -24,6 +24,21 @@ impl SqliteStore {
         })
     }
 
+    pub fn open_readwrite<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let conn = Connection::open_with_flags(
+            path.as_ref(),
+            OpenFlags::SQLITE_OPEN_READ_WRITE
+                | OpenFlags::SQLITE_OPEN_CREATE
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )?;
+        conn.pragma_update(None, "journal_mode", "WAL")?;
+        conn.pragma_update(None, "foreign_keys", "ON")?;
+        conn.pragma_update(None, "synchronous", "NORMAL")?;
+        Ok(Self {
+            conn: Mutex::new(conn),
+        })
+    }
+
     pub fn list_tasks(&self) -> Result<Vec<Task>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(super::queries::LIST_TASKS)?;

@@ -191,6 +191,24 @@ fn detail_focused_subtasks_section() {
 }
 
 #[test]
+fn confirm_delete_overlay() {
+    let s = snapshot("confirm_delete_overlay", 120, 32, |a| {
+        a.modals.confirm_delete_open = true;
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn edit_title_overlay() {
+    let s = snapshot("edit_title_overlay", 120, 32, |a| {
+        a.modals.edit_title_open = true;
+        a.modals.edit_title_buf = "ship the demo".to_string();
+        a.ui.mode = rondo_tui::focus::Mode::Insert;
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
 fn empty_journal() {
     let s = snapshot("empty_journal", 120, 32, |a| {
         a.ui.page = Page::Journal;

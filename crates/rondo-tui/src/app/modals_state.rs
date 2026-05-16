@@ -22,6 +22,9 @@ pub struct ModalsState {
     pub journal_editor_open: bool,
     pub journal_editor_buf: String,
     pub sort_overlay_open: bool,
+    pub confirm_delete_open: bool,
+    pub edit_title_open: bool,
+    pub edit_title_buf: String,
 }
 
 impl Default for ModalsState {
@@ -43,6 +46,9 @@ impl Default for ModalsState {
             journal_editor_open: false,
             journal_editor_buf: String::new(),
             sort_overlay_open: false,
+            confirm_delete_open: false,
+            edit_title_open: false,
+            edit_title_buf: String::new(),
         }
     }
 }
@@ -58,6 +64,8 @@ impl ModalsState {
             || self.quick_add_open
             || self.journal_editor_open
             || self.sort_overlay_open
+            || self.confirm_delete_open
+            || self.edit_title_open
     }
 
     /// Pure modal mutations that don't need cross-substate access.
@@ -118,6 +126,10 @@ impl ModalsState {
             Action::JournalCancelEntry => {
                 self.journal_editor_open = false;
                 self.journal_editor_buf.clear();
+                None
+            }
+            Action::EditTitleInput(s) => {
+                self.edit_title_buf = s;
                 None
             }
             Action::OpenSortOverlay => {

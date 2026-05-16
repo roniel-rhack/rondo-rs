@@ -67,6 +67,15 @@ pub enum Action {
     CloseSortOverlay,
     SetSortOrder(crate::app::ui_state::SortOrder),
 
+    RequestDeleteTask,
+    ConfirmDeleteTask,
+    CancelDelete,
+    RequestEditTitle,
+    EditTitleInput(String),
+    SubmitEditTitle(String),
+    CancelEditTitle,
+    ToggleFocusedSubtask,
+
     Error(String),
 }
 

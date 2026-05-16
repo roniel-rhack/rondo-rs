@@ -1,5 +1,7 @@
 pub mod analytics;
 pub mod command_palette;
+pub mod confirm;
+pub mod edit_title;
 pub mod filter_strip;
 pub mod footer;
 pub mod header;

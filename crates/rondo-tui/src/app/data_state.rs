@@ -54,6 +54,31 @@ impl DataState {
         })
     }
 
+    /// Currently selected task (if any), as a reference.
+    pub fn selected_task(&self) -> Option<&Task> {
+        self.tasks.get(self.selected_task)
+    }
+
+    /// Currently selected task id, if any.
+    pub fn selected_task_id(&self) -> Option<i64> {
+        self.tasks.get(self.selected_task).map(|t| t.id)
+    }
+
+    /// Reload tasks from the store. Used after mutations to keep the
+    /// in-memory list in sync with persisted state.
+    pub fn refresh_tasks(&mut self) {
+        if let Ok(tasks) = self.store.list_tasks() {
+            self.tasks = tasks;
+        }
+        if self.tasks.is_empty() {
+            self.selected_task = 0;
+            self.task_list_state.select(None);
+        } else if self.selected_task >= self.tasks.len() {
+            self.selected_task = self.tasks.len() - 1;
+            self.task_list_state.select(Some(self.selected_task));
+        }
+    }
+
     /// Reload journal notes from the store, honoring the `journal_show_hidden` flag.
     /// Also refreshes entries for the currently-selected note (clamped).
     pub fn refresh_journal_notes(&mut self) {

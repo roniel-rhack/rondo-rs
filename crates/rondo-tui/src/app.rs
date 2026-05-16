@@ -48,6 +48,11 @@ pub struct AppState {
     pub leader_goto: bool,
     pub fx: crate::fx::FxManager,
     pub last_footer_rect: ratatui::layout::Rect,
+    pub last_task_list_rect: ratatui::layout::Rect,
+    pub last_detail_rect: ratatui::layout::Rect,
+    pub last_body_rect: ratatui::layout::Rect,
+    pub last_pomodoro_rect: ratatui::layout::Rect,
+    pub last_quick_add_rect: ratatui::layout::Rect,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,6 +67,18 @@ impl AppState {
     /// Returns true when an animation requires periodic redraw without user input.
     pub fn needs_animation_tick(&self) -> bool {
         self.pomodoro_open || self.flash.is_some() || self.fx.any_running()
+    }
+
+    /// Spawn a sweep transition over the body when changing pages.
+    fn spawn_page_swap(&mut self) {
+        if self.last_body_rect.width > 0 {
+            let eff = crate::fx::presets::page_swap(self.theme.bg);
+            self.fx.spawn(
+                crate::fx::EffectId::PageSwap,
+                eff,
+                self.last_body_rect,
+            );
+        }
     }
 
     /// Spawn a status-toast effect on the footer area.
@@ -171,6 +188,11 @@ impl AppState {
             leader_goto: false,
             fx: crate::fx::FxManager::new(),
             last_footer_rect: ratatui::layout::Rect::default(),
+            last_task_list_rect: ratatui::layout::Rect::default(),
+            last_detail_rect: ratatui::layout::Rect::default(),
+            last_body_rect: ratatui::layout::Rect::default(),
+            last_pomodoro_rect: ratatui::layout::Rect::default(),
+            last_quick_add_rect: ratatui::layout::Rect::default(),
         })
     }
 
@@ -220,18 +242,21 @@ impl AppState {
             }
             Action::NextItem => self.move_selection(1),
             Action::PrevItem => self.move_selection(-1),
-            Action::TogglePage(p) => self.page = p,
-            Action::NextTab => {
-                self.page = match self.page {
-                    Page::Tasks => Page::Journal,
-                    Page::Journal => Page::Tasks,
-                };
+            Action::TogglePage(p) => {
+                if p != self.page {
+                    self.page = p;
+                    self.spawn_page_swap();
+                }
             }
-            Action::PrevTab => {
-                self.page = match self.page {
+            Action::NextTab | Action::PrevTab => {
+                let next = match self.page {
                     Page::Tasks => Page::Journal,
                     Page::Journal => Page::Tasks,
                 };
+                if next != self.page {
+                    self.page = next;
+                    self.spawn_page_swap();
+                }
             }
             Action::FocusNext => {
                 self.focus.pane = match self.focus.pane {
@@ -288,7 +313,15 @@ impl AppState {
                     if let Some(first) = ids.first() {
                         self.flash = Some((FlashTarget::Task(*first), Instant::now()));
                     }
-                    self.status_msg = Some(format!(
+                    if self.last_task_list_rect.width > 0 {
+                        let eff = crate::fx::presets::task_done_sweep(self.theme.fg_muted);
+                        self.fx.spawn(
+                            crate::fx::EffectId::TaskDone(ids.first().copied().unwrap_or(0)),
+                            eff,
+                            self.last_task_list_rect,
+                        );
+                    }
+                    self.toast(format!(
                         "toggled {} tasks (in-memory)",
                         self.selection.len()
                     ));
@@ -336,12 +369,21 @@ impl AppState {
                 self.split_ratio = new.clamp(20, 80) as u16;
             }
             Action::TogglePomodoro | Action::OpenPomodoro => {
-                self.pomodoro_open = !self.pomodoro_open || matches!(action, Action::OpenPomodoro);
+                let was_open = self.pomodoro_open;
+                self.pomodoro_open = !was_open || matches!(action, Action::OpenPomodoro);
                 if self.pomodoro_open && self.pomodoro_started.is_none() {
                     self.pomodoro_started = Some(Instant::now());
                 }
                 if !self.pomodoro_open {
                     self.pomodoro_started = None;
+                }
+                if self.pomodoro_open && !was_open && self.last_pomodoro_rect.width > 0 {
+                    let eff = crate::fx::presets::pomodoro_open(self.theme.accent);
+                    self.fx.spawn(
+                        crate::fx::EffectId::PomodoroOpen,
+                        eff,
+                        self.last_pomodoro_rect,
+                    );
                 }
             }
             Action::ClosePomodoro => {
@@ -544,8 +586,16 @@ impl AppState {
             }
             if let Some(id) = flashed {
                 self.flash = Some((FlashTarget::Subtask(id), Instant::now()));
-                self.status_msg = Some(format!(
-                    "toggled subtask #{} (in-memory; read-only store)",
+                if self.last_detail_rect.width > 0 {
+                    let eff = crate::fx::presets::subtask_dissolve(self.theme.success);
+                    self.fx.spawn(
+                        crate::fx::EffectId::SubtaskToggle(id),
+                        eff,
+                        self.last_detail_rect,
+                    );
+                }
+                self.toast(format!(
+                    "subtask #{} toggled (in-memory)",
                     id
                 ));
             }
@@ -560,8 +610,16 @@ impl AppState {
         if parsed.title.is_empty() {
             return;
         }
-        self.status_msg = Some(format!(
-            "queued: '{}' (tags={:?} prio={:?} due={:?}) — read-only store",
+        if self.last_task_list_rect.width > 0 {
+            let eff = crate::fx::presets::quick_add_slide(self.theme.bg);
+            self.fx.spawn(
+                crate::fx::EffectId::QuickAddInsert,
+                eff,
+                self.last_task_list_rect,
+            );
+        }
+        self.toast(format!(
+            "queued: '{}' (tags={:?} prio={:?} due={:?})",
             parsed.title, parsed.tags, parsed.priority, parsed.due
         ));
     }

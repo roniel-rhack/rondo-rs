@@ -30,13 +30,17 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
     app.last_footer_rect = chunks[3];
 
     if app.pomodoro_open {
-        components::pomodoro::draw(app, f, centered(60, 14, area));
+        let r = centered(60, 14, area);
+        app.last_pomodoro_rect = r;
+        components::pomodoro::draw(app, f, r);
     }
     if app.search_open {
         components::search::draw(app, f, search_rect(area));
     }
     if app.quick_add_open {
-        components::quick_add::draw(app, f, search_rect(area));
+        let r = search_rect(area);
+        app.last_quick_add_rect = r;
+        components::quick_add::draw(app, f, r);
     }
     if app.command_palette_open {
         components::command_palette::draw(app, f, palette_rect(area));
@@ -68,13 +72,16 @@ fn body_with_sidebar(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
 }
 
 fn body(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
+    app.last_body_rect = area;
     let narrow = area.width < NARROW_BREAKPOINT;
     match app.page {
         Page::Tasks => {
             if narrow {
                 if app.focus_left() {
+                    app.last_task_list_rect = area;
                     components::task_list::draw(app, f, area);
                 } else {
+                    app.last_detail_rect = area;
                     components::task_detail::draw(app, f, area);
                 }
             } else {
@@ -85,6 +92,8 @@ fn body(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
                         Constraint::Percentage(100 - app.split_ratio),
                     ])
                     .split(area);
+                app.last_task_list_rect = split[0];
+                app.last_detail_rect = split[1];
                 components::task_list::draw(app, f, split[0]);
                 components::task_detail::draw(app, f, split[1]);
             }

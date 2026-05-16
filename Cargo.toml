@@ -1,6 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["crates/rondo-core", "crates/rondo-plugin-api", "crates/rondo-tui"]
+members = [
+    "crates/rondo-core",
+    "crates/rondo-plugin-api",
+    "crates/rondo-plugin-host",
+    "crates/rondo-tui",
+]
 
 [workspace.package]
 version = "0.1.0"

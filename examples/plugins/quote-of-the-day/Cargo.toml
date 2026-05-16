@@ -1,0 +1,16 @@
+[package]
+name = "quote-of-the-day"
+version = "0.1.0"
+edition = "2021"
+
+# Note: real wasm build configures target wasm32-wasip1 via .cargo/config
+# This crate is the in-source reference for M8.4. Plugin SDK lives in
+# rondo-plugin-api so plugin authors can pull just that crate.
+[dependencies]
+rondo-plugin-api = { path = "../../../crates/rondo-plugin-api" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+
+[lib]
+crate-type = ["cdylib"]

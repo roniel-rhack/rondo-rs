@@ -1,240 +1,364 @@
-# RonDO Rust — Roadmap de funcionalidades faltantes
+# RonDO Rust — Roadmap revisado (post-architect review)
 
-Este documento es el plan operativo para llevar rondo-rust de "MVP visual aprobado" a "feature parity + ventaja propia sobre la versión Go". Cada hito tiene fases ordenadas por dependencia + reward:risk, con archivos a tocar.
+Este documento es el plan operativo para llevar rondo-rust de "MVP visual aprobado" a "feature parity + ventaja propia sobre la versión Go". Revisión completa tras feedback de 3 architects paralelos — los cambios estructurales están documentados al final ("Architect review summary").
 
 ## Estado actual
 
-✅ visual richness · sidebar interactivo · focus stack jerárquico · filtros · animaciones tachyonfx · plugin contract · 20 snapshot tests
+✅ visual richness · sidebar interactivo · focus stack jerárquico · filtros · animaciones tachyonfx · plugin contract embrionario · 20 snapshot tests
 
-❌ writes a la DB · CRUD desde TUI · CLI subcomandos · journal write · pomodoro persistence · recurrence engine · export · stats reales · plugin loader real · multi-device sync
+❌ writes a DB · CRUD desde TUI · CLI subcomandos · journal write · pomodoro persistence · recurrence engine · plugin loader real · sync
 
 ## Principios
 
-1. **Antes de tocar writes, garantizar backup automático** — el Go ya tiene backup diario. Honrar eso desde Rust.
-2. **Writes detrás de un flag explícito** (`--db` distinto OR `--write` flag). Mientras el flag esté OFF, la app es read-only para todas las paths nuevas. Cero riesgo de corromper datos reales.
-3. **Test de migración compatible** — Rust escribe → Go lee → Rust lee. Roundtrip verde antes de quitar el flag.
-4. **Cada fase deja la app shippable** (tests verdes, clippy limpio, `cargo run` corre).
+1. **Antes de tocar writes, garantizar backup automático** y schema migration test.
+2. **Writes detrás de `--write` flag explícito** hasta que `M1 + M4 + roundtrip harness verde` pasen.
+3. **Roundtrip test Rust↔Go** valida que ambos binarios producen el mismo set de instancias recurrentes antes de quitar el flag.
+4. **Plugin loader temprano** — adelantado al puesto 4 (antes de calendar/heatmap/graph) para que esos features nazcan como plugins, no deuda en core.
+5. **Cada fase deja la app shippable** (tests verdes, clippy limpio, `cargo run` corre).
 
 ---
 
-## M1 — Writes seguros + CRUD de tareas básico
+## M0 — Foundations (NUEVO — añadido por architect review)
 
-**Objetivo:** El usuario puede crear, editar, marcar y borrar tareas desde la TUI sin perder paridad con el binario Go.
+**Objetivo:** Refactor de tech debt + harness de testing crítico para que M1+ no se ahoguen en spaghetti.
 
-### Fase M1.1 — `SqliteStore` modo read-write + backup pre-write
+### Fase M0.1 — Substate split en AppState
 
-Files: `crates/rondo-core/src/store/sqlite.rs`, nuevo `crates/rondo-core/src/store/backup.rs`, `crates/rondo-tui/src/main.rs`, `CLAUDE.md`.
+Files: `crates/rondo-tui/src/app/{mod.rs,tasks_state.rs,journal_state.rs,modals_state.rs}`.
 
-- Añadir `SqliteStore::open_readwrite(path) -> Result<Self>` con `OpenFlags::SQLITE_OPEN_READ_WRITE | SQLITE_OPEN_CREATE`. Mantener `open_readonly` separado.
-- Pre-write backup: `backup::snapshot(db_path) -> PathBuf` copia DB con timestamp ISO a `~/.todo-app/backups/rondo-rust-{ts}.db`. Rotación 30 días (paridad con Go en `internal/database/backup.go`).
-- CLI flag `--write` en `main.rs`: si presente, abre RW; si no, RO (default).
-- Test: abrir RW + abrir RO sobre el mismo path verifican comportamiento.
+Hoy `AppState` tiene 30+ campos en un struct plano y `update()` es un match de 700 líneas. Antes de M1 (que sumará undo + modales de confirm + write paths), partir en:
 
-### Fase M1.2 — Schema migrations & `addColumnIfNotExists` parity
+```rust
+pub struct AppState {
+    pub data: DataState,          // store + tasks vec + journal_notes + entries
+    pub ui: UiState,              // focus, mode, split_ratio, selection
+    pub modals: ModalsState,      // help/palette/quickadd/search/pomodoro/quick_actions
+    pub fx: FxManager,
+    pub plugins: PluginRegistry + PluginHost,
+    pub config: Config,
+    pub theme: Theme,
+    pub should_quit: bool,
+}
+```
 
-Files: `crates/rondo-core/src/store/migrations.rs`, `crates/rondo-core/src/store/sqlite.rs`.
+Cada substate tiene su propio `update(action)`. `AppState::update()` se vuelve un dispatcher que enruta. ~1-2 noches.
 
-- Module `migrations` con función `ensure_schema(conn) -> Result<()>`:
-  - `PRAGMA user_version` para versioning explícito (Go usa `addColumnIfNotExists` por shape — equivalente).
-  - Bootstraps fresh DB con todas las tablas del seed.sql.
-  - Migración idempotente: si una columna falta, `ALTER TABLE ADD COLUMN`.
-- `SqliteStore::open_readwrite` corre migrations.
-- Test: tomar `fixtures/seed-v1.sql` (sin columna `metadata`), abrir RW, verificar migración OK.
+### Fase M0.2 — Roundtrip harness Rust↔Go
 
-### Fase M1.3 — Domain mutations en `rondo-core`
+Files: `crates/rondo-tui/tests/roundtrip/`.
+
+Script que verifica:
+1. Rust crea task X → cierra → Go lee X correctamente
+2. Go modifica X → cierra → Rust lee con cambios
+3. Recurrencia: Rust spawnea instancias → Go las ve y no duplica
+4. Backup creado por Rust → Go puede ignorarlo sin error
+
+Sin esto, M1 vuela ciego cuando quitemos el `--write` flag.
+
+### Fase M0.3 — Telemetry + crash reporter
+
+Files: `crates/rondo-core/src/telemetry.rs`.
+
+`tracing` a `~/.todo-app/logs/rondo-rust-{ts}.log`. Panic hook que escribe stack trace + estado parcial. Cap log a 7 días rotación.
+
+**Total M0:** 2-3 noches. Bloquea M1.3.
+
+---
+
+## M1 — Writes seguros + CRUD básico (revisado)
+
+**Objetivo:** CRUD desde TUI con backup + migrations. **Gate revisado:** no quitar `--write` flag hasta M1+M4+roundtrip verdes.
+
+### Fase M1.1 — SqliteStore RW + backup
+
+Files: `crates/rondo-core/src/store/{sqlite.rs,backup.rs}`, `crates/rondo-tui/src/main.rs`.
+
+- `SqliteStore::open_readwrite(path)` separado de `open_readonly`.
+- **Backups en sub-dir propio: `~/.todo-app/backups/rust/`** (no mezclar con la rotación del Go).
+- `backup::snapshot(path) -> PathBuf` copia DB con timestamp ISO antes de cada write session. Rotación 30 días.
+- CLI flag `--write` en `main.rs`: ausente → RO (default por toda M1-M3).
+
+### Fase M1.2 — Schema migrations
+
+Files: `crates/rondo-core/src/store/migrations.rs`.
+
+- `PRAGMA user_version` versioning explícito.
+- Migración idempotente con `ALTER TABLE ADD COLUMN IF NOT EXISTS`.
+- **Lock cooperativo**: `~/.todo-app/.rondo-rust.lock` con PID; warning si Go tiene la DB abierta.
+- Test: cargar `fixtures/seed-v1.sql` (sin columna `metadata`), verificar migración OK.
+
+### Fase M1.3 — Domain mutations API
 
 Files: `crates/rondo-core/src/store/sqlite.rs`, `crates/rondo-core/src/domain/task.rs`.
 
-API mínima:
 ```rust
-impl SqliteStore {
-    fn create_task(&self, input: NewTask) -> Result<i64>;
-    fn update_task(&self, id: i64, patch: TaskPatch) -> Result<()>;
-    fn delete_task(&self, id: i64) -> Result<()>;
-    fn set_status(&self, id: i64, status: Status) -> Result<()>;
-    fn add_subtask(&self, task_id: i64, title: &str) -> Result<i64>;
-    fn toggle_subtask(&self, subtask_id: i64) -> Result<bool>;
-    fn delete_subtask(&self, subtask_id: i64) -> Result<()>;
-    fn add_tag(&self, task_id: i64, name: &str) -> Result<()>;
-    fn remove_tag(&self, task_id: i64, name: &str) -> Result<()>;
-    fn append_metadata(&self, task_id: i64, key: &str, value: &str) -> Result<()>;
-}
-```
-`NewTask` / `TaskPatch` structs en `domain::task`. Patch usa `Option<T>` por campo para soportar partial updates. Todas las writes dentro de transacciones (`conn.transaction(...)`).
-
-Tests por método contra fixture temp DB.
-
-### Fase M1.4 — Wire CRUD desde TUI
-
-Files: `crates/rondo-tui/src/app.rs`, `crates/rondo-tui/src/components/quick_add.rs`, `crates/rondo-tui/src/components/task_detail.rs`, `crates/rondo-tui/src/event.rs`.
-
-- `submit_quick_add` ahora llama `store.create_task(parsed.into())` si modo RW. Toast cambia: "creada #N".
-- `handle_space` en Subtasks: llama `store.toggle_subtask(id)` si RW. Caída a in-memory si RO.
-- Bulk done en Visual: `store.set_status(id, Done)` por cada selected.
-- Bind `d` (List): `store.delete_task(id)` + confirm modal.
-- Bind `e` (Detail · Header section): inline edit del título.
-- Reload `app.tasks` después de cada mutación (re-query) — costo aceptable para personal scale.
-
-Test: snapshot del overlay de confirm delete + smoke test que cuenta tasks antes/después.
-
-### Fase M1.5 — Undo stack
-
-Files: `crates/rondo-tui/src/app.rs`, nuevo `crates/rondo-tui/src/undo.rs`.
-
-- `UndoEntry` enum con variants `TaskCreated(id)`, `TaskDeleted(snapshot)`, `StatusChanged{id, prev}`, etc.
-- `app.undo_stack: VecDeque<UndoEntry>` capacidad 50.
-- Bind `Ctrl+Z` (paridad Go). Aplica inverse op via store.
-- Snapshot test: crear → undo → estado igual al inicial.
-
----
-
-## M2 — Journal completo
-
-**Objetivo:** Escribir entradas, esconder/restaurar notas, navegar fechas con calendario.
-
-### Fase M2.1 — Journal write API
-
-Files: `crates/rondo-core/src/store/sqlite.rs`.
-
-```rust
-fn create_or_get_today_note(&self) -> Result<Note>;
-fn add_journal_entry(&self, note_id: i64, body: &str) -> Result<i64>;
-fn hide_note(&self, note_id: i64) -> Result<()>;
-fn restore_note(&self, note_id: i64) -> Result<()>;
-fn delete_entry(&self, entry_id: i64) -> Result<()>;
+fn create_task(&self, input: NewTask) -> Result<i64>;
+fn update_task(&self, id: i64, patch: TaskPatch) -> Result<UndoSnapshot>;
+fn delete_task(&self, id: i64) -> Result<UndoSnapshot>;
+fn set_status(&self, id: i64, status: Status) -> Result<UndoSnapshot>;
+fn add_subtask(&self, task_id: i64, title: &str) -> Result<i64>;
+fn toggle_subtask(&self, id: i64) -> Result<bool>;
+fn add_tag(&self, task_id: i64, name: &str) -> Result<()>;
+fn remove_tag(&self, task_id: i64, name: &str) -> Result<()>;
 ```
 
-### Fase M2.2 — TUI inline entry editor
+Cada mutate retorna `UndoSnapshot` (Task completa pre-cambio + child rows). Todas en transacciones.
 
-Files: `crates/rondo-tui/src/components/journal.rs`, `crates/rondo-tui/src/app.rs`.
+### Fase M4 — Recurrence engine (movida adelante de M1.4)
 
-- En journal day-view, presionar `a` abre un editor de 5 filas (usar `tui-textarea`, ya en deps).
-- `Enter` en linea vacía + `Ctrl+S` guarda. `Esc` cancela.
-- Markdown se renderiza en preview al guardar.
+**Movida aquí desde puesto 4 original por architect review.** Sin esto, activar writes corrompe paridad con Go.
 
-### Fase M2.3 — Date jumping + hidden filter
-
-- Bind `g` `g` jump top, `G` jump bottom (paridad list).
-- `H` / `Shift+H` toggle hide.
-- Filter `[h]` HIDDEN en sidebar (estado de la nota, no del task).
-
-### Fase M2.4 — Calendar widget
-
-Files: nuevo `crates/rondo-tui/src/widgets/calendar.rs`, `crates/rondo-tui/src/components/journal.rs`.
-
-- Ratatui `ratatui-widgets` feature `calendar` ya disponible (depende de `time` crate). Activar.
-- Renderiza mini-calendar a la derecha del journal con highlight en días que tienen entradas. Click/Enter jump.
-
----
-
-## M3 — Pomodoro persistente + Focus stats
-
-**Objetivo:** Sesiones pomodoro se persisten en `focus_sessions`. La tab `[4] FOCUS` (hoy stub) muestra streak + heatmap.
-
-### Fase M3.1 — Persist focus sessions
-
-Files: `crates/rondo-core/src/store/sqlite.rs`, `crates/rondo-tui/src/components/pomodoro.rs`.
-
-```rust
-fn start_focus_session(&self, task_id: Option<i64>, kind: SessionKind) -> Result<i64>;
-fn complete_focus_session(&self, id: i64) -> Result<()>;
-fn list_focus_sessions(&self, from: NaiveDate, to: NaiveDate) -> Result<Vec<Session>>;
-fn focus_streak(&self) -> Result<u32>;
-```
-
-Pomodoro modal llama `start_focus_session` al `p` press. Al expire del timer, `complete_focus_session`. Bell + status toast "ciclo X de 4 completado".
-
-### Fase M3.2 — Focus page
-
-Files: nuevo `crates/rondo-tui/src/components/focus_page.rs`, `crates/rondo-tui/src/components/root.rs`.
-
-- Nueva `Page::Focus` (al wire de `[4] FOCUS` en sidebar).
-- Heatmap 7×N (semanas verticales) de sesiones por día, coloreado por intensidad.
-- Streak counter `↟ 5d` (ya en header telemetría — leer de la misma fuente).
-- Top tasks by time logged (table sortable).
-
-### Fase M3.3 — Configurable durations
-
-Files: `crates/rondo-tui/src/components/command_palette.rs` (cmd `:focus-config`), `crates/rondo-core/src/config.rs` (nuevo).
-
-- Settings: work=25min, short_break=5min, long_break=15min, cycles_to_long=4.
-- Persistir en `~/.todo-app/config.toml`. Crate `toml` ya transitively disponible.
-
----
-
-## M4 — Recurrence engine
-
-**Objetivo:** Tasks recurrentes se autospawnean (paridad Go `internal/task/recurrence.go`).
-
-### Fase M4.1 — Recurrence calculation
-
-Files: `crates/rondo-core/src/recurrence.rs` (nuevo), tests.
+Files: `crates/rondo-core/src/recurrence.rs`.
 
 ```rust
 pub fn next_occurrence(task: &Task, now: NaiveDate) -> Option<NaiveDate>;
 pub fn spawn_recurrent_instances(store: &SqliteStore, now: NaiveDate) -> Result<Vec<i64>>;
 ```
 
-Lógica: si `task.recur_freq != None` AND `task.due_date < now`, crea copia con `due_date = next_occurrence`, marca original como `Done`. Test exhaustivo con calendario edge-cases (last day of month, leap year).
+Portar tests del Go `internal/task/recurrence_test.go` (~30 casos: DST, leap year, month-end, recur_interval>1). **Estimación revisada 3-4 noches** (era 1-2).
 
-### Fase M4.2 — TUI integration
+`main.rs` al startup llama `spawn_recurrent_instances` (silent, idempotent).
 
-- `main.rs` al startup llama `spawn_recurrent_instances` (silent, idempotente).
-- Status toast: "N recurrentes generados".
-- Detail panel muestra ◑ next occurrence en metadata.
+### Fase M1.4 — Wire CRUD desde TUI
+
+Files: `crates/rondo-tui/src/app/tasks_state.rs`, modales, bindings.
+
+- `submit_quick_add` → `store.create_task(parsed)` si RW.
+- `handle_space` Subtasks → `store.toggle_subtask(id)`.
+- Bulk done Visual → `store.set_status` por id.
+- Bind `d` → delete + confirm modal.
+- Bind `e` → inline edit.
+- **No `app.tasks = store.list_tasks()` después de cada mutate** — invalidación dirigida: aplicar `UndoSnapshot` localmente al vector + invalidar índices afectados.
+
+### Fase M1.5 — Undo stack
+
+Files: `crates/rondo-tui/src/app/undo.rs`.
+
+- `Vec<UndoSnapshot>` cap 50.
+- `Ctrl+Z` re-aplica via store.
+- Test: crear → undo → estado idéntico inicial.
+
+### **GATE — Quitar `--write` flag por defecto:** sólo cuando M1 + M4 + roundtrip harness verde. Hasta entonces, default RO.
 
 ---
 
-## M5 — Dependencies + cycle prevention
+## M10.1 — Config schema mínima (adelantado)
 
-**Objetivo:** Dependencias bloqueantes manejables desde la TUI.
+**Movida desde puesto 10 a 4 — bloqueante de M8 (plugin loader).** Sin config, los plugins no tienen donde declarar enabled/permissions.
 
-### Fase M5.1 — Dep mutations
+Files: `crates/rondo-core/src/config.rs`.
 
-```rust
-fn add_dependency(&self, task_id: i64, blocked_by: i64) -> Result<()>;  // detects cycles
-fn remove_dependency(&self, task_id: i64, blocked_by: i64) -> Result<()>;
-fn dependency_graph(&self) -> Result<DepGraph>;
+```toml
+[ui]
+theme = "dark"
+sidebar = true
+animations = true
+[pomodoro]
+work_min = 25
+short_break_min = 5
+long_break_min = 15
+[plugins]
+enabled = ["builtin.pomodoro"]
+[plugins.permissions]
+"quote-of-the-day" = ["overlay_view", "tick_handler"]
 ```
 
-Cycle detection: DFS sobre `task_dependencies`.
-
-### Fase M5.2 — TUI
-
-- Detail · Dependencies section: cursor + `Enter` para abrir target. Bind `a` añade nueva (palette `:dep #N`).
-- Delete con `--cascade` confirm modal (paridad Go).
-- Sidebar item `[g]` Grafo (nueva nav item, rehabilita el stub): renderiza ASCII graph con `Block`/edges. Optionally usar `tui-tree-widget`.
+`Config::load_or_default(path)` + `RONDO_CONFIG` env override. Defaults inline en código. ~medio día.
 
 ---
 
-## M6 — Search / fuzzy / sort
+## M8 — Plugin loader (MOVIDO DEL PUESTO 9 AL 5)
 
-**Objetivo:** Búsqueda real + ordenación múltiple.
+**Reframing crítico de architect review:** adelantar plugin loader **antes** de calendar/heatmap/graph para que esos features nazcan como plugins, no como deuda en core.
 
-### Fase M6.1 — Fuzzy implementation
+Runtime decisión: **extism 1.x** (defendido en plugin-runtime review):
+- Sandbox WASI gratis (sin fs, sin red por defecto)
+- Cold-load 10-30ms para módulos pequeños
+- Cross-platform (un `.wasm` cualquier OS)
+- SDKs Rust/Go/Zig/JS estables para autores
+- JSON serde ya en el contrato (cero migración)
 
-Files: `crates/rondo-tui/src/components/search.rs`, `crates/rondo-tui/src/app.rs`.
+### Fase M8.1 — Plugin contract evolution (BLOQUEANTE)
 
-- Crate `fuzzy-matcher = "0.3"` o `nucleo = "0.5"`.
-- `search_buf` aplica fuzzy match sobre title + tags + description (configurable). Score ordena resultados.
-- `Enter` ejecuta — aplica search como filter persistente. `Esc` cancela.
-- Highlight matched chars en title con underline accent.
+Files: `crates/rondo-plugin-api/src/{capabilities.rs,plugin.rs}`.
 
-### Fase M6.2 — Sort selector
+El contrato actual es **insuficiente** para WASM real (plugins read-only no pueden persistir nada → pomodoro-como-plugin imposible). Antes de M8.2 expandir:
 
-- Bind `s` abre overlay "Sort by: due | priority | created | title (asc/desc)".
-- Persiste en `AppState.sort_order`. Sidebar title agrega "↕ due".
-- Paridad Go `F1/F2/F3`.
+```rust
+pub enum Capability {
+    // Existing
+    OverlayView, TickHandler, CommandContributor, PageView,
+    // Nuevas
+    QueryAccess(QueryScope),       // ReadOnlyStore filtrado
+    MutationAccess(MutationScope), // writes auditadas, opt-in usuario
+    Exporter { format_id: &'static str, mime: &'static str },
+    Syncer { name: &'static str },
+    Notifier { channel: NotifyChannel },
+    CliSubcommand { name: &'static str },
+    ThemeContributor,
+}
+```
+
+`PluginContext` ahora `#[derive(Serialize, Deserialize)]` con `now: DateTime<Utc>` + manifest reference.
+
+Host-functions exposed via extism: `kv_get(plugin_id, key)`, `kv_set(plugin_id, key, val)`, `query_tasks(filter)`, etc.
+
+Plugins read-only por defecto; `MutationAccess` requiere prompt user explícito en first-load.
+
+### Fase M8.2 — `rondo-plugin-host` crate
+
+Files: nuevo `crates/rondo-plugin-host/` workspace member.
+
+```rust
+pub struct PluginHost {
+    plugins: HashMap<String, LoadedPlugin>,
+    policy: Policy,
+}
+impl PluginHost {
+    fn load_from_dir(&mut self, dir: &Path) -> Result<Vec<String>>;
+    fn dispatch(&mut self, action: &PluginAction) -> Vec<(String, PluginResult)>;
+    fn set_enabled(&mut self, id: &str, on: bool) -> Result<()>;
+}
+```
+
+Manifest TOML por plugin (`plugin.toml`):
+```toml
+id = "calendar-extra"
+version = "0.1.0"
+api = "0.1"
+capabilities = ["page_view", "query_access:journal"]
+[wasi]
+allowed_paths = []
+allowed_hosts = []
+```
+
+Backwards compat: `PluginRegistry` builtins (PomodoroPlugin) coexiste — dispatch combina ambos.
+
+### Fase M8.3 — KV store host-functions
+
+Files: `crates/rondo-core/src/store/plugin_kv.rs`.
+
+Tabla `plugin_kv (plugin_id, key, value BLOB)` con migración. Host-functions `kv_get/kv_set` namespaced por `plugin_id`. Plugin no ve DDL ni otras tablas.
+
+### Fase M8.4 — Sample plugin: Quote of the Day
+
+Files: `examples/plugins/quote-of-the-day/`.
+
+Plugin trivial que demuestra `OverlayView` + `TickHandler`. Sin capabilities peligrosas. Cargo build a `wasm32-wasip1` + script.
+
+### Fase M8.5 — Permission prompt + plugins CLI
+
+Files: `crates/rondo-tui/src/components/permission_prompt.rs`, `crates/rondo-tui/src/cli/plugins.rs`.
+
+- First-load: TUI overlay pidiendo aprobar capabilities.
+- Sidebar `[5] PLUGINS` lista plugins reales con enable/disable.
+- CLI: `rondo-tui plugins {install,list,info,remove}`. `install gh:owner/repo@tag` descarga `.wasm`.
+
+### Performance budget M8
+
+- Cold-load < 50ms por plugin
+- Per-tick overhead < 200µs (M1 Pro) / < 500µs (x86_64 general)
+- Memoria < 2MB residente por plugin
+- Dispatch total < 5ms con 10 plugins
+- Bench en `crates/rondo-plugin-host/benches/`. CI fail si regress >20%.
+
+**Total M8:** 7-10 noches.
 
 ---
 
-## M7 — Export / import
+## M2 — Journal completo (revisado)
 
-**Objetivo:** Replicar `rondo export markdown|json|ndjson`.
+**M2.4 (calendar widget) reclasificada como plugin builtin** post-M8.
 
-### Fase M7.1 — Exporters en core
+### M2.1 — Journal write API (CORE)
 
-Files: `crates/rondo-core/src/export.rs` (nuevo).
+```rust
+fn create_or_get_today_note(&self) -> Result<Note>;
+fn add_journal_entry(&self, note_id: i64, body: &str) -> Result<i64>;
+fn hide_note(&self, note_id: i64) -> Result<()>;
+fn delete_entry(&self, entry_id: i64) -> Result<()>;
+```
+
+### M2.2 — TUI inline entry editor (CORE)
+
+`tui-textarea` para input multilínea. Markdown preview al guardar.
+
+### M2.3 — Date navigation (CORE)
+
+`gg`/`G`, hidden filter, `H` toggle hide.
+
+### M2.4 — Calendar widget → **PLUGIN BUILTIN**
+
+Files: `crates/rondo-tui/src/plugins/builtin/calendar.rs`.
+
+Plugin in-process (no `.wasm` aún, sólo trait Plugin). Usa `Capability::PageView + QueryAccess(Journal)`. Renderiza mini-calendar 7×N con días que tienen entries highlighted.
+
+Razón de plugin: visualización alternativa, no dominio. Si el usuario no quiere calendario, no carga el plugin.
+
+---
+
+## M3 — Pomodoro persistencia (revisado)
+
+### M3.1 — Focus sessions persistence (CORE)
+
+```rust
+fn start_focus_session(&self, task_id: Option<i64>, kind: SessionKind) -> Result<i64>;
+fn complete_focus_session(&self, id: i64) -> Result<()>;
+fn focus_streak(&self) -> Result<u32>;
+```
+
+### M3.2 — Focus page con heatmap → **PLUGIN BUILTIN**
+
+Files: `crates/rondo-tui/src/plugins/builtin/focus_page.rs`.
+
+Plugin con `PageView + QueryAccess(FocusSessions)`. Heatmap 7×N coloreado por sesiones/día.
+
+### M3.3 — Bell sound → **PLUGIN BUILTIN**
+
+Plugin con `Notifier { channel: Audio }`. Side-effect aislable.
+
+### M3.4 — Configurable durations (CONFIG)
+
+`[pomodoro]` en config.toml. Ya cubierto por M10.1.
+
+---
+
+## M9 — CLI subcomandos
+
+**Reclasificado:** `skill install` → plugin. Resto core.
+
+Subcommands core (`rondo-tui <cmd>`):
+1. `add` quick-add syntax
+2. `list` JSON/table
+3. `done <id>`
+4. `delete <id>`
+5. `journal add`
+6. `focus start`
+7. `stats` JSON
+8. `export` (md/json/ndjson — builtin)
+9. `batch` NDJSON stdin
+10. `recur preview`
+11. `dep add/remove`
+12. `note add`
+13. `tag add/remove`
+14. `timelog start/stop`
+15. `config get/set`
+16. `completion bash/zsh/fish` (clap_complete)
+17. `plugins {install,list,info,remove}` (parte de M8.5)
+
+`--json` global flag, `--quiet` suprime status.
+
+`skill install` → plugin externo con `Capability::CliSubcommand`.
+
+Tests integración con `assert_cmd`. **Empezar con 4** (`add/list/done/export`), el resto bajo demanda.
+
+---
+
+## M7 — Export (revisado)
+
+### M7.1 — Exporters builtin (CORE)
+
+Files: `crates/rondo-core/src/export.rs`.
 
 ```rust
 pub fn to_markdown(tasks: &[Task]) -> String;
@@ -242,183 +366,221 @@ pub fn to_json(tasks: &[Task]) -> Result<String>;
 pub fn to_ndjson<W: Write>(tasks: &[Task], w: &mut W) -> Result<()>;
 ```
 
-Test golden: snapshot del output sobre `fixtures/seed.sql` cargado.
+Golden tests sobre `fixtures/seed.sql`.
 
-### Fase M7.2 — TUI hook + CLI subcommand
+### M7.2 — Exporter trait + plugin contributions (HYBRID)
 
-- Palette `:export markdown ./tasks.md`.
-- CLI `rondo-tui export --format markdown --out tasks.md` (ver M9).
+`Capability::Exporter { format_id, mime }`. Core enruta `rondo-tui export --format icalendar` al plugin matching.
 
----
-
-## M8 — Plugin loader real
-
-**Objetivo:** Cargar plugins externos. Hoy el `PluginRegistry` solo acepta builtins compilados.
-
-### Fase M8.1 — Decisión de runtime
-
-Subagente original recomendó WASM via `extism`. Confirmar con spike:
-- 3 días: cargar un `.wasm` trivial que implementa `Plugin` y registra una página custom.
-- Si extism overhead aceptable (cold load < 50ms) → adelante. Si no, fallback a `mlua` (Lua).
-
-Files: `crates/rondo-plugin-host/` (nuevo workspace member), `crates/rondo-tui/src/plugins/mod.rs`.
-
-### Fase M8.2 — Plugin discovery
-
-- `~/.todo-app/plugins/*.wasm` auto-cargados al startup.
-- Sidebar item `[5] PLUGINS` (hoy stub) lista cargados + estado + permite enable/disable.
-- Capability checks: plugin debe declarar capabilities, host las honra.
-
-### Fase M8.3 — Sample external plugin
-
-- Repo `examples/plugins/calendar-extra/` con un plugin que añade una pagina con vista calendario diferente.
-- Build script + instrucciones de instalación.
+Formatos exóticos (iCal, taskpaper, Org-mode, CSV) → plugins externos.
 
 ---
 
-## M9 — CLI subcomandos (paridad Cobra)
+## M6 — Search + sort
 
-**Objetivo:** `rondo-tui add "..."`, `rondo-tui list`, etc. para scripting. Paridad con los 19 subcommands del Go (`internal/cli/`).
+### M6.1 — Fuzzy search (HYBRID)
 
-### Fase M9.1 — clap subcommand tree
+Files: `crates/rondo-tui/src/components/search.rs`, `crates/rondo-tui/src/app/search.rs`.
 
-Files: `crates/rondo-tui/src/main.rs` (refactor a `Command` enum).
+Crate `nucleo = "0.5"` default. Match sobre title + tags + description. Highlight matches con underline accent.
 
-Subcommands a implementar (prioridad descendente):
-1. `add` — crear task (acepta sintaxis quick-add)
-2. `list` — JSON o table output
-3. `done` — marcar done por id
-4. `delete` — borrar por id
-5. `journal add` — agregar entry
-6. `focus start` — iniciar sesión
-7. `stats` — JSON stats
-8. `export` — re-uses M7
-9. `batch` — NDJSON via stdin (paridad `internal/cli/batch.go`)
-10. `recur preview` — ver próximas ocurrencias
-11. `dep add/remove` — manejo de dependencies
-12. `note add` — task note
-13. `tag add/remove`
-14. `timelog start/stop`
-15. `config get/set`
-16. `skill install` — paridad Go (escribir SKILL.md a `~/.claude/skills/`)
-17. `completion bash/zsh/fish` — `clap_complete`
+`Capability::Matcher` para algoritmos alternativos (regex, exact, etc.).
 
-### Fase M9.2 — Output format flag
+### M6.2 — Sort selector (CORE)
 
-`--json` global flag fuerza output structured. `--quiet` suprime status. Paridad output con Go para scripts ya existentes.
-
-### Fase M9.3 — Tests integración
-
-`crates/rondo-tui/tests/cli/` — spawn binary con `assert_cmd`, verifica salida vs golden. Mantener equivalencia con `internal/cli/cli_integration_test.go` del Go.
+`s` abre overlay. Persiste en `AppState.sort_order` + config.
 
 ---
 
-## M10 — Config + temas
+## M5 — Dependencies (revisado)
 
-**Objetivo:** Configuración persistente, dark/light mode, custom theme.
+### M5.1 — Dep mutations (CORE)
 
-### Fase M10.1 — Config schema
-
-Files: `crates/rondo-core/src/config.rs`.
-
-```toml
-[ui]
-theme = "dark"           # "dark" | "light" | "high-contrast" | "<custom-name>"
-sidebar = true
-analytics = "auto"       # "auto" | "always" | "never"
-animations = true
-
-[pomodoro]
-work_min = 25
-short_break_min = 5
-long_break_min = 15
-cycles_to_long = 4
-bell = true
-
-[journal]
-date_format = "%A, %B %-d, %Y"
-
-[plugins]
-enabled = ["builtin.pomodoro", "calendar-extra"]
+```rust
+fn add_dependency(&self, task_id: i64, blocked_by: i64) -> Result<()>;  // detects cycles
+fn remove_dependency(&self, task_id: i64, blocked_by: i64) -> Result<()>;
 ```
 
-Load at startup. Env var `RONDO_CONFIG` override path. `RONDO_FX=0` sigue funcionando como override binario.
+Cycle detection DFS.
 
-### Fase M10.2 — Theme variants
+### M5.2 — Dep graph render → **PLUGIN BUILTIN**
 
-Files: `crates/rondo-tui/src/theme.rs`.
-
-- `Theme::dark()`, `Theme::light()`, `Theme::high_contrast()`.
-- Custom themes from `~/.todo-app/themes/<name>.toml` (7 hex tokens).
-- Live reload: `:theme light` sin restart.
-
-### Fase M10.3 — A11y
-
-- Modifier `NO_COLOR` env: drop hue, keep BOLD/UNDERLINED/REVERSED (where allowed).
-- `--reduced-motion` flag honra `prefers-reduced-motion` simulation: `RONDO_FX=0` equivalente.
+Plugin `PageView + QueryAccess(Deps)`. ASCII graph o `tui-tree-widget`.
 
 ---
 
-## M11 — Sync (long-shot)
+## M10.2/M10.3 — Themes + a11y
 
-**Objetivo:** El "sincronización" panel del dashboard funciona de verdad.
+Theme variants dark/light/high-contrast. Custom themes via `Capability::ThemeContributor`.
 
-### Fase M11.1 — Decision
-
-Tres caminos posibles, pick one:
-- **A — git-backed:** SQLite + auto-commit cada N min. Pull on startup. Conflicts trivial (last-write-wins).
-- **B — CRDT** (Automerge / Yjs Rust port): per-task diffs sync. Más complejo.
-- **C — Cloud:** WebDAV / S3 backup periódico. Más simple, sin merge real.
-
-Recomendación tentativa: **A** primero (zero infrastructure), CRDT como evolución.
-
-### Fase M11.2 — Implementation por path elegido
-
-Esquema concreto se diseña tras spike de la opción seleccionada.
+`NO_COLOR` honor, `RONDO_FX=0` (ya existe), `--reduced-motion` flag.
 
 ---
 
-## Cronograma estimado (sin compromisos)
+## Analytics dashboard → **PLUGIN BUILTIN**
 
-| Hito | Esfuerzo estimado | Bloqueado por |
+Hoy `components/analytics.rs` está en core. **Promover a plugin builtin** con `PageView + QueryAccess(Tasks, FocusSessions)`. Si usuario no quiere dashboard, desactiva.
+
+---
+
+## M11 — Sync → **PLUGINS EXTERNOS**
+
+**Reclasificado:** ya no es milestone monolítico. Tres caminos posibles, cada uno un plugin separado:
+
+- `rondo-plugin-sync-git` (git-backed, conflict policy = last-write-wins)
+- `rondo-plugin-sync-crdt` (Automerge, complejidad alta)
+- `rondo-plugin-sync-cloud` (WebDAV/S3 backup)
+
+Cada uno con `Capability::Syncer + MutationAccess(All) + TickHandler`.
+
+**Recomendación:** **abandonar git-backed sync**. Conflict resolution sobre blob SQLite es hell. Empezar con cloud-backup-only.
+
+---
+
+## Plugins externos (descubiertos en `~/.todo-app/plugins/`)
+
+No-core, no-builtin, opcionales por usuario:
+
+- `rondo-plugin-skill-install` — escribe SKILL.md a `~/.claude/skills/`
+- `rondo-plugin-templates` — task templates (daily-standup, weekly-review, etc.)
+- `rondo-plugin-notify-desktop` — notify-rust / AppleScript / dbus
+- `rondo-plugin-attachments-kitty` — kitty image protocol previews
+- `rondo-plugin-export-ical`, `-org-mode`, `-csv`
+- `rondo-plugin-sync-*` (M11)
+- `rondo-plugin-themes-pack` — preset bundles
+
+---
+
+## Cronograma revisado
+
+| Hito | Esfuerzo (noches) | Bloqueado por |
 |---|---|---|
-| M1 | 3-5 días nocturnos | — |
-| M2 | 2-3 días | M1.1, M1.2 |
-| M3 | 2-3 días | M1.1 |
-| M4 | 1-2 días | M1.3 |
-| M5 | 2 días | M1.3 |
-| M6 | 1-2 días | M1.3 |
-| M7 | 1 día | M1.3 |
-| M8 | 5-7 días | nada (independiente) |
-| M9 | 3-4 días | M1.3, M7 |
-| M10 | 2 días | — |
-| M11 | 5+ días | M1.2 |
+| **M0 Foundations** (substates + roundtrip + telemetry) | 2-3 | — |
+| M1.1+M1.2 (backup + migrations) | 2 | M0.1 |
+| M10.1 (config schema) | 0.5 | — |
+| M1.3 (mutations API) | 2 | M0.1, M1.2 |
+| **M4** (recurrence + tests Go) | **3-4** (era 1-2) | M1.3 |
+| M1.4+M1.5 (TUI CRUD + undo) | 5-7 (era 3-5) | M4 |
+| **GATE: roundtrip Rust↔Go verde → quitar `--write` default** | — | M1.5 |
+| **M8.1** (contract evolution) | 2 | M1.3 |
+| **M8.2-M8.4** (host crate + sample plugin) | 5-7 | M8.1, M10.1 |
+| M8.5 (permission prompt + CLI) | 2 | M8.2 |
+| M7.1 (export builtin) | 1 | M1.3 |
+| M9.1 (CLI básico: 4 cmds) | 2 | M7.1 |
+| M2.1-M2.3 (journal write) | 3 | M1.3 |
+| **M2.4 calendar widget (PLUGIN)** | 2 | M8 |
+| M3.1 (focus persistence) | 2 | M1.3 |
+| **M3.2 focus page (PLUGIN)** | 3 | M8 |
+| **M3.3 bell (PLUGIN)** | 1 | M8 |
+| **Analytics dashboard (PLUGIN, refactor)** | 2 | M8 |
+| M6 (search + sort) | 2 | M1.3 |
+| M5.1 (dep mutations) | 1 | M1.3 |
+| **M5.2 dep graph (PLUGIN)** | 2 | M8 |
+| M9 (CLI restantes) | 3-4 | M1.3 |
+| M7.2 (exporter trait) | 1 | M8 |
+| M10.2/M10.3 (themes + a11y) | 2 | — |
+| M11 sync (plugin separado) | 5+ | M8 + telemetry |
 
-**Total bruto:** 27-38 días nocturnos. Estimación honesta optimista: 2x = 8-12 semanas con jornadas de fin de semana.
+**Total revisado:** 51-66 noches (era 27-38 sin contar M0 ni replanteamiento).
 
-## Orden recomendado
+Estimación honesta optimista: 2x = **15-20 semanas** weekend-pace.
 
-1. **M1.1 + M1.2** (writes + backup + migrations) — bloqueante para todo lo demás.
-2. **M10.1** (config schema) — barato, habilita feature flags.
-3. **M1.3 + M1.4 + M1.5** (CRUD + undo) — el grueso del valor de usuario.
-4. **M2** (journal write) — completa la segunda página.
-5. **M9.1** (CLI subcommands list/add/done) — abre uso scripting.
-6. **M6** (search/sort) — pulido productividad.
-7. **M3** (pomodoro persistence) + **M4** (recurrence) — paridad Go restante.
-8. **M5** (deps) + **M7** (export) — paridad final.
-9. **M8** (plugin loader) — feature diferenciadora vs Go.
-10. **M10.2/M10.3** (themes/a11y) — pulido.
-11. **M11** (sync) — última, gran apuesta.
+## Orden recomendado (revisado)
+
+1. **M0.1 + M0.2** — substates + roundtrip harness (bloqueante absoluto)
+2. **M1.1 + M1.2** — backup + migrations
+3. **M10.1** — config schema (habilita M8)
+4. **M1.3** — mutations API
+5. **M4** — recurrence engine (antes de M1.4!)
+6. **M1.4 + M1.5** — TUI CRUD + undo
+7. **GATE** — roundtrip verde → quitar `--write` flag
+8. **M8.1 + M8.2 + M8.3 + M8.4** — plugin contract + host + KV + sample (4-5 commits seguidos)
+9. **M7.1** — export markdown/json/ndjson (puro)
+10. **M9.1** — CLI básico (4 subcommands)
+11. **M2.1-M2.3** — journal write core
+12. **M2.4** — calendar widget como PLUGIN
+13. **M3.1** — focus session persistence core
+14. **M3.2 + M3.3** — focus page + bell como PLUGINS
+15. **Analytics dashboard refactor** → PLUGIN
+16. **M6** — search + sort
+17. **M5** — dependencies (core + graph plugin)
+18. **M9 resto** + **M7.2** — CLI completo + exporter trait
+19. **M8.5** — permission prompt + plugins CLI
+20. **M10.2 + M10.3** — themes + a11y
+21. **M11** — sync plugin (decisión tras telemetry)
+
+---
+
+## Architect review summary
+
+Tres architects revisaron este roadmap en paralelo. Hallazgos clave:
+
+### Critical-review architect
+**Top 3 leverage edits aplicadas:**
+1. ✅ Insertado **M0** (AppState substates + roundtrip harness)
+2. ✅ Movido **M4** antes de M1.4; gate revisado a `M1 + M4 + roundtrip`
+3. ✅ Plugin contract a expandir en **M8.1** (Serialize, KV, MutationAccess) antes de comprometer WASM
+
+**Adicional:**
+- M9 depende de M4 (sino CLI produce duplicados recurrentes) → wired
+- M8 depende de M10.1 (config para enabled/permissions) → adelantado M10.1 al puesto 3
+- AppState god-struct rompe antes de M3 sin substates → M0.1 obligatorio
+- `focus_left()` shim no sobrevive a M3 → coordinar con substates
+- Backup en sub-dir propio `~/.todo-app/backups/rust/` para no chocar con Go
+
+**Time estimates corregidas:**
+- M1: 3-5 → **8-12 noches** (mutation API + UI reload + undo snapshots completos)
+- M8: 5-7 → **7-10 noches** (spike + contract evolution + host + sample)
+- M11: 5 → **20+** o **abandonar git-backed** completamente
+
+### Plugin-runtime architect
+**Decisión:** extism 1.x. Defensa: sandbox WASI gratis, cold-load <50ms, cross-platform single `.wasm`, SDKs estables, JSON serde ya existe. Status quo (sólo builtins) insuficiente — M8 es la feature diferenciadora vs Go.
+
+**Fallback:** mlua con sandbox estricto.
+
+**Plan 6 commits:** skeleton → extism integration → dispatch+KV → wire to TUI → sample plugin → permission prompt + CLI.
+
+**Threat model definido:** trust boundary en `.wasm`. Plugin no puede acceder fs/net por defecto, no puede mutar `AppState`, no puede leer KV de otros plugins (namespaced).
+
+**Performance budget:** cold-load <50ms, per-tick <200µs, mem <2MB. Bench en `crates/rondo-plugin-host/benches/`.
+
+**Distribución:** GitHub releases scanned + curated index. NO crates.io.
+
+### Core-vs-plugin architect
+**Clasificación global:** 58% CORE · 30% PLUGIN · 8% HYBRID · 4% CONFIG.
+
+**Reclassificaciones aplicadas al roadmap:**
+- M2.4 calendar → PLUGIN BUILTIN
+- M3.2 focus page → PLUGIN BUILTIN
+- M3.3 bell → PLUGIN BUILTIN
+- M5.2 dep graph → PLUGIN BUILTIN
+- Analytics dashboard (hoy en core) → PROMOVER a PLUGIN BUILTIN
+- M7.2 exporters exóticos → PLUGINS EXTERNOS
+- M11 sync → PLUGINS EXTERNOS (3 variantes)
+- `skill install` → PLUGIN EXTERNO
+- Notifications, templates, attachments → PLUGINS EXTERNOS
+
+**Capabilities nuevas propuestas (en M8.1):**
+- `QueryAccess(scope)` — read-only store filtrado
+- `MutationAccess(scope)` — writes auditadas, opt-in
+- `Exporter { format_id, mime }`
+- `Syncer { name }`
+- `Notifier { channel }`
+- `CliSubcommand { name, args_spec }`
+- `ThemeContributor`
+- `Matcher` (opcional)
+
+**Helix test:** `cargo install rondo-tui --no-default-features` debería dar task tracker funcional sin pomodoro/sync/gráficos. Eso valida que el core es minimal.
+
+**Reframing más importante (aplicado):** plugin loader al puesto 5 (post M1.4) en vez de puesto 9 — sino calendar/heatmap/graph nacen en core como deuda permanente.
 
 ---
 
 ## Notas de implementación cross-cutting
 
-- **Cada fase**: snapshot test antes (estado actual) → cambio → snapshot diff revisado.
-- **DB writes**: dentro de transacciones con rollback en cualquier `?` failure.
-- **Sin `unsafe`**.
-- **Sin global state**: `AppState` reducer, store inyectado.
-- **CHANGELOG.md** al root, actualizado en cada hito (paridad Go).
-- **AGENTS.md** o **docs/contributing.md** explicando cómo abrir PR sin tocar paridad Go.
-- **Tests RW** usan `tempfile::NamedTempFile` con `Drop`, nunca tocan `~/.todo-app/`.
-- **`#[deny(clippy::pedantic)]`** opcional a futuro, hoy `-D warnings` cubre.
+- Cada fase: snapshot test antes → cambio → diff revisado
+- DB writes en transacciones con rollback en `?` failure
+- Sin `unsafe`
+- CHANGELOG.md actualizado por hito
+- Tests RW usan `tempfile`, nunca `~/.todo-app/` real
+- `cargo bench` baseline antes de M8 para detectar regressions

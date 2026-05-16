@@ -28,6 +28,8 @@ pub fn reduced_motion(cli_flag: bool) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
+
     fn with_env<T>(key: &str, value: Option<&str>, f: impl FnOnce() -> T) -> T {
         let prev = std::env::var(key).ok();
         match value {
@@ -42,14 +44,17 @@ mod tests {
         r
     }
     #[test]
+    #[serial(env_no_color)]
     fn no_color_set_non_empty() {
         with_env("NO_COLOR", Some("1"), || assert!(no_color()));
     }
     #[test]
+    #[serial(env_no_color)]
     fn no_color_empty_is_false() {
         with_env("NO_COLOR", Some(""), || assert!(!no_color()));
     }
     #[test]
+    #[serial(env_no_color)]
     fn no_color_unset_is_false() {
         with_env("NO_COLOR", None, || assert!(!no_color()));
     }

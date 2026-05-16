@@ -1,16 +1,34 @@
+# Empty `[workspace]` keeps this crate isolated from the parent workspace;
+# we build it standalone for `wasm32-wasip1`, while the workspace targets the
+# host triple.
+[workspace]
+
 [package]
 name = "quote-of-the-day"
 version = "0.1.0"
 edition = "2021"
 
-# Note: real wasm build configures target wasm32-wasip1 via .cargo/config
-# This crate is the in-source reference for M8.4. Plugin SDK lives in
-# rondo-plugin-api so plugin authors can pull just that crate.
+# This crate is intentionally NOT a workspace member: it builds to
+# `wasm32-wasip1` via the local `.cargo/config.toml`, while the workspace
+# targets the host triple. Build with `bash build.sh` from this directory.
+#
+# It depends on `rondo-plugin-api` for type-safe (de)serialization of
+# `PluginAction` / `PluginResult` / `ViewSpec`, ensuring the on-the-wire
+# JSON shape always matches the host. Run `cargo update` here independently
+# from the workspace.
+
 [dependencies]
 rondo-plugin-api = { path = "../../../crates/rondo-plugin-api" }
+extism-pdk = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
 
 [lib]
 crate-type = ["cdylib"]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true

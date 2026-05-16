@@ -72,7 +72,13 @@ impl PluginHost {
         let wasm_path = dir.join("plugin.wasm");
         let extism_plugin = if wasm_path.exists() {
             let wasm = std::fs::read(&wasm_path)?;
-            let p = extism::Plugin::new(wasm, [], false)
+            // Enable WASI so plugins compiled to `wasm32-wasip1` (the modern
+            // default for Rust → WASM via `extism-pdk`) can resolve their
+            // `wasi_snapshot_preview1` imports. The plugin's filesystem and
+            // network access is still gated by the empty `allowed_paths` /
+            // `allowed_hosts` from its manifest — those will be threaded
+            // through extism's `Manifest` in a follow-up.
+            let p = extism::Plugin::new(wasm, [], true)
                 .map_err(|e| HostError::Extism(e.to_string()))?;
             Some(p)
         } else {

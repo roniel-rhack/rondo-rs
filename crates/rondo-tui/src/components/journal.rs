@@ -10,6 +10,22 @@ use ratatui::{
 
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
+    if app.journal_notes.is_empty() {
+        let lines = vec![
+            Line::raw(""),
+            Line::raw(""),
+            Line::from(Span::styled("  No journal entries yet", t.muted())),
+            Line::raw(""),
+            Line::from(vec![
+                Span::raw("  "),
+                Span::styled("?", t.kbd()),
+                Span::raw(" "),
+                Span::styled("for help", t.muted()),
+            ]),
+        ];
+        f.render_widget(Paragraph::new(lines).block(t.panel("Journal", true)), area);
+        return;
+    }
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Length(30), Constraint::Min(1)])

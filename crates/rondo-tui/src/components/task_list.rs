@@ -14,6 +14,30 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let title = format!("Tasks ({})", app.tasks.len());
     let block = t.panel(&title, app.focus_left);
 
+    if app.tasks.is_empty() {
+        let lines = vec![
+            Line::raw(""),
+            Line::raw(""),
+            Line::from(Span::styled("  No tasks yet", t.muted())),
+            Line::raw(""),
+            Line::from(vec![
+                Span::raw("  "),
+                Span::styled("?", t.kbd()),
+                Span::raw(" "),
+                Span::styled("for help", t.muted()),
+                Span::raw("    "),
+                Span::styled(":", t.kbd()),
+                Span::raw(" "),
+                Span::styled("commands", t.muted()),
+            ]),
+        ];
+        f.render_widget(
+            ratatui::widgets::Paragraph::new(lines).block(block),
+            area,
+        );
+        return;
+    }
+
     let selected = app.task_list_state.selected();
     let items: Vec<ListItem> = app
         .tasks

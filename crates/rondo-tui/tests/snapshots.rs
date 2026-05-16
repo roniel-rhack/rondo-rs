@@ -103,3 +103,23 @@ fn search_overlay() {
     });
     assert_snapshot!(s);
 }
+
+#[test]
+fn empty_tasks() {
+    let s = snapshot("empty_tasks", 120, 32, |a| {
+        a.tasks.clear();
+        a.task_list_state.select(None);
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn empty_journal() {
+    let s = snapshot("empty_journal", 120, 32, |a| {
+        a.page = Page::Journal;
+        a.journal_notes.clear();
+        a.journal_entries.clear();
+        a.journal_list_state.select(None);
+    });
+    assert_snapshot!(s);
+}

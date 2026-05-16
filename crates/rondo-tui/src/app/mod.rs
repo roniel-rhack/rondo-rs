@@ -39,12 +39,14 @@ impl AppState {
         store: Arc<rondo_core::store::sqlite::SqliteStore>,
         writable: bool,
     ) -> Result<Self> {
+        let mut plugins = PluginRegistry::new();
+        plugins.register(Box::new(crate::plugins::builtin::bell::BellPlugin));
         Ok(Self {
             data: DataState::new(store)?,
             ui: UiState::default(),
             modals: ModalsState::default(),
             fx: crate::fx::FxManager::new(),
-            plugins: PluginRegistry::new(),
+            plugins,
             theme: Theme::dark(),
             should_quit: false,
             status_msg: None,
@@ -907,7 +909,40 @@ impl AppState {
                 );
             }
         }
+        if reached_total {
+            self.ring_pomodoro_bell();
+        }
         self.modals.pomodoro_started = None;
+    }
+
+    /// Dispatch an Audio `Notify` to every plugin whose manifest declares
+    /// `Capability::Notifier(NotifyChannel::Audio)`. Today that's just
+    /// `builtin.bell`, but the dispatch is capability-driven so future
+    /// plugins (e.g. desktop-notifier) wire up the same way.
+    fn ring_pomodoro_bell(&mut self) {
+        use rondo_plugin_api::{Capability, NotifyChannel, PluginAction, PluginContext};
+        let targets: Vec<String> = self
+            .plugins
+            .iter_manifests()
+            .filter(|m| {
+                m.capabilities
+                    .iter()
+                    .any(|c| matches!(c, Capability::Notifier(NotifyChannel::Audio)))
+            })
+            .map(|m| m.id)
+            .collect();
+        for id in targets {
+            if let Some(p) = self.plugins.get_mut(&id) {
+                let ctx = PluginContext::new(&id);
+                let _ = p.handle(
+                    PluginAction::Notify {
+                        channel: NotifyChannel::Audio,
+                        message: "pomodoro complete".into(),
+                    },
+                    &ctx,
+                );
+            }
+        }
     }
 
     fn dispatch_plugin_ticks(&mut self) {

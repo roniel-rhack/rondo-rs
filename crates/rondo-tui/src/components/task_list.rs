@@ -1,4 +1,4 @@
-use crate::app::AppState;
+use crate::app::{AppState, FlashTarget};
 use crate::widgets::{bracket_panel::BracketPanel, due_badge, priority_badge, priority_spine, ring};
 use ratatui::{
     layout::Rect,
@@ -45,7 +45,10 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         .map(|(idx, task)| {
             let is_selected = Some(idx) == selected;
             let in_visual = app.selection.contains(&task.id);
-            let gutter = if in_visual {
+            let flashing = app.is_flashing(FlashTarget::Task(task.id));
+            let gutter = if flashing {
+                Span::styled("◉ ", Style::default().fg(t.warn).add_modifier(Modifier::BOLD))
+            } else if in_visual {
                 Span::styled("● ", Style::default().fg(t.danger).add_modifier(Modifier::BOLD))
             } else if is_selected {
                 Span::styled("▌ ", Style::default().fg(t.accent))

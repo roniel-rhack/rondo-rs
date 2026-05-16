@@ -1,4 +1,4 @@
-use crate::app::AppState;
+use crate::app::{AppState, FlashTarget};
 use crate::focus::{DetailSection, Pane};
 use crate::widgets::{
     bracket_panel::BracketPanel, due_badge, markdown, priority_badge, ring, sparkline,
@@ -138,7 +138,10 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         lines.push(header);
         for (i, st) in task.subtasks.iter().enumerate() {
             let cursor_here = section_active && app.focus.section_item == i;
-            let gutter = if cursor_here {
+            let flashing = app.is_flashing(FlashTarget::Subtask(st.id));
+            let gutter = if flashing {
+                Span::styled("◉ ", Style::default().fg(t.warn).add_modifier(Modifier::BOLD))
+            } else if cursor_here {
                 Span::styled("▌ ", Style::default().fg(t.accent))
             } else {
                 Span::raw("  ")
@@ -153,6 +156,10 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
             } else {
                 ("○", Style::default().fg(t.fg))
             };
+            let mut line_style = st_style;
+            if flashing {
+                line_style = line_style.add_modifier(Modifier::REVERSED);
+            }
             lines.push(Line::from(vec![
                 gutter,
                 Span::styled(
@@ -164,7 +171,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
                     }),
                 ),
                 Span::raw("  "),
-                Span::styled(st.title.clone(), st_style),
+                Span::styled(st.title.clone(), line_style),
             ]));
         }
         lines.push(Line::raw(""));

@@ -54,7 +54,8 @@ fn register_builtin_plugins(app: &mut AppState) {
 }
 
 fn run(terminal: &mut tui::Tui, app: &mut AppState) -> Result<()> {
-    let anim_tick = Duration::from_millis(100);
+    let flash_tick = Duration::from_millis(40); // 25 Hz while flashing
+    let anim_tick = Duration::from_millis(100); // 10 Hz for pomodoro
     let idle_tick = Duration::from_secs(60);
     let mut last_tick = Instant::now();
     let mut dirty = true;
@@ -63,7 +64,9 @@ fn run(terminal: &mut tui::Tui, app: &mut AppState) -> Result<()> {
             terminal.draw(|f| components::root::draw(app, f))?;
             dirty = false;
         }
-        let tick = if app.needs_animation_tick() {
+        let tick = if app.flash.is_some() {
+            flash_tick
+        } else if app.needs_animation_tick() {
             anim_tick
         } else {
             idle_tick

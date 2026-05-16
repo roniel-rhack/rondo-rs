@@ -41,12 +41,38 @@ pub struct AppState {
     pub status_msg: Option<String>,
     pub plugins: PluginRegistry,
     pub store: Arc<rondo_core::store::sqlite::SqliteStore>,
+    pub flash: Option<(FlashTarget, Instant)>,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlashTarget {
+    Task(i64),
+    Subtask(i64),
+}
+
+pub const FLASH_DURATION_MS: u128 = 220;
 
 impl AppState {
     /// Returns true when an animation requires periodic redraw without user input.
     pub fn needs_animation_tick(&self) -> bool {
-        self.pomodoro_open
+        self.pomodoro_open || self.flash.is_some()
+    }
+
+    /// Is `target` currently flashing? Clears the flash if expired.
+    pub fn is_flashing(&self, target: FlashTarget) -> bool {
+        match self.flash {
+            Some((t, when)) if t == target => when.elapsed().as_millis() < FLASH_DURATION_MS,
+            _ => false,
+        }
+    }
+
+    /// Periodic housekeeping (called on tick).
+    pub fn expire_flash(&mut self) {
+        if let Some((_, when)) = self.flash {
+            if when.elapsed().as_millis() >= FLASH_DURATION_MS {
+                self.flash = None;
+            }
+        }
     }
 
     /// Backward-compat shim — still used by some pane-render code paths to color borders.
@@ -101,6 +127,7 @@ impl AppState {
             status_msg: None,
             plugins: PluginRegistry::new(),
             store,
+            flash: None,
         })
     }
 
@@ -135,6 +162,7 @@ impl AppState {
                 if self.pomodoro_open {
                     self.pomodoro_throbber.calc_next();
                 }
+                self.expire_flash();
                 self.dispatch_plugin_ticks();
             }
             Action::NextItem => self.move_selection(1),
@@ -193,6 +221,9 @@ impl AppState {
                                 _ => rondo_core::domain::task::Status::Done,
                             };
                         }
+                    }
+                    if let Some(first) = ids.first() {
+                        self.flash = Some((FlashTarget::Task(*first), Instant::now()));
                     }
                     self.status_msg = Some(format!(
                         "toggled {} tasks (in-memory)",
@@ -395,15 +426,20 @@ impl AppState {
                 None => return,
             };
             let item_idx = self.focus.section_item;
+            let mut flashed: Option<i64> = None;
             if let Some(task) = self.tasks.get_mut(self.selected_task) {
                 if let Some(st) = task.subtasks.get_mut(item_idx) {
                     st.completed = !st.completed;
-                    self.status_msg = Some(format!(
-                        "toggled subtask #{} (in-memory; read-only store)",
-                        st.id
-                    ));
+                    flashed = Some(st.id);
                     let _ = task_id;
                 }
+            }
+            if let Some(id) = flashed {
+                self.flash = Some((FlashTarget::Subtask(id), Instant::now()));
+                self.status_msg = Some(format!(
+                    "toggled subtask #{} (in-memory; read-only store)",
+                    id
+                ));
             }
         }
     }

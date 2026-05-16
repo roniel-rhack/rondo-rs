@@ -24,10 +24,19 @@ pub struct AppState {
     pub theme: Theme,
     pub should_quit: bool,
     pub status_msg: Option<String>,
+    /// True when the underlying store was opened RW (so we can persist mutations).
+    pub writable: bool,
 }
 
 impl AppState {
     pub fn new(store: Arc<rondo_core::store::sqlite::SqliteStore>) -> Result<Self> {
+        Self::with_writable(store, false)
+    }
+
+    pub fn with_writable(
+        store: Arc<rondo_core::store::sqlite::SqliteStore>,
+        writable: bool,
+    ) -> Result<Self> {
         Ok(Self {
             data: DataState::new(store)?,
             ui: UiState::default(),
@@ -37,6 +46,7 @@ impl AppState {
             theme: Theme::dark(),
             should_quit: false,
             status_msg: None,
+            writable,
         })
     }
 
@@ -220,9 +230,10 @@ impl AppState {
                 self.modals.pomodoro_open = !was_open || matches!(action, Action::OpenPomodoro);
                 if self.modals.pomodoro_open && self.modals.pomodoro_started.is_none() {
                     self.modals.pomodoro_started = Some(Instant::now());
+                    self.persist_pomodoro_start();
                 }
                 if !self.modals.pomodoro_open {
-                    self.modals.pomodoro_started = None;
+                    self.finalize_pomodoro_close();
                 }
                 if self.modals.pomodoro_open && !was_open && self.ui.last_pomodoro_rect.width > 0 {
                     let eff = crate::fx::presets::pomodoro_open(self.theme.accent);
@@ -235,7 +246,7 @@ impl AppState {
             }
             Action::ClosePomodoro => {
                 self.modals.pomodoro_open = false;
-                self.modals.pomodoro_started = None;
+                self.finalize_pomodoro_close();
             }
             Action::SubmitCommand(cmd) => self.handle_command(cmd),
             Action::EscapeContext => {
@@ -257,7 +268,7 @@ impl AppState {
                     self.ui.selection.clear();
                 } else if self.modals.pomodoro_open {
                     self.modals.pomodoro_open = false;
-                    self.modals.pomodoro_started = None;
+                    self.finalize_pomodoro_close();
                 } else if self.status_msg.is_some() {
                     self.status_msg = None;
                 }
@@ -489,13 +500,65 @@ impl AppState {
             "tasks" => self.ui.page = Page::Tasks,
             "journal" => self.ui.page = Page::Journal,
             "pomodoro" => {
+                let already = self.modals.pomodoro_open;
                 self.modals.pomodoro_open = true;
-                self.modals.pomodoro_started = Some(Instant::now());
+                if !already {
+                    self.modals.pomodoro_started = Some(Instant::now());
+                    self.persist_pomodoro_start();
+                }
             }
             "quit" => self.should_quit = true,
             "" => {}
             other => self.status_msg = Some(format!("unknown: {}", other)),
         }
+    }
+
+    /// Insert a `focus_sessions` row for the just-opened pomodoro. No-op when
+    /// the store is read-only; logs a debug line instead.
+    fn persist_pomodoro_start(&mut self) {
+        if !self.writable {
+            tracing::debug!("pomodoro: read-only store, skipping focus_sessions insert");
+            return;
+        }
+        let task_id = self.data.tasks.get(self.data.selected_task).map(|t| t.id);
+        let total = self.modals.pomodoro_total.as_secs();
+        match self.data.store.start_focus_session(
+            task_id,
+            rondo_core::domain::focus::SessionKind::Work,
+            total,
+        ) {
+            Ok(id) => {
+                self.modals.pomodoro_session_id = Some(id);
+                tracing::debug!("pomodoro: started focus_sessions id={}", id);
+            }
+            Err(e) => tracing::warn!("pomodoro: failed to persist start: {}", e),
+        }
+    }
+
+    /// On modal close, mark the session completed iff the timer reached 100%.
+    /// Always clears in-memory pomodoro state (started_at, session_id).
+    fn finalize_pomodoro_close(&mut self) {
+        let reached_total = match self.modals.pomodoro_started {
+            Some(started) => started.elapsed() >= self.modals.pomodoro_total,
+            None => false,
+        };
+        if let Some(id) = self.modals.pomodoro_session_id.take() {
+            if reached_total && self.writable {
+                if let Err(e) = self.data.store.complete_focus_session(id) {
+                    tracing::warn!("pomodoro: failed to persist complete: {}", e);
+                } else {
+                    tracing::debug!("pomodoro: completed focus_sessions id={}", id);
+                }
+            } else {
+                tracing::debug!(
+                    "pomodoro: closed early (reached_total={}, writable={}), id={} left incomplete",
+                    reached_total,
+                    self.writable,
+                    id
+                );
+            }
+        }
+        self.modals.pomodoro_started = None;
     }
 
     fn dispatch_plugin_ticks(&mut self) {

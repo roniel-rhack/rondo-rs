@@ -1,6 +1,6 @@
 use rusqlite::Connection;
 
-pub const CURRENT_VERSION: u32 = 1;
+pub const CURRENT_VERSION: u32 = 2;
 
 #[derive(Debug, thiserror::Error)]
 pub enum MigrationError {
@@ -28,7 +28,9 @@ pub fn migrate(conn: &Connection) -> Result<u32, MigrationError> {
     if from < 1 {
         migrate_to_v1(conn)?;
     }
-    // Future: if from < 2 { migrate_to_v2(conn)?; } ...
+    if from < 2 {
+        migrate_to_v2(conn)?;
+    }
     set_user_version(conn, CURRENT_VERSION)?;
     Ok(CURRENT_VERSION)
 }
@@ -39,6 +41,27 @@ fn migrate_to_v1(conn: &Connection) -> Result<(), MigrationError> {
     if !column_exists(&tx, "tasks", "metadata")? {
         tx.execute_batch("ALTER TABLE tasks ADD COLUMN metadata TEXT")?;
     }
+    tx.commit()?;
+    Ok(())
+}
+
+/// v1 → v2: create `focus_sessions` table for persistent pomodoro sessions.
+fn migrate_to_v2(conn: &Connection) -> Result<(), MigrationError> {
+    let tx = conn.unchecked_transaction()?;
+    tx.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS focus_sessions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          task_id INTEGER,
+          kind INTEGER NOT NULL,
+          started_at TEXT NOT NULL,
+          completed_at TEXT,
+          duration_secs INTEGER NOT NULL,
+          FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_focus_sessions_started_at ON focus_sessions(started_at);
+        "#,
+    )?;
     tx.commit()?;
     Ok(())
 }

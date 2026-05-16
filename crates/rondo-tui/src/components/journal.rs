@@ -4,7 +4,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{List, ListItem, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap},
     Frame,
 };
 
@@ -97,6 +97,50 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
             .block(t.panel("Journal", true)),
         chunks[1],
     );
+}
+
+pub fn draw_editor_overlay(app: &AppState, f: &mut Frame<'_>, area: Rect) {
+    let t = &app.theme;
+    let h = 6.min(area.height.saturating_sub(2)).max(3);
+    let editor_rect = Rect {
+        x: area.x + 2,
+        y: area.y + area.height.saturating_sub(h + 1),
+        width: area.width.saturating_sub(4),
+        height: h,
+    };
+    f.render_widget(Clear, editor_rect);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(t.border_style(true))
+        .title(Span::styled(" + journal entry ", t.accent_style()));
+    let inner = block.inner(editor_rect);
+    f.render_widget(block, editor_rect);
+
+    let buf = &app.modals.journal_editor_buf;
+    let mut lines: Vec<Line> = Vec::new();
+    for (i, segment) in buf.split('\n').enumerate() {
+        let prefix = if i == 0 { " > " } else { "   " };
+        lines.push(Line::from(vec![
+            Span::styled(prefix, t.accent_style()),
+            Span::styled(segment.to_string(), Style::default().fg(t.fg)),
+        ]));
+    }
+    if let Some(last) = lines.last_mut() {
+        last.spans.push(Span::styled(
+            "▏",
+            Style::default().fg(t.fg).add_modifier(Modifier::SLOW_BLINK),
+        ));
+    }
+    lines.push(Line::from(vec![
+        Span::styled("  ", t.muted()),
+        Span::styled("Ctrl+S", t.kbd()),
+        Span::styled(" save · ", t.muted()),
+        Span::styled("Esc", t.kbd()),
+        Span::styled(" cancel · ", t.muted()),
+        Span::styled("Enter", t.kbd()),
+        Span::styled(" newline", t.muted()),
+    ]));
+    f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
 }
 
 fn smart_date_label(date: NaiveDate) -> String {

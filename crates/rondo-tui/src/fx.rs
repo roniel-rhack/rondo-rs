@@ -130,9 +130,15 @@ pub mod presets {
 
     pub fn status_toast(accent: Color, muted: Color) -> Effect {
         fx::sequence(&[
-            fx::fade_from_fg(rgb_color(accent), EffectTimer::from_ms(120, Interpolation::QuadIn)),
+            fx::fade_from_fg(
+                rgb_color(accent),
+                EffectTimer::from_ms(120, Interpolation::QuadIn),
+            ),
             fx::sleep(EffectTimer::from_ms(900, Interpolation::Linear)),
-            fx::fade_to_fg(rgb_color(muted), EffectTimer::from_ms(220, Interpolation::QuadOut)),
+            fx::fade_to_fg(
+                rgb_color(muted),
+                EffectTimer::from_ms(220, Interpolation::QuadOut),
+            ),
         ])
     }
 
@@ -143,7 +149,10 @@ pub mod presets {
         // effects and look black/partial.
         fx::parallel(&[
             fx::coalesce(EffectTimer::from_ms(220, Interpolation::CubicOut)),
-            fx::fade_from_fg(rgb_color(accent), EffectTimer::from_ms(180, Interpolation::QuadOut)),
+            fx::fade_from_fg(
+                rgb_color(accent),
+                EffectTimer::from_ms(180, Interpolation::QuadOut),
+            ),
         ])
     }
 
@@ -158,7 +167,10 @@ pub mod presets {
     }
 
     pub fn pomodoro_open(accent: Color) -> Effect {
-        fx::fade_from_fg(rgb_color(accent), EffectTimer::from_ms(280, Interpolation::QuadIn))
+        fx::fade_from_fg(
+            rgb_color(accent),
+            EffectTimer::from_ms(280, Interpolation::QuadIn),
+        )
     }
 
     pub fn quick_add_slide(bg: Color) -> Effect {

@@ -67,10 +67,7 @@ impl Plugin for PomodoroPlugin {
                         label: Some(format!("{:.0}%", ratio * 100.0)),
                     },
                     Block::Paragraph {
-                        text: format!(
-                            "{}s remaining",
-                            (self.total_ms - self.elapsed_ms) / 1000
-                        ),
+                        text: format!("{}s remaining", (self.total_ms - self.elapsed_ms) / 1000),
                         style: Some(TextStyle {
                             fg: Some(ColorToken::Accent),
                             ..Default::default()

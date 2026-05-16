@@ -88,9 +88,7 @@ impl<'a> Widget for BracketPanel<'a> {
             Span::styled(format!("{} ", h), style),
             Span::styled(
                 self.title.to_string(),
-                Style::default()
-                    .fg(t.accent)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
             ),
             Span::raw(" "),
         ];

@@ -18,6 +18,7 @@ pub struct DataState {
     pub selected_journal: usize,
     pub journal_list_state: ListState,
     pub active_filter: Filter,
+    pub journal_show_hidden: bool,
 }
 
 impl DataState {
@@ -49,7 +50,32 @@ impl DataState {
             selected_journal: 0,
             journal_list_state,
             active_filter: Filter::Inbox,
+            journal_show_hidden: false,
         })
+    }
+
+    /// Reload journal notes from the store, honoring the `journal_show_hidden` flag.
+    /// Also refreshes entries for the currently-selected note (clamped).
+    pub fn refresh_journal_notes(&mut self) {
+        let notes = if self.journal_show_hidden {
+            self.store
+                .list_all_journal_notes_including_hidden()
+                .unwrap_or_default()
+        } else {
+            self.store.list_journal_notes().unwrap_or_default()
+        };
+        self.journal_notes = notes;
+        if self.journal_notes.is_empty() {
+            self.selected_journal = 0;
+            self.journal_list_state.select(None);
+            self.journal_entries.clear();
+            return;
+        }
+        if self.selected_journal >= self.journal_notes.len() {
+            self.selected_journal = self.journal_notes.len() - 1;
+        }
+        self.journal_list_state.select(Some(self.selected_journal));
+        self.reload_journal_entries();
     }
 
     /// Indices of tasks that pass the current filter, in their original order.

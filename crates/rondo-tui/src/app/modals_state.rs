@@ -16,6 +16,8 @@ pub struct ModalsState {
     pub quick_actions_open: bool,
     pub quick_add_open: bool,
     pub quick_add_buf: String,
+    pub journal_editor_open: bool,
+    pub journal_editor_buf: String,
 }
 
 impl Default for ModalsState {
@@ -33,6 +35,8 @@ impl Default for ModalsState {
             quick_actions_open: false,
             quick_add_open: false,
             quick_add_buf: String::new(),
+            journal_editor_open: false,
+            journal_editor_buf: String::new(),
         }
     }
 }
@@ -46,6 +50,7 @@ impl ModalsState {
             || self.search_open
             || self.quick_actions_open
             || self.quick_add_open
+            || self.journal_editor_open
     }
 
     /// Pure modal mutations that don't need cross-substate access.
@@ -97,6 +102,15 @@ impl ModalsState {
             }
             Action::QuickAddUpdate(s) => {
                 self.quick_add_buf = s;
+                None
+            }
+            Action::JournalEntryInput(s) => {
+                self.journal_editor_buf = s;
+                None
+            }
+            Action::JournalCancelEntry => {
+                self.journal_editor_open = false;
+                self.journal_editor_buf.clear();
                 None
             }
             _ => None,

@@ -4,7 +4,9 @@ use crossterm::event;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use rondo_tui::{a11y, action::Action, app::AppState, components, event as ev, fx::FxManager, theme::Theme, tui};
+use rondo_tui::{
+    a11y, action::Action, app::AppState, components, event as ev, fx::FxManager, theme::Theme, tui,
+};
 
 #[derive(Parser)]
 #[command(name = "rondo-tui", version, about = "Rust + ratatui MVP of rondo")]

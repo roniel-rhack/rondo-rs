@@ -42,6 +42,9 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
         app.ui.last_quick_add_rect = r;
         components::quick_add::draw(app, f, r);
     }
+    if app.modals.journal_editor_open && app.ui.page == Page::Journal {
+        components::journal::draw_editor_overlay(app, f, app.ui.last_body_rect);
+    }
     if app.modals.command_palette_open {
         components::command_palette::draw(app, f, palette_rect(area));
     }

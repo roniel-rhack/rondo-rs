@@ -19,10 +19,7 @@ fn snapshot_creates_file_with_timestamp() {
 #[test]
 fn snapshot_missing_source_errors() {
     let tmp = tempfile::tempdir().unwrap();
-    let res = snapshot(
-        &tmp.path().join("nonexistent"),
-        &tmp.path().join("backups"),
-    );
+    let res = snapshot(&tmp.path().join("nonexistent"), &tmp.path().join("backups"));
     assert!(res.is_err());
 }
 

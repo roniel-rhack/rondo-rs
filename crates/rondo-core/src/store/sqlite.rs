@@ -134,7 +134,10 @@ impl SqliteStore {
             tx.execute(super::queries::UPDATE_TASK_DUE_DATE, params![s, id])?;
         }
         if let Some(r) = patch.recur_freq {
-            tx.execute(super::queries::UPDATE_TASK_RECUR_FREQ, params![r as i64, id])?;
+            tx.execute(
+                super::queries::UPDATE_TASK_RECUR_FREQ,
+                params![r as i64, id],
+            )?;
         }
         if let Some(ri) = patch.recur_interval {
             tx.execute(super::queries::UPDATE_TASK_RECUR_INTERVAL, params![ri, id])?;
@@ -185,7 +188,10 @@ impl SqliteStore {
             params![task_id],
             |r| r.get(0),
         )?;
-        tx.execute(super::queries::INSERT_SUBTASK, params![task_id, title, position])?;
+        tx.execute(
+            super::queries::INSERT_SUBTASK,
+            params![task_id, title, position],
+        )?;
         let id = tx.last_insert_rowid();
         tx.commit()?;
         Ok((
@@ -204,11 +210,10 @@ impl SqliteStore {
         {
             let mut conn = self.conn.lock().unwrap();
             let tx = conn.transaction()?;
-            let (tid, completed): (i64, i64) = tx.query_row(
-                super::queries::SUBTASK_LOOKUP,
-                params![id],
-                |r| Ok((r.get(0)?, r.get(1)?)),
-            )?;
+            let (tid, completed): (i64, i64) =
+                tx.query_row(super::queries::SUBTASK_LOOKUP, params![id], |r| {
+                    Ok((r.get(0)?, r.get(1)?))
+                })?;
             task_id = tid;
             new_completed = if completed == 0 { 1 } else { 0 };
             tx.execute(
@@ -252,6 +257,88 @@ impl SqliteStore {
             task_before: Some(before),
             created_id: None,
         })
+    }
+
+    /// Returns the today-dated note, creating it if it doesn't exist yet.
+    pub fn create_or_get_today_note(&self) -> Result<Note> {
+        let today = Utc::now().date_naive();
+        self.create_or_get_note_for(today)
+    }
+
+    pub fn create_or_get_note_for(&self, date: NaiveDate) -> Result<Note> {
+        let conn = self.conn.lock().unwrap();
+        let date_s = date.format("%Y-%m-%d").to_string();
+        let existing: rusqlite::Result<(i64, i64, String, String)> = conn.query_row(
+            super::queries::JOURNAL_NOTE_BY_DATE,
+            params![&date_s],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+        );
+        match existing {
+            Ok((id, hidden, created_at, updated_at)) => Ok(Note {
+                id,
+                date,
+                hidden: hidden != 0,
+                created_at: parse_dt(&created_at),
+                updated_at: parse_dt(&updated_at),
+            }),
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
+                let now = Utc::now().to_rfc3339();
+                conn.execute(
+                    super::queries::INSERT_JOURNAL_NOTE,
+                    params![&date_s, &now, &now],
+                )?;
+                let id = conn.last_insert_rowid();
+                Ok(Note {
+                    id,
+                    date,
+                    hidden: false,
+                    created_at: parse_dt(&now),
+                    updated_at: parse_dt(&now),
+                })
+            }
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    pub fn add_journal_entry(&self, note_id: i64, body: &str) -> Result<i64> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().to_rfc3339();
+        let tx = conn.unchecked_transaction()?;
+        tx.execute(
+            super::queries::INSERT_JOURNAL_ENTRY,
+            params![note_id, body, &now],
+        )?;
+        let id = tx.last_insert_rowid();
+        tx.execute(super::queries::TOUCH_JOURNAL_NOTE, params![&now, note_id])?;
+        tx.commit()?;
+        Ok(id)
+    }
+
+    pub fn hide_note(&self, note_id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(super::queries::HIDE_JOURNAL_NOTE, params![note_id])?;
+        Ok(())
+    }
+
+    pub fn unhide_note(&self, note_id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(super::queries::UNHIDE_JOURNAL_NOTE, params![note_id])?;
+        Ok(())
+    }
+
+    pub fn delete_entry(&self, entry_id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(super::queries::DELETE_JOURNAL_ENTRY, params![entry_id])?;
+        Ok(())
+    }
+
+    pub fn list_all_journal_notes_including_hidden(&self) -> Result<Vec<Note>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(super::queries::LIST_ALL_JOURNAL_NOTES)?;
+        let rows = stmt
+            .query_map([], row_to_note)?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
     }
 }
 
@@ -352,9 +439,8 @@ fn row_to_note(r: &Row<'_>) -> rusqlite::Result<Note> {
     let date_str: String = r.get(1)?;
     Ok(Note {
         id: r.get(0)?,
-        date: NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").unwrap_or_else(|_| {
-            NaiveDate::from_ymd_opt(1970, 1, 1).expect("epoch date is valid")
-        }),
+        date: NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+            .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).expect("epoch date is valid")),
         hidden: r.get::<_, i64>(2)? != 0,
         created_at: parse_dt(&r.get::<_, String>(3)?),
         updated_at: parse_dt(&r.get::<_, String>(4)?),

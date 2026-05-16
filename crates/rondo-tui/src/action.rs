@@ -54,6 +54,15 @@ pub enum Action {
     QuickAddUpdate(String),
     SubmitQuickAdd(String),
 
+    JournalStartEntry,
+    JournalEntryInput(String),
+    JournalSubmitEntry,
+    JournalCancelEntry,
+    JournalToggleHidden,
+    JournalGotoTop,
+    JournalGotoBottom,
+    JournalDeleteEntry,
+
     Error(String),
 }
 

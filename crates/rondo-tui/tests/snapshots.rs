@@ -32,7 +32,13 @@ fn snapshot(
     let backend = TestBackend::new(width, height);
     let mut term = Terminal::new(backend).unwrap();
     term.draw(|f| components::root::draw(&mut app, f)).unwrap();
-    term.backend().to_string()
+    let raw = term.backend().to_string();
+    // Redact wall-clock timestamps so snapshots are stable across runs.
+    // Order matters: longer pattern first (HH:MM:SS), then plain HH:MM.
+    let re_hms = regex::Regex::new(r"\d{2}:\d{2}:\d{2}").unwrap();
+    let stage1 = re_hms.replace_all(&raw, "HH:MM:SS").to_string();
+    let re_hm = regex::Regex::new(r"\b\d{2}:\d{2}\b").unwrap();
+    re_hm.replace_all(&stage1, "HH:MM").to_string()
 }
 
 #[test]
@@ -56,10 +62,7 @@ fn tasks_blocked() {
 #[test]
 fn journal_view() {
     let s = snapshot("journal_view", 120, 32, |a| a.page = Page::Journal);
-    // Redact timestamps (HH:MM) that drift between test runs based on wall clock.
-    let re = regex::Regex::new(r"\d{2}:\d{2}").unwrap();
-    let scrubbed = re.replace_all(&s, "HH:MM").to_string();
-    assert_snapshot!(scrubbed);
+    assert_snapshot!(s);
 }
 
 #[test]

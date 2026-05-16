@@ -2,7 +2,7 @@
 source: crates/rondo-tui/tests/snapshots.rs
 expression: s
 ---
-" ▌rondo v0.1.0       // SISTEMA DE GESTIÓN DE TAREAS AVANZADO //                  ⊙ ONLINE · 14:25:48 · ◷ 0/0 · P— · ☑0 "
+" ▌rondo v0.1.0       // SISTEMA DE GESTIÓN DE TAREAS AVANZADO //                  ⊙ ONLINE · HH:MM:SS · ◷ 0/0 · P— · ☑0 "
 "┌─ navegación ───────┐┏━ inbox · 0 tareas ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
 "   ◉ INBOX                                                                                                              "
 "   ◷ HOY                                                                                                                "
@@ -26,8 +26,8 @@ expression: s
 "└────────────────────┘┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
 "┌─ vista general ────┐┌─ próximas 7 días ──────────────┐┌─ distribución por tag ───────────┐┌─ sincronización ─────────┐"
 "                                                                                               ESTADO     Conectado     "
-"    0  TOTAL                                                                                   ÚLTIMA     14:25:48      "
-"                                                                                               PRÓXIMA    14:30:48      "
+"    0  TOTAL                                                                                   ÚLTIMA     HH:MM:SS      "
+"                                                                                               PRÓXIMA    HH:MM:SS      "
 "    ◑    0  Completa                                                                           DISPOSIT.  1/1 local     "
 "    ◐    0  En progr                                                                                                    "
 "    ○    0  Pendient      16   17   18   19   20   21                                                 ⌬                 "

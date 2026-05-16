@@ -249,11 +249,56 @@ impl AppState {
                 self.finalize_pomodoro_close();
             }
             Action::SubmitCommand(cmd) => self.handle_command(cmd),
+            Action::JournalStartEntry => {
+                if self.ui.page == Page::Journal {
+                    self.modals.journal_editor_open = true;
+                    self.modals.journal_editor_buf.clear();
+                    self.ui.mode = Mode::Insert;
+                }
+            }
+            Action::JournalSubmitEntry => self.submit_journal_entry(),
+            Action::JournalCancelEntry => {
+                self.modals.journal_editor_open = false;
+                self.modals.journal_editor_buf.clear();
+                self.ui.mode = Mode::Normal;
+            }
+            Action::JournalToggleHidden => {
+                self.data.journal_show_hidden = !self.data.journal_show_hidden;
+                self.data.refresh_journal_notes();
+                let label = if self.data.journal_show_hidden {
+                    "showing hidden"
+                } else {
+                    "hiding hidden"
+                };
+                self.toast(format!("journal: {}", label));
+            }
+            Action::JournalGotoTop => {
+                if self.ui.page == Page::Journal && !self.data.journal_notes.is_empty() {
+                    self.data.selected_journal = 0;
+                    self.data.journal_list_state.select(Some(0));
+                    self.data.reload_journal_entries();
+                }
+            }
+            Action::JournalGotoBottom => {
+                if self.ui.page == Page::Journal && !self.data.journal_notes.is_empty() {
+                    let last = self.data.journal_notes.len() - 1;
+                    self.data.selected_journal = last;
+                    self.data.journal_list_state.select(Some(last));
+                    self.data.reload_journal_entries();
+                }
+            }
+            Action::JournalDeleteEntry => {
+                self.delete_focused_journal_entry();
+            }
             Action::EscapeContext => {
                 if self.modals.help_open {
                     self.modals.help_open = false;
                 } else if self.modals.quick_actions_open {
                     self.modals.quick_actions_open = false;
+                } else if self.modals.journal_editor_open {
+                    self.modals.journal_editor_open = false;
+                    self.modals.journal_editor_buf.clear();
+                    self.ui.mode = Mode::Normal;
                 } else if self.modals.quick_add_open {
                     self.modals.quick_add_open = false;
                     self.modals.quick_add_buf.clear();
@@ -492,6 +537,46 @@ impl AppState {
             "queued: '{}' (tags={:?} prio={:?} due={:?})",
             parsed.title, parsed.tags, parsed.priority, parsed.due
         ));
+    }
+
+    fn submit_journal_entry(&mut self) {
+        let body = std::mem::take(&mut self.modals.journal_editor_buf);
+        self.modals.journal_editor_open = false;
+        self.ui.mode = Mode::Normal;
+        if body.trim().is_empty() {
+            return;
+        }
+        match self.data.store.create_or_get_today_note() {
+            Ok(note) => match self.data.store.add_journal_entry(note.id, &body) {
+                Ok(_) => {
+                    self.data.refresh_journal_notes();
+                    // Jump cursor to today's note (newest).
+                    if let Some(pos) = self.data.journal_notes.iter().position(|n| n.id == note.id)
+                    {
+                        self.data.selected_journal = pos;
+                        self.data.journal_list_state.select(Some(pos));
+                        self.data.reload_journal_entries();
+                    }
+                    self.toast("entry saved".to_string());
+                }
+                Err(e) => self.toast(format!("save failed: {}", e)),
+            },
+            Err(e) => self.toast(format!("save failed: {}", e)),
+        }
+    }
+
+    fn delete_focused_journal_entry(&mut self) {
+        let entry_id = match self.data.journal_entries.last() {
+            Some(e) => e.id,
+            None => return,
+        };
+        match self.data.store.delete_entry(entry_id) {
+            Ok(_) => {
+                self.data.reload_journal_entries();
+                self.toast(format!("deleted entry #{}", entry_id));
+            }
+            Err(e) => self.toast(format!("delete failed: {}", e)),
+        }
     }
 
     fn handle_command(&mut self, cmd: String) {

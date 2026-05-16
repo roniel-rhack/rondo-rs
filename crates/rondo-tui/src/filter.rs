@@ -67,10 +67,12 @@ impl Filter {
         match self {
             Self::Inbox => task.status != Status::Done,
             Self::Today => task.status != Status::Done && task.due_date == Some(today),
-            Self::Upcoming => task.status != Status::Done
-                && task
-                    .due_date
-                    .is_some_and(|d| (1..=7).contains(&(d - today).num_days())),
+            Self::Upcoming => {
+                task.status != Status::Done
+                    && task
+                        .due_date
+                        .is_some_and(|d| (1..=7).contains(&(d - today).num_days()))
+            }
             Self::NoTag => task.tags.is_empty(),
             Self::Urgent => task.priority == Priority::Urgent && task.status != Status::Done,
             Self::HighPriority => {

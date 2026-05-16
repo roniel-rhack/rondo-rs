@@ -70,10 +70,7 @@ pub fn render(md: &str, theme: &Theme) -> Text<'static> {
                 let text = s.to_string();
                 if in_code {
                     for code_line in text.lines() {
-                        lines.push(Line::from(Span::styled(
-                            format!(" {} ", code_line),
-                            style,
-                        )));
+                        lines.push(Line::from(Span::styled(format!(" {} ", code_line), style)));
                     }
                 } else {
                     buf.push(Span::styled(text, style));

@@ -101,3 +101,24 @@ SELECT DISTINCT DATE(completed_at) FROM focus_sessions
 WHERE kind = 0 AND completed_at IS NOT NULL
 ORDER BY DATE(completed_at) DESC
 "#;
+
+pub const JOURNAL_NOTE_BY_DATE: &str =
+    "SELECT id, hidden, created_at, updated_at FROM journal_notes WHERE date = ?1";
+
+pub const INSERT_JOURNAL_NOTE: &str =
+    "INSERT INTO journal_notes (date, hidden, created_at, updated_at) VALUES (?1, 0, ?2, ?3)";
+
+pub const INSERT_JOURNAL_ENTRY: &str =
+    "INSERT INTO journal_entries (note_id, body, created_at) VALUES (?1, ?2, ?3)";
+
+pub const TOUCH_JOURNAL_NOTE: &str = "UPDATE journal_notes SET updated_at = ?1 WHERE id = ?2";
+
+pub const HIDE_JOURNAL_NOTE: &str = "UPDATE journal_notes SET hidden = 1 WHERE id = ?1";
+pub const UNHIDE_JOURNAL_NOTE: &str = "UPDATE journal_notes SET hidden = 0 WHERE id = ?1";
+
+pub const DELETE_JOURNAL_ENTRY: &str = "DELETE FROM journal_entries WHERE id = ?1";
+
+pub const LIST_ALL_JOURNAL_NOTES: &str = r#"
+SELECT id, date, hidden, created_at, updated_at
+FROM journal_notes ORDER BY date DESC LIMIT 365
+"#;

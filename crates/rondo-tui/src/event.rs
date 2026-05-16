@@ -15,6 +15,9 @@ pub fn map(ev: Event, app: &AppState) -> Option<Action> {
     if app.modals.quick_add_open {
         return quick_add_key(ev, app);
     }
+    if app.modals.journal_editor_open {
+        return journal_editor_key(ev, app);
+    }
     if app.ui.leader_goto {
         if let Event::Key(k) = ev {
             if let KeyCode::Char(c) = k.code {
@@ -97,6 +100,34 @@ fn search_key(ev: Event, app: &AppState) -> Option<Action> {
     })
 }
 
+fn journal_editor_key(ev: Event, app: &AppState) -> Option<Action> {
+    let Event::Key(k) = ev else {
+        return None;
+    };
+    let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
+    Some(match k.code {
+        KeyCode::Esc => Action::JournalCancelEntry,
+        KeyCode::Char('s') if ctrl => Action::JournalSubmitEntry,
+        KeyCode::Enter if ctrl => Action::JournalSubmitEntry,
+        KeyCode::Enter => Action::JournalEntryInput({
+            let mut s = app.modals.journal_editor_buf.clone();
+            s.push('\n');
+            s
+        }),
+        KeyCode::Backspace => Action::JournalEntryInput({
+            let mut s = app.modals.journal_editor_buf.clone();
+            s.pop();
+            s
+        }),
+        KeyCode::Char(c) => Action::JournalEntryInput({
+            let mut s = app.modals.journal_editor_buf.clone();
+            s.push(c);
+            s
+        }),
+        _ => return None,
+    })
+}
+
 fn quick_add_key(ev: Event, app: &AppState) -> Option<Action> {
     let Event::Key(k) = ev else {
         return None;
@@ -122,6 +153,7 @@ fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
     let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
     let in_visual = app.ui.mode == crate::focus::Mode::Visual;
     let in_sidebar = app.ui.focus.pane == crate::focus::Pane::Sidebar;
+    let on_journal = app.ui.page == Page::Journal;
     Some(match k.code {
         KeyCode::Enter if in_sidebar => Action::ApplySidebarSelection,
         KeyCode::Char('q') if !ctrl => Action::Quit,
@@ -130,6 +162,10 @@ fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
         KeyCode::Char('u') if ctrl => Action::HalfPageUp,
         KeyCode::Char('j') | KeyCode::Down => Action::NextItem,
         KeyCode::Char('k') | KeyCode::Up => Action::PrevItem,
+        KeyCode::Char('i') if on_journal => Action::JournalStartEntry,
+        KeyCode::Char('H') if on_journal => Action::JournalToggleHidden,
+        KeyCode::Char('g') if on_journal => Action::JournalGotoTop,
+        KeyCode::Char('G') if on_journal => Action::JournalGotoBottom,
         KeyCode::Char('g') => Action::JumpTop,
         KeyCode::Char('G') => Action::JumpBottom,
         KeyCode::Char('h') => Action::FocusLeft,

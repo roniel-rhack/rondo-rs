@@ -358,6 +358,88 @@ impl SqliteStore {
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
     }
+
+    /// Returns the today-dated note, creating it if it doesn't exist yet.
+    pub fn create_or_get_today_note(&self) -> Result<Note> {
+        let today = Utc::now().date_naive();
+        self.create_or_get_note_for(today)
+    }
+
+    pub fn create_or_get_note_for(&self, date: NaiveDate) -> Result<Note> {
+        let conn = self.conn.lock().unwrap();
+        let date_s = date.format("%Y-%m-%d").to_string();
+        let existing: rusqlite::Result<(i64, i64, String, String)> = conn.query_row(
+            super::queries::JOURNAL_NOTE_BY_DATE,
+            params![&date_s],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+        );
+        match existing {
+            Ok((id, hidden, created_at, updated_at)) => Ok(Note {
+                id,
+                date,
+                hidden: hidden != 0,
+                created_at: parse_dt(&created_at),
+                updated_at: parse_dt(&updated_at),
+            }),
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
+                let now = Utc::now().to_rfc3339();
+                conn.execute(
+                    super::queries::INSERT_JOURNAL_NOTE,
+                    params![&date_s, &now, &now],
+                )?;
+                let id = conn.last_insert_rowid();
+                Ok(Note {
+                    id,
+                    date,
+                    hidden: false,
+                    created_at: parse_dt(&now),
+                    updated_at: parse_dt(&now),
+                })
+            }
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    pub fn add_journal_entry(&self, note_id: i64, body: &str) -> Result<i64> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().to_rfc3339();
+        let tx = conn.unchecked_transaction()?;
+        tx.execute(
+            super::queries::INSERT_JOURNAL_ENTRY,
+            params![note_id, body, &now],
+        )?;
+        let id = tx.last_insert_rowid();
+        tx.execute(super::queries::TOUCH_JOURNAL_NOTE, params![&now, note_id])?;
+        tx.commit()?;
+        Ok(id)
+    }
+
+    pub fn hide_note(&self, note_id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(super::queries::HIDE_JOURNAL_NOTE, params![note_id])?;
+        Ok(())
+    }
+
+    pub fn unhide_note(&self, note_id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(super::queries::UNHIDE_JOURNAL_NOTE, params![note_id])?;
+        Ok(())
+    }
+
+    pub fn delete_entry(&self, entry_id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(super::queries::DELETE_JOURNAL_ENTRY, params![entry_id])?;
+        Ok(())
+    }
+
+    pub fn list_all_journal_notes_including_hidden(&self) -> Result<Vec<Note>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(super::queries::LIST_ALL_JOURNAL_NOTES)?;
+        let rows = stmt
+            .query_map([], row_to_note)?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
 }
 
 fn would_create_cycle(conn: &Connection, task_id: i64, blocked_by: i64) -> Result<bool> {

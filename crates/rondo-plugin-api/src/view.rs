@@ -15,10 +15,21 @@ pub enum ViewKind {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Block {
-    Heading { text: String, level: u8 },
-    Paragraph { text: String, style: Option<TextStyle> },
-    Gauge { ratio: f64, label: Option<String> },
-    Throbber { label: String },
+    Heading {
+        text: String,
+        level: u8,
+    },
+    Paragraph {
+        text: String,
+        style: Option<TextStyle>,
+    },
+    Gauge {
+        ratio: f64,
+        label: Option<String>,
+    },
+    Throbber {
+        label: String,
+    },
     Divider,
     Spans(Vec<Span>),
 }

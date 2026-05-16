@@ -24,11 +24,7 @@ impl LockGuard {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let mut f = match OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&path)
-        {
+        let mut f = match OpenOptions::new().write(true).create_new(true).open(&path) {
             Ok(f) => f,
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
                 let mut s = String::new();

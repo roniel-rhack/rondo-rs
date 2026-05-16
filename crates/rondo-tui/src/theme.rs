@@ -81,6 +81,25 @@ impl Theme {
         self.name
     }
 
+    /// Monochrome theme honoring the NO_COLOR convention.
+    /// Every color falls back to `Color::Reset` so the terminal applies its
+    /// own default foreground/background.
+    pub fn no_color() -> Self {
+        Self {
+            name: "no-color",
+            bg: Color::Reset,
+            surface: Color::Reset,
+            fg: Color::Reset,
+            fg_muted: Color::Reset,
+            accent: Color::Reset,
+            danger: Color::Reset,
+            warn: Color::Reset,
+            success: Color::Reset,
+            border_active: Color::Reset,
+            border_inactive: Color::Reset,
+        }
+    }
+
     pub fn priority_color(&self, p: Priority) -> Color {
         match p {
             Priority::Low => self.success,

@@ -49,13 +49,20 @@ pub struct FxManager {
 
 impl FxManager {
     pub fn new() -> Self {
-        let enabled = std::env::var("RONDO_FX")
-            .map(|v| v != "0" && v.to_lowercase() != "false")
-            .unwrap_or(true);
+        Self::new_with_options(false)
+    }
+
+    /// Build with an explicit reduced-motion override (CLI flag / env).
+    /// Animations are disabled when either the override is true OR
+    /// RONDO_FX=0/false in the environment.
+    pub fn new_with_options(reduced_motion: bool) -> Self {
+        let env_disabled = std::env::var("RONDO_FX")
+            .map(|v| v == "0" || v.to_lowercase() == "false")
+            .unwrap_or(false);
         Self {
             effects: Vec::new(),
             last_tick: Instant::now(),
-            enabled,
+            enabled: !reduced_motion && !env_disabled,
         }
     }
 

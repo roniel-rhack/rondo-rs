@@ -10,7 +10,47 @@ use ratatui::{
     Frame,
 };
 use rondo_core::domain::task::Status;
+use rondo_plugin_api::{
+    action::PluginAction,
+    capabilities::{Capability, QueryScope},
+    plugin::{Plugin, PluginContext, PluginManifest, PluginResult},
+};
 use std::collections::HashMap;
+
+/// Direct-render builtin plugin that surfaces the bottom analytics row.
+///
+/// The actual ratatui rendering happens via the free [`draw`] function below,
+/// which the host (`components::root`) calls into directly. `handle()` is a
+/// no-op for now: the [`ViewSpec`](rondo_plugin_api::view::ViewSpec) DSL does
+/// not yet expose donut / sparkline / stacked-bar blocks, so we keep the
+/// existing widget code and only declare the capability surface here. Once
+/// the DSL grows the needed primitives, `handle()` will return a real
+/// `ViewSpec` and the host wrapper can drop the direct call.
+#[derive(Default)]
+pub struct AnalyticsPlugin;
+
+impl Plugin for AnalyticsPlugin {
+    fn manifest(&self) -> PluginManifest {
+        PluginManifest {
+            id: "builtin.analytics".into(),
+            name: "Analytics Dashboard".into(),
+            version: "0.1.0".into(),
+            api_version: env!("CARGO_PKG_VERSION").into(),
+            capabilities: vec![
+                Capability::PageView,
+                Capability::QueryAccess(QueryScope::Tasks),
+                Capability::QueryAccess(QueryScope::FocusSessions),
+            ],
+            exporter: None,
+            syncer: None,
+            cli: None,
+        }
+    }
+
+    fn handle(&mut self, _action: PluginAction, _ctx: &PluginContext) -> PluginResult {
+        PluginResult::default()
+    }
+}
 
 /// Bottom analytics row: donut · 7-day bar chart · tag distribution · sync placeholder
 pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
@@ -276,5 +316,38 @@ fn truncate(s: &str, max: usize) -> String {
         let mut out: String = s.chars().take(max - 1).collect();
         out.push('…');
         out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn manifest_declares_capabilities() {
+        let p = AnalyticsPlugin;
+        let m = p.manifest();
+        assert_eq!(m.id, "builtin.analytics");
+        assert!(m
+            .capabilities
+            .iter()
+            .any(|c| matches!(c, Capability::PageView)));
+        assert!(m
+            .capabilities
+            .iter()
+            .any(|c| matches!(c, Capability::QueryAccess(QueryScope::Tasks))));
+        assert!(m
+            .capabilities
+            .iter()
+            .any(|c| matches!(c, Capability::QueryAccess(QueryScope::FocusSessions))));
+    }
+
+    #[test]
+    fn handle_returns_empty_result() {
+        let mut p = AnalyticsPlugin;
+        let ctx = PluginContext::new("builtin.analytics");
+        let r = p.handle(PluginAction::Show, &ctx);
+        assert!(r.view.is_none());
+        assert!(r.follow_up.is_empty());
     }
 }

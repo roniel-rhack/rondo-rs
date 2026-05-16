@@ -24,7 +24,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
     components::header::draw(app, f, chunks[0]);
     body_with_sidebar(app, f, chunks[1]);
     if show_analytics {
-        components::analytics::draw(app, f, chunks[2]);
+        crate::plugins::builtin::analytics::draw(app, f, chunks[2]);
     }
     components::footer::draw(app, f, chunks[3]);
     app.ui.last_footer_rect = chunks[3];

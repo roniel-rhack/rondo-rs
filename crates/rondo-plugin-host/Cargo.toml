@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+rondo-core = { path = "../rondo-core" }
 rondo-plugin-api = { path = "../rondo-plugin-api" }
 extism = "=1.10.0"
 serde = { workspace = true }
@@ -16,4 +17,5 @@ tracing = { workspace = true }
 chrono = { workspace = true }
 
 [dev-dependencies]
+rusqlite = { workspace = true }
 tempfile = "3.10"

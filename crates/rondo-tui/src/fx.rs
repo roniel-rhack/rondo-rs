@@ -64,6 +64,12 @@ impl FxManager {
         if !self.enabled {
             return;
         }
+        // If the bucket was empty, reset the clock so dt on the first frame
+        // is small. Otherwise the stale `last_tick` (set when fx went idle)
+        // could be seconds old, completing the new effect in one frame.
+        if self.effects.is_empty() {
+            self.last_tick = Instant::now();
+        }
         self.effects.retain(|e| e.id != id);
         self.effects.push(LiveEffect { id, effect, area });
     }
@@ -79,10 +85,13 @@ impl FxManager {
             self.last_tick = Instant::now();
             return;
         }
-        let dt = self.last_tick.elapsed();
+        // Clamp dt at 64ms so an occasional slow frame can't fast-forward
+        // every active effect to completion.
+        let raw = self.last_tick.elapsed();
         self.last_tick = Instant::now();
+        let clamped_ms = raw.as_millis().min(64) as u32;
+        let dt = tachyonfx::Duration::from_millis(clamped_ms);
         let frame_area = f.area();
-        let dt = tachyonfx::Duration::from_millis(dt.as_millis().min(u32::MAX as u128) as u32);
         let buf: &mut Buffer = f.buffer_mut();
         self.effects.retain_mut(|live| {
             let clipped = live.area.intersection(frame_area);

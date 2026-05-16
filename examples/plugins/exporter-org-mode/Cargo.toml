@@ -1,0 +1,29 @@
+# Empty `[workspace]` keeps this crate isolated from the parent workspace;
+# it builds standalone for `wasm32-wasip1` while the workspace targets the
+# host triple. M7.2 only scaffolds the contract — full wasm wiring lands in
+# M8.5.
+[workspace]
+
+[package]
+name = "exporter-org-mode"
+version = "0.1.0"
+edition = "2021"
+
+# Sample plugin showing the `Capability::Exporter` contract: the manifest
+# carries `[exporter] format_id = "org"` and the host routes
+# `rondo-tui export --format org` to this module's `export` entrypoint.
+
+[dependencies]
+rondo-plugin-api = { path = "../../../crates/rondo-plugin-api" }
+extism-pdk = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true

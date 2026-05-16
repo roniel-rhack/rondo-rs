@@ -2,17 +2,22 @@
 //!
 //! All exporters operate on `&[Task]`; the caller is responsible for
 //! sourcing the slice (e.g., `SqliteStore::list_tasks`).
+//!
+//! Two surfaces coexist:
+//!   * Free fns `to_markdown` / `to_json` / `to_ndjson` — kept for
+//!     back-compat with M7.1 callers and tests.
+//!   * The [`Exporter`] trait + [`ExporterRegistry`] — extensibility point
+//!     so plugin-contributed formats (org-mode, ical, taskpaper, …) plug in
+//!     uniformly. The CLI dispatches through the registry.
+
+pub mod exporter;
+
+pub use exporter::{
+    ExportError, Exporter, ExporterRegistry, JsonExporter, MarkdownExporter, NdjsonExporter,
+};
 
 use crate::domain::task::Task;
 use std::io::Write;
-
-#[derive(Debug, thiserror::Error)]
-pub enum ExportError {
-    #[error("json: {0}")]
-    Json(#[from] serde_json::Error),
-    #[error("io: {0}")]
-    Io(#[from] std::io::Error),
-}
 
 pub fn to_markdown(tasks: &[Task]) -> String {
     let mut out = String::new();

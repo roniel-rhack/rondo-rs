@@ -1,0 +1,13 @@
+id = "exporter-org-mode"
+name = "Org-mode exporter"
+version = "0.1.0"
+api = "0.1"
+capabilities = ["Exporter"]
+
+[exporter]
+format_id = "org"
+mime = "text/x-org"
+
+[wasi]
+allowed_paths = []
+allowed_hosts = []

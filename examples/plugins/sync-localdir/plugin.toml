@@ -1,0 +1,12 @@
+id = "sync-localdir"
+name = "Local-directory backup syncer"
+version = "0.1.0"
+api = "0.1"
+capabilities = ["Syncer", "TickHandler"]
+
+[syncer]
+name = "localdir"
+
+[wasi]
+allowed_paths = ["~/.todo-app/sync/"]
+allowed_hosts = []

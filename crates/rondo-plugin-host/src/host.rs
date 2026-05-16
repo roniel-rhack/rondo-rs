@@ -1,5 +1,6 @@
 use crate::error::HostError;
 use crate::manifest::FsManifest;
+use crate::policy::Policy;
 use rondo_plugin_api::{PluginAction, PluginContext, PluginResult};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -28,13 +29,29 @@ impl LoadedPlugin {
 /// the caller fan-out follow-up actions and overlay views.
 pub struct PluginHost {
     plugins: HashMap<String, LoadedPlugin>,
+    policy: Policy,
 }
 
 impl PluginHost {
     pub fn new() -> Self {
         Self {
             plugins: HashMap::new(),
+            policy: Policy::default(),
         }
+    }
+
+    /// Build a host that gates dangerous capabilities through `policy`.
+    /// Plugins whose manifest declares an ungranted capability load with
+    /// `enabled = false` and a warning is logged.
+    pub fn with_policy(policy: Policy) -> Self {
+        Self {
+            plugins: HashMap::new(),
+            policy,
+        }
+    }
+
+    pub fn set_policy(&mut self, policy: Policy) {
+        self.policy = policy;
     }
 
     /// Scan `dir` for subdirectories containing a `plugin.toml`. Each valid
@@ -69,6 +86,24 @@ impl PluginHost {
         if !manifest.api.starts_with("0.1") {
             return Err(HostError::UnsupportedApi(manifest.api.clone()));
         }
+        let missing = self
+            .policy
+            .missing_for(&manifest.id, &manifest.capabilities);
+        let granted_ok = missing.is_empty();
+        if !granted_ok {
+            tracing::warn!(
+                "plugin `{}` declares ungranted capabilities {:?}; loading DISABLED. \
+                 Grant via config: [plugins.permissions] {} = [{}]",
+                manifest.id,
+                missing,
+                manifest.id,
+                missing
+                    .iter()
+                    .map(|t| format!("\"{}\"", t))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            );
+        }
         let wasm_path = dir.join("plugin.wasm");
         let extism_plugin = if wasm_path.exists() {
             let wasm = std::fs::read(&wasm_path)?;
@@ -92,7 +127,7 @@ impl PluginHost {
                 manifest,
                 dir: dir.to_path_buf(),
                 plugin: extism_plugin,
-                enabled: true,
+                enabled: granted_ok,
             },
         );
         Ok(id)

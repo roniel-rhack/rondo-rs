@@ -11,7 +11,9 @@
 pub mod error;
 pub mod host;
 pub mod manifest;
+pub mod policy;
 
 pub use error::HostError;
 pub use host::{LoadedPlugin, PluginHost};
 pub use manifest::{FsManifest, Wasi};
+pub use policy::Policy;

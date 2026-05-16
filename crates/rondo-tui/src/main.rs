@@ -43,19 +43,26 @@ fn main() -> Result<()> {
     rondo_core::telemetry::install_panic_hook(log_dir);
     let cli_args = Cli::parse();
     let db_path = cli_args.db.clone().unwrap_or_else(default_db_path);
+    if let Some(cmd) = cli_args.command {
+        if cli::needs_db(&cmd) && !db_path.exists() {
+            eprintln!(
+                "DB no encontrado en {}. Usa --db o setea RONDO_DB.",
+                db_path.display()
+            );
+            std::process::exit(2);
+        }
+        let opts = cli::CliOpts {
+            json: cli_args.json,
+            write: cli_args.write,
+        };
+        return cli::run(cmd, &opts, &db_path);
+    }
     if !db_path.exists() {
         eprintln!(
             "DB no encontrado en {}. Usa --db o setea RONDO_DB.",
             db_path.display()
         );
         std::process::exit(2);
-    }
-    if let Some(cmd) = cli_args.command {
-        let opts = cli::CliOpts {
-            json: cli_args.json,
-            write: cli_args.write,
-        };
-        return cli::run(cmd, &opts, &db_path);
     }
     let mut _lock_guard: Option<rondo_core::store::lock::LockGuard> = None;
     let store = if cli_args.write {

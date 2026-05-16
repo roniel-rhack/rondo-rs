@@ -39,18 +39,30 @@ fn search_rect(area: Rect) -> Rect {
     anchored
 }
 
+const NARROW_BREAKPOINT: u16 = 100;
+
 fn body(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
+    let narrow = area.width < NARROW_BREAKPOINT;
     match app.page {
         Page::Tasks => {
-            let split = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Percentage(app.split_ratio),
-                    Constraint::Percentage(100 - app.split_ratio),
-                ])
-                .split(area);
-            components::task_list::draw(app, f, split[0]);
-            components::task_detail::draw(app, f, split[1]);
+            if narrow {
+                // Single-pane: show whichever side has focus.
+                if app.focus_left {
+                    components::task_list::draw(app, f, area);
+                } else {
+                    components::task_detail::draw(app, f, area);
+                }
+            } else {
+                let split = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([
+                        Constraint::Percentage(app.split_ratio),
+                        Constraint::Percentage(100 - app.split_ratio),
+                    ])
+                    .split(area);
+                components::task_list::draw(app, f, split[0]);
+                components::task_detail::draw(app, f, split[1]);
+            }
         }
         Page::Journal => components::journal::draw(app, f, area),
     }

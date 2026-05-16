@@ -16,10 +16,14 @@ struct Cli {
 
 fn main() -> Result<()> {
     color_eyre::install()?;
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .with_writer(std::io::stderr)
-        .init();
+    let log_dir = std::env::var("HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_default()
+        .join(".todo-app")
+        .join("logs");
+    rondo_core::telemetry::rotate_old_logs(&log_dir, 7);
+    let _log_guard = rondo_core::telemetry::init_logging(log_dir.clone()).ok();
+    rondo_core::telemetry::install_panic_hook(log_dir);
     let cli = Cli::parse();
     let db_path = cli.db.unwrap_or_else(default_db_path);
     if !db_path.exists() {

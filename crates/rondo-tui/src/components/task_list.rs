@@ -56,9 +56,10 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
 
     draw_column_header(f, layout[0], t);
 
-    let items = render_items(app, &visible);
-    let highlight = app.theme.selection();
-    let list = List::new(items).highlight_style(highlight);
+    let items = render_items(app, &visible, layout[1].width);
+    // No REVERSED highlight — bg changes are theme-fragile. The accent ▌ gutter
+    // already marks the cursor row.
+    let list = List::new(items);
     f.render_stateful_widget(list, layout[1], &mut app.task_list_state);
 
     draw_progress_bar(app, f, layout[2], t);
@@ -75,22 +76,28 @@ fn draw_column_header(f: &mut Frame<'_>, area: Rect, t: &Theme) {
     f.render_widget(Paragraph::new(header), area);
 }
 
-fn render_items(app: &AppState, visible: &[usize]) -> Vec<ListItem<'static>> {
-    let selected = app.task_list_state.selected();
+fn render_items(app: &AppState, visible: &[usize], width: u16) -> Vec<ListItem<'static>> {
+    let selected_pos = app.task_list_state.selected();
+    let last_idx = visible.len().saturating_sub(1);
     visible
         .iter()
-        .map(|&idx| build_row(&app.tasks[idx], idx, selected, app, &app.theme))
+        .enumerate()
+        .map(|(pos, &idx)| {
+            let is_selected = Some(pos) == selected_pos;
+            let is_last = pos == last_idx;
+            build_row(&app.tasks[idx], is_selected, is_last, app, &app.theme, width)
+        })
         .collect()
 }
 
 fn build_row(
     task: &Task,
-    idx: usize,
-    selected: Option<usize>,
+    is_selected: bool,
+    is_last: bool,
     app: &AppState,
     t: &Theme,
+    width: u16,
 ) -> ListItem<'static> {
-    let is_selected = Some(idx) == selected;
     let in_visual = app.selection.contains(&task.id);
     let flashing = app.is_flashing(FlashTarget::Task(task.id));
     let gutter = || -> Span<'static> {
@@ -120,6 +127,11 @@ fn build_row(
         Style::default()
             .fg(t.fg_muted)
             .add_modifier(Modifier::CROSSED_OUT)
+    } else if is_selected {
+        // Selected: brighter accent fg + bold + underline. No bg change.
+        Style::default()
+            .fg(t.accent)
+            .add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
     } else {
         Style::default().fg(t.fg).add_modifier(Modifier::BOLD)
     };
@@ -182,8 +194,15 @@ fn build_row(
         lines.push(Line::from(tag_spans));
     }
 
-    // ROW final — blank separator for breathing room (NEXUS-style).
-    lines.push(Line::raw(""));
+    // ROW final — subtle separator unless this is the last row (no trailing line).
+    if !is_last {
+        let dash_width = (width as usize).saturating_sub(4);
+        let sep = "╌".repeat(dash_width);
+        lines.push(Line::from(vec![
+            Span::raw("  "),
+            Span::styled(sep, Style::default().fg(t.border_inactive)),
+        ]));
+    }
 
     ListItem::new(lines)
 }

@@ -73,7 +73,12 @@ impl AppState {
     }
 
     pub fn visible_task_indices(&self) -> Vec<usize> {
-        self.data.visible_task_indices()
+        if self.modals.search_open && !self.modals.search_buf.trim().is_empty() {
+            self.data
+                .visible_task_indices_with_search(&self.modals.search_buf)
+        } else {
+            self.data.visible_task_indices()
+        }
     }
 
     pub fn visible_count(&self) -> usize {

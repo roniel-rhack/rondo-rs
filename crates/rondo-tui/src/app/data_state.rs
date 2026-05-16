@@ -62,6 +62,34 @@ impl DataState {
             .collect()
     }
 
+    /// Indices of tasks that pass the current filter AND match the given
+    /// fuzzy query (`title + tags + description`). Results are sorted by
+    /// score descending. Empty/whitespace query falls back to the filter
+    /// result in declared order.
+    pub fn visible_task_indices_with_search(&self, query: &str) -> Vec<usize> {
+        let q = query.trim();
+        let base = self.visible_task_indices();
+        if q.is_empty() {
+            return base;
+        }
+        let mut engine = crate::search::SearchEngine::new();
+        let mut scored: Vec<(u16, usize)> = base
+            .into_iter()
+            .filter_map(|i| {
+                let t = &self.tasks[i];
+                let hay = format!(
+                    "{} {} {}",
+                    t.title,
+                    t.tags.join(" "),
+                    t.description.as_deref().unwrap_or("")
+                );
+                engine.score_only(q, &hay).map(|s| (s, i))
+            })
+            .collect();
+        scored.sort_by(|a, b| b.0.cmp(&a.0));
+        scored.into_iter().map(|(_, i)| i).collect()
+    }
+
     /// Number of tasks passing the current filter.
     pub fn visible_count(&self) -> usize {
         self.tasks

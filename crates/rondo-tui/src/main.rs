@@ -123,6 +123,10 @@ fn register_builtin_plugins(app: &mut AppState) {
     app.plugins.register(Box::new(
         rondo_tui::plugins::builtin::pomodoro::PomodoroPlugin::new(),
     ));
+    app.plugins
+        .register(Box::new(rondo_tui::plugins::builtin::calendar::CalendarPlugin::new(
+            app.data.store.clone(),
+        )));
 }
 
 fn run(terminal: &mut tui::Tui, app: &mut AppState) -> Result<()> {

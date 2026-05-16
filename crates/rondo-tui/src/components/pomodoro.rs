@@ -13,11 +13,11 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     f.render_widget(Clear, area);
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(t.urgent))
+        .border_style(Style::default().fg(t.danger))
         .title(Span::styled(
             " 🍅 Focus Session ",
             Style::default()
-                .fg(t.urgent)
+                .fg(t.danger)
                 .add_modifier(Modifier::BOLD | Modifier::REVERSED),
         ));
     let inner = block.inner(area);
@@ -67,13 +67,13 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         .style(Style::default().fg(t.accent))
         .throbber_style(
             Style::default()
-                .fg(t.urgent)
+                .fg(t.danger)
                 .add_modifier(Modifier::BOLD),
         );
     f.render_stateful_widget(throbber, chunks[1], &mut app.pomodoro_throbber);
 
     let gauge = Gauge::default()
-        .gauge_style(Style::default().fg(t.urgent).bg(t.border_inactive))
+        .gauge_style(Style::default().fg(t.danger).bg(t.border_inactive))
         .ratio(ratio)
         .label(format!("{:.0}%", ratio * 100.0));
     f.render_widget(gauge, chunks[2]);

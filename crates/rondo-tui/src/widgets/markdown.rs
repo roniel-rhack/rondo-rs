@@ -38,7 +38,7 @@ pub fn render(md: &str, theme: &Theme) -> Text<'static> {
                     lines.push(Line::from(std::mem::take(&mut buf)));
                 }
                 in_code = true;
-                style = Style::default().fg(theme.warning);
+                style = Style::default().fg(theme.warn);
             }
             Event::End(TagEnd::CodeBlock) => {
                 if !buf.is_empty() {
@@ -50,7 +50,7 @@ pub fn render(md: &str, theme: &Theme) -> Text<'static> {
             Event::Code(s) => {
                 buf.push(Span::styled(
                     s.to_string(),
-                    Style::default().fg(theme.warning),
+                    Style::default().fg(theme.warn),
                 ));
             }
             Event::Text(s) => {

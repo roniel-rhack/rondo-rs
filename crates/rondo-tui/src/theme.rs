@@ -1,15 +1,20 @@
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::{
+    style::{Color, Modifier, Style},
+    widgets::{Block, BorderType, Borders},
+};
 use rondo_core::domain::task::Priority;
 
+/// Cohesive 7-token semantic palette.
+/// Designed to feel warm and restrained, not Material-Design rainbow.
 pub struct Theme {
-    pub accent: Color,
-    pub success: Color,
-    pub warning: Color,
-    pub danger: Color,
-    pub urgent: Color,
+    pub bg: Color,
+    pub surface: Color,
     pub fg: Color,
     pub fg_muted: Color,
-    pub bg: Color,
+    pub accent: Color,
+    pub danger: Color,
+    pub warn: Color,
+    pub success: Color,
     pub border_active: Color,
     pub border_inactive: Color,
 }
@@ -17,25 +22,25 @@ pub struct Theme {
 impl Theme {
     pub fn dark() -> Self {
         Self {
-            accent: Color::Rgb(0x00, 0xBC, 0xD4),
-            success: Color::Rgb(0x4C, 0xAF, 0x50),
-            warning: Color::Rgb(0xFF, 0xC1, 0x07),
-            danger: Color::Rgb(0xF4, 0x43, 0x36),
-            urgent: Color::Rgb(0xE9, 0x1E, 0x63),
-            fg: Color::Rgb(0xFA, 0xFA, 0xFA),
-            fg_muted: Color::Rgb(0x9E, 0x9E, 0x9E),
-            bg: Color::Reset,
-            border_active: Color::Rgb(0x00, 0xBC, 0xD4),
-            border_inactive: Color::Rgb(0x42, 0x42, 0x42),
+            bg: Color::Rgb(0x0F, 0x11, 0x15),
+            surface: Color::Rgb(0x18, 0x1B, 0x22),
+            fg: Color::Rgb(0xE6, 0xE1, 0xCF),
+            fg_muted: Color::Rgb(0x5C, 0x63, 0x70),
+            accent: Color::Rgb(0x7F, 0xDB, 0xCA),
+            danger: Color::Rgb(0xFF, 0x6B, 0x6B),
+            warn: Color::Rgb(0xE5, 0xC0, 0x7B),
+            success: Color::Rgb(0x98, 0xC3, 0x79),
+            border_active: Color::Rgb(0x7F, 0xDB, 0xCA),
+            border_inactive: Color::Rgb(0x2A, 0x2E, 0x36),
         }
     }
 
     pub fn priority_color(&self, p: Priority) -> Color {
         match p {
             Priority::Low => self.success,
-            Priority::Med => self.warning,
+            Priority::Med => self.warn,
             Priority::High => self.danger,
-            Priority::Urgent => self.urgent,
+            Priority::Urgent => self.danger,
         }
     }
 
@@ -49,7 +54,48 @@ impl Theme {
         Style::default().fg(self.fg_muted)
     }
 
+    pub fn fg_style(&self) -> Style {
+        Style::default().fg(self.fg)
+    }
+
     pub fn accent_style(&self) -> Style {
         Style::default().fg(self.accent).add_modifier(Modifier::BOLD)
+    }
+
+    pub fn kbd(&self) -> Style {
+        Style::default().fg(self.accent).add_modifier(Modifier::BOLD)
+    }
+
+    pub fn badge(&self, color: Color) -> Style {
+        Style::default().fg(color).add_modifier(Modifier::BOLD)
+    }
+
+    pub fn selection(&self) -> Style {
+        Style::default().add_modifier(Modifier::REVERSED)
+    }
+
+    pub fn border_style(&self, active: bool) -> Style {
+        Style::default().fg(if active {
+            self.border_active
+        } else {
+            self.border_inactive
+        })
+    }
+
+    /// Standard panel block with focus-aware border + accent title.
+    pub fn panel<'a>(&'a self, title: &'a str, active: bool) -> Block<'a> {
+        let border_type = if active {
+            BorderType::Rounded
+        } else {
+            BorderType::Plain
+        };
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(border_type)
+            .border_style(self.border_style(active))
+            .title(ratatui::text::Span::styled(
+                format!(" {} ", title),
+                self.accent_style(),
+            ))
     }
 }

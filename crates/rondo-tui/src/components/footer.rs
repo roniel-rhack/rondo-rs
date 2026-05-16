@@ -29,7 +29,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         spans.push(Span::raw("  │  "));
         spans.push(Span::styled(
             msg.clone(),
-            Style::default().fg(t.warning),
+            Style::default().fg(t.warn),
         ));
     }
     f.render_widget(Paragraph::new(Line::from(spans)), area);

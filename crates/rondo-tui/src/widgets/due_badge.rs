@@ -11,7 +11,7 @@ pub fn span(due: Option<NaiveDate>, theme: &Theme) -> Option<Span<'static>> {
     let (label, color) = if due < today {
         ("OVERDUE", theme.danger)
     } else if due == today {
-        ("TODAY", theme.warning)
+        ("TODAY", theme.warn)
     } else {
         ("UPCOMING", theme.fg_muted)
     };

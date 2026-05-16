@@ -63,6 +63,10 @@ pub enum Action {
     JournalGotoBottom,
     JournalDeleteEntry,
 
+    OpenSortOverlay,
+    CloseSortOverlay,
+    SetSortOrder(crate::app::ui_state::SortOrder),
+
     Error(String),
 }
 

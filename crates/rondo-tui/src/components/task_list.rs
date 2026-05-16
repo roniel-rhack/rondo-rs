@@ -1,3 +1,4 @@
+use crate::app::ui_state::SortOrder;
 use crate::app::{AppState, FlashTarget};
 use crate::theme::Theme;
 use crate::widgets::{
@@ -14,7 +15,8 @@ use rondo_core::domain::task::{Status, Task};
 
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
-    let visible: Vec<usize> = app.visible_task_indices();
+    let visible: Vec<usize> =
+        sorted_indices(&app.data.tasks, app.ui.sort_order, app.visible_task_indices());
     let filter_label = app.data.active_filter.label().to_lowercase();
     let title = if app.modals.search_open && !app.modals.search_buf.trim().is_empty() {
         format!(
@@ -325,6 +327,37 @@ fn highlight_title(
         spans.push(Span::styled(current, style));
     }
     spans
+}
+
+fn sorted_indices(tasks: &[Task], order: SortOrder, base: Vec<usize>) -> Vec<usize> {
+    let mut out = base;
+    match order {
+        SortOrder::Default => {} // already in SQL order
+        SortOrder::PriorityDesc => out.sort_by(|&a, &b| {
+            (tasks[b].priority as i64)
+                .cmp(&(tasks[a].priority as i64))
+                .then(tasks[a].id.cmp(&tasks[b].id))
+        }),
+        SortOrder::DueAsc => out.sort_by(|&a, &b| {
+            match (tasks[a].due_date, tasks[b].due_date) {
+                (Some(x), Some(y)) => x.cmp(&y),
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (None, None) => std::cmp::Ordering::Equal,
+            }
+            .then(tasks[a].id.cmp(&tasks[b].id))
+        }),
+        SortOrder::CreatedAtDesc => {
+            out.sort_by(|&a, &b| tasks[b].created_at.cmp(&tasks[a].created_at))
+        }
+        SortOrder::TitleAsc => out.sort_by(|&a, &b| {
+            tasks[a]
+                .title
+                .to_lowercase()
+                .cmp(&tasks[b].title.to_lowercase())
+        }),
+    }
+    out
 }
 
 fn truncate(s: &str, max: usize) -> String {

@@ -10,6 +10,36 @@ pub enum FlashTarget {
     Subtask(i64),
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum SortOrder {
+    /// Default: by status asc, priority desc, due asc, id desc (matches existing SQL ORDER BY).
+    #[default]
+    Default,
+    PriorityDesc,
+    DueAsc,
+    CreatedAtDesc,
+    TitleAsc,
+}
+
+impl SortOrder {
+    pub const ALL: &'static [SortOrder] = &[
+        SortOrder::Default,
+        SortOrder::PriorityDesc,
+        SortOrder::DueAsc,
+        SortOrder::CreatedAtDesc,
+        SortOrder::TitleAsc,
+    ];
+    pub fn label(self) -> &'static str {
+        match self {
+            SortOrder::Default => "default (status, priority, due)",
+            SortOrder::PriorityDesc => "priority (high to low)",
+            SortOrder::DueAsc => "due date (soonest first)",
+            SortOrder::CreatedAtDesc => "newest first",
+            SortOrder::TitleAsc => "title (A-Z)",
+        }
+    }
+}
+
 pub const FLASH_DURATION_MS: u128 = 220;
 
 /// View-level state: page, focus, mode, splits, flashes, cached rects.
@@ -27,6 +57,7 @@ pub struct UiState {
     pub last_body_rect: Rect,
     pub last_pomodoro_rect: Rect,
     pub last_quick_add_rect: Rect,
+    pub sort_order: SortOrder,
 }
 
 impl Default for UiState {
@@ -45,6 +76,7 @@ impl Default for UiState {
             last_body_rect: Rect::default(),
             last_pomodoro_rect: Rect::default(),
             last_quick_add_rect: Rect::default(),
+            sort_order: SortOrder::default(),
         }
     }
 }

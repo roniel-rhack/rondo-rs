@@ -9,18 +9,24 @@ const SIDEBAR_WIDTH: u16 = 22;
 
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
     let area = f.area();
+    let show_analytics = area.height >= 30 && area.width >= NARROW_BREAKPOINT;
+    let analytics_height = if show_analytics { 9 } else { 0 };
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1), // brand strip
             Constraint::Min(1),    // body (sidebar + content)
+            Constraint::Length(analytics_height), // analytics row (optional)
             Constraint::Length(1), // footer
         ])
         .split(area);
 
     components::header::draw(app, f, chunks[0]);
     body_with_sidebar(app, f, chunks[1]);
-    components::footer::draw(app, f, chunks[2]);
+    if show_analytics {
+        components::analytics::draw(app, f, chunks[2]);
+    }
+    components::footer::draw(app, f, chunks[3]);
 
     if app.pomodoro_open {
         components::pomodoro::draw(app, f, centered(60, 14, area));

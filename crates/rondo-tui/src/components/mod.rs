@@ -1,3 +1,4 @@
+pub mod analytics;
 pub mod command_palette;
 pub mod filter_strip;
 pub mod footer;

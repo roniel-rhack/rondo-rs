@@ -93,6 +93,12 @@ fn wide_terminal() {
 }
 
 #[test]
+fn full_dashboard_140x42() {
+    let s = snapshot("full_dashboard_140x42", 140, 42, |_| {});
+    assert_snapshot!(s);
+}
+
+#[test]
 fn help_overlay() {
     let s = snapshot("help_overlay", 120, 32, |a| a.help_open = true);
     assert_snapshot!(s);

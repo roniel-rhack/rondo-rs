@@ -41,6 +41,9 @@ impl AppState {
     ) -> Result<Self> {
         let mut plugins = PluginRegistry::new();
         plugins.register(Box::new(crate::plugins::builtin::bell::BellPlugin));
+        plugins.register(Box::new(
+            crate::plugins::builtin::dep_graph::DepGraphPlugin::new(Arc::clone(&store)),
+        ));
         Ok(Self {
             data: DataState::new(store)?,
             ui: UiState::default(),

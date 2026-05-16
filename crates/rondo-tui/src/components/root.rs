@@ -8,14 +8,16 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
+            Constraint::Length(3),
             Constraint::Length(1),
             Constraint::Min(1),
             Constraint::Length(1),
         ])
         .split(f.area());
     components::header::draw(app, f, chunks[0]);
-    body(app, f, chunks[1]);
-    components::footer::draw(app, f, chunks[2]);
+    components::filter_strip::draw(app, f, chunks[1]);
+    body(app, f, chunks[2]);
+    components::footer::draw(app, f, chunks[3]);
     if app.pomodoro_open {
         components::pomodoro::draw(app, f, centered(60, 14, f.area()));
     }

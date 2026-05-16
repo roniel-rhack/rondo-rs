@@ -1,4 +1,5 @@
 pub mod command_palette;
+pub mod filter_strip;
 pub mod footer;
 pub mod header;
 pub mod help;

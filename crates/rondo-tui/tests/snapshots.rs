@@ -1,7 +1,7 @@
 use insta::assert_snapshot;
 use ratatui::{backend::TestBackend, Terminal};
 use rondo_core::store::sqlite::SqliteStore;
-use rondo_tui::{action::Page, app::AppState, components};
+use rondo_tui::{action::Page, app::AppState, components, filter};
 use std::sync::Arc;
 
 fn fixture_store() -> Arc<SqliteStore> {
@@ -107,6 +107,7 @@ fn help_overlay() {
 #[test]
 fn search_overlay() {
     let s = snapshot("search_overlay", 120, 32, |a| {
+        a.apply_filter(filter::Filter::All);
         a.modals.search_open = true;
         a.modals.search_buf = "deploy".to_string();
     });

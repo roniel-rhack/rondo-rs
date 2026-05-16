@@ -16,7 +16,16 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
     let visible: Vec<usize> = app.visible_task_indices();
     let filter_label = app.data.active_filter.label().to_lowercase();
-    let title = format!("{} · {} tareas", filter_label, visible.len());
+    let title = if app.modals.search_open && !app.modals.search_buf.trim().is_empty() {
+        format!(
+            "{} · {} tareas · /{}",
+            filter_label,
+            visible.len(),
+            app.modals.search_buf
+        )
+    } else {
+        format!("{} · {} tareas", filter_label, visible.len())
+    };
     let panel = BracketPanel::new(&title, t).active(app.ui.focus.pane == crate::focus::Pane::List);
     let inner = panel.inner(area);
     panel.render(area, f.buffer_mut());
@@ -57,7 +66,13 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
 
     draw_column_header(f, layout[0], t);
 
-    let items = render_items(app, &visible, layout[1].width);
+    let search_query: Option<String> =
+        if app.modals.search_open && !app.modals.search_buf.trim().is_empty() {
+            Some(app.modals.search_buf.trim().to_string())
+        } else {
+            None
+        };
+    let items = render_items(app, &visible, layout[1].width, search_query.as_deref());
     // No REVERSED highlight — bg changes are theme-fragile. The accent ▌ gutter
     // already marks the cursor row.
     let list = List::new(items);
@@ -77,9 +92,15 @@ fn draw_column_header(f: &mut Frame<'_>, area: Rect, t: &Theme) {
     f.render_widget(Paragraph::new(header), area);
 }
 
-fn render_items(app: &AppState, visible: &[usize], width: u16) -> Vec<ListItem<'static>> {
+fn render_items(
+    app: &AppState,
+    visible: &[usize],
+    width: u16,
+    query: Option<&str>,
+) -> Vec<ListItem<'static>> {
     let selected_pos = app.data.task_list_state.selected();
     let last_idx = visible.len().saturating_sub(1);
+    let mut engine = query.map(|_| crate::search::SearchEngine::new());
     visible
         .iter()
         .enumerate()
@@ -93,11 +114,14 @@ fn render_items(app: &AppState, visible: &[usize], width: u16) -> Vec<ListItem<'
                 app,
                 &app.theme,
                 width,
+                query,
+                engine.as_mut(),
             )
         })
         .collect()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_row(
     task: &Task,
     is_selected: bool,
@@ -105,6 +129,8 @@ fn build_row(
     app: &AppState,
     t: &Theme,
     width: u16,
+    query: Option<&str>,
+    engine: Option<&mut crate::search::SearchEngine>,
 ) -> ListItem<'static> {
     let in_visual = app.ui.selection.contains(&task.id);
     let flashing = app.is_flashing(FlashTarget::Task(task.id));
@@ -145,6 +171,8 @@ fn build_row(
     };
 
     // ROW 1 — primary identity: gutter · spine · checkbox · title · badges
+    let truncated_title = truncate(&task.title, 50);
+    let title_spans = highlight_title(&truncated_title, title_style, query, engine, t);
     let mut primary: Vec<Span<'static>> = vec![
         gutter(),
         spine.clone(),
@@ -153,8 +181,8 @@ fn build_row(
         Span::raw("   "),
         priority_badge::span(task.priority, t),
         Span::raw("  "),
-        Span::styled(truncate(&task.title, 50), title_style),
     ];
+    primary.extend(title_spans);
     if let Some(b) = due_badge::span(task.due_date, t) {
         primary.push(Span::raw("   "));
         primary.push(b);
@@ -254,6 +282,49 @@ fn draw_progress_bar(app: &AppState, f: &mut Frame<'_>, area: Rect, t: &Theme) {
     ];
     let _ = &mut spans;
     f.render_widget(Paragraph::new(Line::from(spans)), area);
+}
+
+/// Build title spans, optionally splitting matched chars into accent
+/// underlined runs. Falls back to a single styled span when no query is
+/// active or no match is found in the (already-truncated) title.
+fn highlight_title(
+    title: &str,
+    base_style: Style,
+    query: Option<&str>,
+    engine: Option<&mut crate::search::SearchEngine>,
+    t: &Theme,
+) -> Vec<Span<'static>> {
+    let fallback = || vec![Span::styled(title.to_string(), base_style)];
+    let (Some(q), Some(eng)) = (query, engine) else {
+        return fallback();
+    };
+    let Some((_, indices)) = eng.score(q, title) else {
+        return fallback();
+    };
+    if indices.is_empty() {
+        return fallback();
+    }
+    let match_set: std::collections::BTreeSet<u32> = indices.into_iter().collect();
+    let hl_style = Style::default()
+        .fg(t.accent)
+        .add_modifier(Modifier::BOLD | Modifier::UNDERLINED);
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    let mut current = String::new();
+    let mut current_hl = false;
+    for (i, ch) in title.chars().enumerate() {
+        let is_hl = match_set.contains(&(i as u32));
+        if is_hl != current_hl && !current.is_empty() {
+            let style = if current_hl { hl_style } else { base_style };
+            spans.push(Span::styled(std::mem::take(&mut current), style));
+        }
+        current.push(ch);
+        current_hl = is_hl;
+    }
+    if !current.is_empty() {
+        let style = if current_hl { hl_style } else { base_style };
+        spans.push(Span::styled(current, style));
+    }
+    spans
 }
 
 fn truncate(s: &str, max: usize) -> String {

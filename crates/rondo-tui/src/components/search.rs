@@ -39,16 +39,9 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 }
 
 fn matching_tasks(app: &AppState) -> usize {
-    let q = app.modals.search_buf.trim().to_lowercase();
+    let q = app.modals.search_buf.trim();
     if q.is_empty() {
-        return app.data.tasks.len();
+        return app.data.visible_task_indices().len();
     }
-    app.data
-        .tasks
-        .iter()
-        .filter(|t| {
-            t.title.to_lowercase().contains(&q)
-                || t.tags.iter().any(|tag| tag.to_lowercase().contains(&q))
-        })
-        .count()
+    app.data.visible_task_indices_with_search(q).len()
 }

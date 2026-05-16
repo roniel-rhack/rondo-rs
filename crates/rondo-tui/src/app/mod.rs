@@ -39,12 +39,16 @@ impl AppState {
         store: Arc<rondo_core::store::sqlite::SqliteStore>,
         writable: bool,
     ) -> Result<Self> {
+        let mut plugins = PluginRegistry::new();
+        plugins.register(Box::new(
+            crate::plugins::builtin::dep_graph::DepGraphPlugin::new(Arc::clone(&store)),
+        ));
         Ok(Self {
             data: DataState::new(store)?,
             ui: UiState::default(),
             modals: ModalsState::default(),
             fx: crate::fx::FxManager::new(),
-            plugins: PluginRegistry::new(),
+            plugins,
             theme: Theme::dark(),
             should_quit: false,
             status_msg: None,

@@ -7,7 +7,9 @@ pub mod registry;
 pub mod view;
 
 pub use action::PluginAction;
-pub use capabilities::Capability;
-pub use plugin::{Plugin, PluginContext, PluginMeta, PluginResult};
+pub use capabilities::{Capability, MutationScope, NotifyChannel, QueryScope};
+pub use plugin::{
+    CliMeta, ExporterMeta, Plugin, PluginContext, PluginManifest, PluginResult, SyncerMeta,
+};
 pub use registry::PluginRegistry;
 pub use view::{Block, ColorToken, Span, TextStyle, ViewKind, ViewSpec};

@@ -1,9 +1,9 @@
-use crate::plugin::{Plugin, PluginMeta};
+use crate::plugin::{Plugin, PluginManifest};
 use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct PluginRegistry {
-    plugins: HashMap<&'static str, Box<dyn Plugin>>,
+    plugins: HashMap<String, Box<dyn Plugin>>,
 }
 
 impl PluginRegistry {
@@ -12,7 +12,7 @@ impl PluginRegistry {
     }
 
     pub fn register(&mut self, plugin: Box<dyn Plugin>) {
-        let id = plugin.meta().id;
+        let id = plugin.manifest().id;
         self.plugins.insert(id, plugin);
     }
 
@@ -20,8 +20,12 @@ impl PluginRegistry {
         self.plugins.get_mut(id)
     }
 
-    pub fn iter_meta(&self) -> impl Iterator<Item = PluginMeta> + '_ {
-        self.plugins.values().map(|p| p.meta())
+    pub fn iter_manifests(&self) -> impl Iterator<Item = PluginManifest> + '_ {
+        self.plugins.values().map(|p| p.manifest())
+    }
+
+    pub fn ids(&self) -> Vec<String> {
+        self.plugins.keys().cloned().collect()
     }
 
     pub fn len(&self) -> usize {
@@ -43,15 +47,19 @@ mod tests {
 
     struct Dummy;
     impl Plugin for Dummy {
-        fn meta(&self) -> PluginMeta {
-            PluginMeta {
-                id: "dummy",
-                name: "Dummy",
-                version: "0.1.0",
-                capabilities: &[Capability::OverlayView],
+        fn manifest(&self) -> PluginManifest {
+            PluginManifest {
+                id: "dummy".into(),
+                name: "Dummy".into(),
+                version: "0.1.0".into(),
+                api_version: env!("CARGO_PKG_VERSION").into(),
+                capabilities: vec![Capability::OverlayView],
+                exporter: None,
+                syncer: None,
+                cli: None,
             }
         }
-        fn handle(&mut self, _: PluginAction, _: &PluginContext<'_>) -> PluginResult {
+        fn handle(&mut self, _: PluginAction, _: &PluginContext) -> PluginResult {
             PluginResult {
                 view: Some(ViewSpec {
                     kind: ViewKind::Overlay,
@@ -67,11 +75,13 @@ mod tests {
         let mut reg = PluginRegistry::new();
         reg.register(Box::new(Dummy));
         assert_eq!(reg.len(), 1);
-        let ctx = PluginContext::now();
+        let ctx = PluginContext::new("dummy");
         let r = reg
             .get_mut("dummy")
             .unwrap()
             .handle(PluginAction::Show, &ctx);
         assert!(r.view.is_some());
+        let manifest_ids: Vec<String> = reg.iter_manifests().map(|m| m.id).collect();
+        assert_eq!(manifest_ids, vec!["dummy".to_string()]);
     }
 }

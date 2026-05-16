@@ -8,7 +8,7 @@ use ratatui::{
 };
 use throbber_widgets_tui::{Throbber, ThrobberState};
 
-pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
+pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
     f.render_widget(Clear, area);
     let block = Block::default()

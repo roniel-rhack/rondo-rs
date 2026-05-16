@@ -8,7 +8,7 @@ use ratatui::{
     Frame,
 };
 
-pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
+pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
     let chunks = Layout::default()
         .direction(Direction::Horizontal)

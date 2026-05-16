@@ -9,7 +9,7 @@ use ratatui::{
 };
 use rondo_core::domain::task::Status;
 
-pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
+pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
     let border_color = if app.focus_left {
         t.border_active

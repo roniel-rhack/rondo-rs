@@ -4,7 +4,7 @@ use ratatui::{
     Frame,
 };
 
-pub fn draw(app: &AppState, f: &mut Frame<'_>) {
+pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -24,7 +24,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>) {
     }
 }
 
-fn body(app: &AppState, f: &mut Frame<'_>, area: Rect) {
+fn body(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     match app.page {
         Page::Tasks => {
             let split = Layout::default()

@@ -16,6 +16,7 @@ path = "src/main.rs"
 [dependencies]
 rondo-core = { path = "../rondo-core" }
 rondo-plugin-api = { path = "../rondo-plugin-api" }
+rondo-plugin-host = { path = "../rondo-plugin-host" }
 ratatui = { workspace = true }
 crossterm = { workspace = true }
 clap = { workspace = true }

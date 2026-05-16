@@ -6,7 +6,7 @@
 use color_eyre::eyre::{eyre, Result};
 use rondo_core::domain::task::{NewTask, Status, Task};
 use rondo_core::store::sqlite::SqliteStore;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::filter::Filter;
@@ -34,6 +34,29 @@ pub enum Command {
         #[arg(long, default_value = "md")]
         format: String,
     },
+    /// Manage plugins installed under ~/.todo-app/plugins/
+    Plugins {
+        #[command(subcommand)]
+        action: PluginsAction,
+    },
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum PluginsAction {
+    /// List all installed plugins
+    List,
+    /// Show full manifest for a plugin
+    Info { id: String },
+    /// Install a plugin from a local path (dir containing plugin.toml [+ plugin.wasm])
+    Install { path: PathBuf },
+    /// Remove a plugin by id
+    Remove { id: String },
+}
+
+/// Subcommands that do not need a SQLite database. Used by `main.rs` to skip
+/// the DB-existence check when only metadata work is requested.
+pub fn needs_db(cmd: &Command) -> bool {
+    !matches!(cmd, Command::Plugins { .. })
 }
 
 /// Shared CLI options used by every subcommand.
@@ -48,6 +71,7 @@ pub fn run(cmd: Command, opts: &CliOpts, db_path: &Path) -> Result<()> {
         Command::List { filter } => cli_list(db_path, opts, &filter),
         Command::Done { id } => cli_done(db_path, opts, id),
         Command::Export { format } => cli_export(db_path, opts, &format),
+        Command::Plugins { action } => cli_plugins(opts, action),
     }
 }
 
@@ -205,4 +229,226 @@ fn truncate(s: &str, max: usize) -> String {
         out.push('…');
         out
     }
+}
+
+// ---------------------------------------------------------------------------
+// plugins subcommands
+// ---------------------------------------------------------------------------
+
+fn default_plugins_dir() -> PathBuf {
+    std::env::var("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_default()
+        .join(".todo-app")
+        .join("plugins")
+}
+
+fn cli_plugins(opts: &CliOpts, action: PluginsAction) -> Result<()> {
+    let dir = default_plugins_dir();
+    match action {
+        PluginsAction::List => plugins_list(&dir, opts.json),
+        PluginsAction::Info { id } => plugins_info(&dir, &id, opts.json),
+        PluginsAction::Install { path } => plugins_install(&dir, &path),
+        PluginsAction::Remove { id } => plugins_remove(&dir, &id),
+    }
+}
+
+fn load_manifests(dir: &Path) -> Vec<(rondo_plugin_host::FsManifest, PathBuf)> {
+    let mut out = Vec::new();
+    let read = match std::fs::read_dir(dir) {
+        Ok(r) => r,
+        Err(_) => return out,
+    };
+    for entry in read.flatten() {
+        let p = entry.path();
+        if !p.is_dir() {
+            continue;
+        }
+        let mf = p.join("plugin.toml");
+        if !mf.exists() {
+            continue;
+        }
+        match rondo_plugin_host::FsManifest::load(&mf) {
+            Ok(m) => out.push((m, p)),
+            Err(e) => eprintln!("warn: failed to read {}: {}", mf.display(), e),
+        }
+    }
+    out.sort_by(|a, b| a.0.id.cmp(&b.0.id));
+    out
+}
+
+fn plugins_list(dir: &Path, json: bool) -> Result<()> {
+    let manifests = load_manifests(dir);
+    if json {
+        let arr: Vec<serde_json::Value> = manifests
+            .iter()
+            .map(|(m, p)| {
+                serde_json::json!({
+                    "id": m.id,
+                    "version": m.version,
+                    "api": m.api,
+                    "capabilities": m.capabilities,
+                    "has_wasm": p.join("plugin.wasm").exists(),
+                })
+            })
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&arr)?);
+        return Ok(());
+    }
+    if manifests.is_empty() {
+        println!("(no plugins installed in {})", dir.display());
+        return Ok(());
+    }
+    println!(
+        "{:<24}  {:<10}  {:<6}  {:<6}  CAPABILITIES",
+        "ID", "VERSION", "API", "WASM"
+    );
+    for (m, p) in &manifests {
+        let caps = m
+            .capabilities
+            .iter()
+            .map(|c| format!("{:?}", c))
+            .collect::<Vec<_>>()
+            .join(",");
+        let wasm = if p.join("plugin.wasm").exists() {
+            "yes"
+        } else {
+            "no"
+        };
+        println!(
+            "{:<24}  {:<10}  {:<6}  {:<6}  {}",
+            truncate(&m.id, 24),
+            truncate(&m.version, 10),
+            m.api,
+            wasm,
+            caps
+        );
+    }
+    Ok(())
+}
+
+fn plugins_info(dir: &Path, id: &str, json: bool) -> Result<()> {
+    let manifests = load_manifests(dir);
+    let found = manifests.into_iter().find(|(m, _)| m.id == id);
+    let (m, p) = match found {
+        Some(t) => t,
+        None => {
+            eprintln!("error: plugin `{}` not found in {}", id, dir.display());
+            std::process::exit(2);
+        }
+    };
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "id": m.id,
+                "name": m.name,
+                "version": m.version,
+                "api": m.api,
+                "capabilities": m.capabilities,
+                "wasi": {
+                    "allowed_paths": m.wasi.allowed_paths,
+                    "allowed_hosts": m.wasi.allowed_hosts,
+                },
+                "exporter": m.exporter,
+                "syncer": m.syncer,
+                "cli": m.cli,
+                "dir": p.display().to_string(),
+                "has_wasm": p.join("plugin.wasm").exists(),
+            }))?
+        );
+        return Ok(());
+    }
+    println!("id:           {}", m.id);
+    if let Some(n) = &m.name {
+        println!("name:         {}", n);
+    }
+    println!("version:      {}", m.version);
+    println!("api:          {}", m.api);
+    println!("dir:          {}", p.display());
+    println!(
+        "wasm:         {}",
+        if p.join("plugin.wasm").exists() {
+            "yes"
+        } else {
+            "no"
+        }
+    );
+    println!("capabilities:");
+    for c in &m.capabilities {
+        println!("  - {:?}", c);
+    }
+    if !m.wasi.allowed_paths.is_empty() {
+        println!("wasi.allowed_paths: {:?}", m.wasi.allowed_paths);
+    }
+    if !m.wasi.allowed_hosts.is_empty() {
+        println!("wasi.allowed_hosts: {:?}", m.wasi.allowed_hosts);
+    }
+    Ok(())
+}
+
+fn plugins_install(dir: &Path, src: &Path) -> Result<()> {
+    if !src.exists() {
+        return Err(eyre!("source path does not exist: {}", src.display()));
+    }
+    if !src.is_dir() {
+        return Err(eyre!(
+            "source must be a directory containing plugin.toml [+ plugin.wasm]: {}",
+            src.display()
+        ));
+    }
+    let manifest_path = src.join("plugin.toml");
+    if !manifest_path.exists() {
+        return Err(eyre!(
+            "missing plugin.toml in {} — not a plugin directory",
+            src.display()
+        ));
+    }
+    let manifest = rondo_plugin_host::FsManifest::load(&manifest_path)
+        .map_err(|e| eyre!("invalid plugin.toml: {}", e))?;
+    std::fs::create_dir_all(dir)?;
+    let dst = dir.join(&manifest.id);
+    if dst.exists() {
+        return Err(eyre!(
+            "plugin `{}` is already installed at {} — remove it first",
+            manifest.id,
+            dst.display()
+        ));
+    }
+    copy_dir_all(src, &dst)?;
+    println!("installed `{}` -> {}", manifest.id, dst.display());
+    Ok(())
+}
+
+fn plugins_remove(dir: &Path, id: &str) -> Result<()> {
+    let target = dir.join(id);
+    if !target.exists() {
+        println!("(plugin `{}` not installed; nothing to remove)", id);
+        return Ok(());
+    }
+    if !target.is_dir() {
+        return Err(eyre!(
+            "refusing to remove non-directory entry: {}",
+            target.display()
+        ));
+    }
+    std::fs::remove_dir_all(&target)?;
+    println!("removed `{}` ({})", id, target.display());
+    Ok(())
+}
+
+fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let from = entry.path();
+        let to = dst.join(entry.file_name());
+        if ty.is_dir() {
+            copy_dir_all(&from, &to)?;
+        } else if ty.is_file() {
+            std::fs::copy(&from, &to)?;
+        }
+    }
+    Ok(())
 }

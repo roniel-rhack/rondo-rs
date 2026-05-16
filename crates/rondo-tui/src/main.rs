@@ -82,7 +82,7 @@ fn run(terminal: &mut tui::Tui, app: &mut AppState) -> Result<()> {
             terminal.draw(|f| components::root::draw(app, f))?;
             dirty = false;
         }
-        let tick = if app.flash.is_some() || app.fx.any_running() {
+        let tick = if app.ui.flash.is_some() || app.fx.any_running() {
             flash_tick
         } else if app.needs_animation_tick() {
             anim_tick

@@ -22,7 +22,10 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         .split(area);
 
     let mark = Line::from(vec![
-        Span::styled(" ▌", Style::default().fg(t.accent).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            " ▌",
+            Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
+        ),
         Span::styled(
             "rondo",
             Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
@@ -59,30 +62,35 @@ fn telemetry(app: &AppState) -> Vec<Span<'static>> {
     let time = now.format("%H:%M:%S").to_string();
     let today = now.date_naive();
     let due_today = app
+        .data
         .tasks
         .iter()
         .filter(|x| x.due_date == Some(today) && x.status != Status::Done)
         .count();
     let done_today = app
+        .data
         .tasks
         .iter()
         .filter(|x| x.status == Status::Done)
         .count();
     let total_active = app
+        .data
         .tasks
         .iter()
         .filter(|x| x.status != Status::Done)
         .count();
-    let pomodoro = if app.pomodoro_open { "⏵ P1" } else { "P—" };
+    let pomodoro = if app.modals.pomodoro_open {
+        "⏵ P1"
+    } else {
+        "P—"
+    };
     let sep = || Span::styled(" · ", Style::default().fg(t.border_inactive));
 
     vec![
         Span::styled("⊙ ", Style::default().fg(t.success)),
         Span::styled(
             "ONLINE",
-            Style::default()
-                .fg(t.success)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(t.success).add_modifier(Modifier::BOLD),
         ),
         sep(),
         Span::styled(time, Style::default().fg(t.fg).add_modifier(Modifier::BOLD)),
@@ -95,7 +103,7 @@ fn telemetry(app: &AppState) -> Vec<Span<'static>> {
         sep(),
         Span::styled(
             pomodoro,
-            Style::default().fg(if app.pomodoro_open {
+            Style::default().fg(if app.modals.pomodoro_open {
                 t.danger
             } else {
                 t.fg_muted
@@ -103,6 +111,9 @@ fn telemetry(app: &AppState) -> Vec<Span<'static>> {
         ),
         sep(),
         Span::styled("☑", Style::default().fg(t.success)),
-        Span::styled(format!("{} ", total_active), Style::default().fg(t.fg_muted)),
+        Span::styled(
+            format!("{} ", total_active),
+            Style::default().fg(t.fg_muted),
+        ),
     ]
 }

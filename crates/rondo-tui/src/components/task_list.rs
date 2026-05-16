@@ -1,6 +1,8 @@
 use crate::app::{AppState, FlashTarget};
 use crate::theme::Theme;
-use crate::widgets::{bracket_panel::BracketPanel, due_badge, priority_badge, priority_spine, ring};
+use crate::widgets::{
+    bracket_panel::BracketPanel, due_badge, priority_badge, priority_spine, ring,
+};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
@@ -13,10 +15,9 @@ use rondo_core::domain::task::{Status, Task};
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
     let visible: Vec<usize> = app.visible_task_indices();
-    let filter_label = app.active_filter.label().to_lowercase();
+    let filter_label = app.data.active_filter.label().to_lowercase();
     let title = format!("{} · {} tareas", filter_label, visible.len());
-    let panel = BracketPanel::new(&title, t)
-        .active(app.focus.pane == crate::focus::Pane::List);
+    let panel = BracketPanel::new(&title, t).active(app.ui.focus.pane == crate::focus::Pane::List);
     let inner = panel.inner(area);
     panel.render(area, f.buffer_mut());
 
@@ -60,7 +61,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     // No REVERSED highlight — bg changes are theme-fragile. The accent ▌ gutter
     // already marks the cursor row.
     let list = List::new(items);
-    f.render_stateful_widget(list, layout[1], &mut app.task_list_state);
+    f.render_stateful_widget(list, layout[1], &mut app.data.task_list_state);
 
     draw_progress_bar(app, f, layout[2], t);
 }
@@ -77,7 +78,7 @@ fn draw_column_header(f: &mut Frame<'_>, area: Rect, t: &Theme) {
 }
 
 fn render_items(app: &AppState, visible: &[usize], width: u16) -> Vec<ListItem<'static>> {
-    let selected_pos = app.task_list_state.selected();
+    let selected_pos = app.data.task_list_state.selected();
     let last_idx = visible.len().saturating_sub(1);
     visible
         .iter()
@@ -85,7 +86,14 @@ fn render_items(app: &AppState, visible: &[usize], width: u16) -> Vec<ListItem<'
         .map(|(pos, &idx)| {
             let is_selected = Some(pos) == selected_pos;
             let is_last = pos == last_idx;
-            build_row(&app.tasks[idx], is_selected, is_last, app, &app.theme, width)
+            build_row(
+                &app.data.tasks[idx],
+                is_selected,
+                is_last,
+                app,
+                &app.theme,
+                width,
+            )
         })
         .collect()
 }
@@ -98,7 +106,7 @@ fn build_row(
     t: &Theme,
     width: u16,
 ) -> ListItem<'static> {
-    let in_visual = app.selection.contains(&task.id);
+    let in_visual = app.ui.selection.contains(&task.id);
     let flashing = app.is_flashing(FlashTarget::Task(task.id));
     let gutter = || -> Span<'static> {
         if flashing {
@@ -171,7 +179,12 @@ fn build_row(
     // Indent depth matches gutter(2) + spine(1) + space(1) + checkbox(3) + 3 = 10 cols
     let indent = "          ";
 
-    let incomplete: Vec<_> = task.subtasks.iter().filter(|s| !s.completed).take(2).collect();
+    let incomplete: Vec<_> = task
+        .subtasks
+        .iter()
+        .filter(|s| !s.completed)
+        .take(2)
+        .collect();
     for st in &incomplete {
         lines.push(Line::from(vec![
             Span::raw(indent),
@@ -208,8 +221,13 @@ fn build_row(
 }
 
 fn draw_progress_bar(app: &AppState, f: &mut Frame<'_>, area: Rect, t: &Theme) {
-    let total = app.tasks.len();
-    let done = app.tasks.iter().filter(|x| x.status == Status::Done).count();
+    let total = app.data.tasks.len();
+    let done = app
+        .data
+        .tasks
+        .iter()
+        .filter(|x| x.status == Status::Done)
+        .count();
     let ratio = if total == 0 {
         0.0
     } else {
@@ -226,19 +244,13 @@ fn draw_progress_bar(app: &AppState, f: &mut Frame<'_>, area: Rect, t: &Theme) {
             "▰".repeat(filled),
             Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
         ),
-        Span::styled(
-            "▱".repeat(empty),
-            Style::default().fg(t.border_inactive),
-        ),
+        Span::styled("▱".repeat(empty), Style::default().fg(t.border_inactive)),
         Span::styled("] ", Style::default().fg(t.border_inactive)),
         Span::styled(
             format!("{}%", pct),
             Style::default().fg(t.fg).add_modifier(Modifier::BOLD),
         ),
-        Span::styled(
-            format!("   {}/{} ", done, total),
-            t.muted(),
-        ),
+        Span::styled(format!("   {}/{} ", done, total), t.muted()),
     ];
     let _ = &mut spans;
     f.render_widget(Paragraph::new(Line::from(spans)), area);

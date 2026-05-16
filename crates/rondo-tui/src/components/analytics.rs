@@ -36,25 +36,31 @@ fn draw_donut(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let inner = panel.inner(area);
     panel.render(area, f.buffer_mut());
 
-    let total = app.tasks.len();
-    let done = app.tasks.iter().filter(|x| x.status == Status::Done).count();
+    let total = app.data.tasks.len();
+    let done = app
+        .data
+        .tasks
+        .iter()
+        .filter(|x| x.status == Status::Done)
+        .count();
     let in_prog = app
+        .data
         .tasks
         .iter()
         .filter(|x| x.status == Status::InProgress)
         .count();
     let pending = app
+        .data
         .tasks
         .iter()
         .filter(|x| x.status == Status::Pending)
         .count();
     let today = Local::now().date_naive();
     let overdue = app
+        .data
         .tasks
         .iter()
-        .filter(|x| {
-            x.status != Status::Done && x.due_date.is_some_and(|d| d < today)
-        })
+        .filter(|x| x.status != Status::Done && x.due_date.is_some_and(|d| d < today))
         .count();
 
     let lines = vec![
@@ -111,7 +117,7 @@ fn draw_bars_7d(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
     let today = Local::now().date_naive();
     let mut counts = [0usize; 7];
-    for task in &app.tasks {
+    for task in &app.data.tasks {
         if let Some(d) = task.due_date {
             let delta = (d - today).num_days();
             if (0..7).contains(&delta) {
@@ -145,7 +151,11 @@ fn draw_bars_7d(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     if let Some(first) = lines.first_mut() {
         let mut spans: Vec<Span<'static>> = Vec::new();
         for (i, &c) in counts.iter().enumerate() {
-            let label = if c > 0 { format!("{}", c) } else { " ".to_string() };
+            let label = if c > 0 {
+                format!("{}", c)
+            } else {
+                " ".to_string()
+            };
             spans.push(Span::raw("  "));
             let _ = i;
             spans.push(Span::styled(
@@ -161,10 +171,7 @@ fn draw_bars_7d(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     for i in 0..7 {
         let d = today + Duration::days(i as i64);
         date_spans.push(Span::raw("  "));
-        date_spans.push(Span::styled(
-            d.format("%d").to_string(),
-            t.muted(),
-        ));
+        date_spans.push(Span::styled(d.format("%d").to_string(), t.muted()));
         date_spans.push(Span::raw(" "));
     }
     lines.push(Line::from(date_spans));
@@ -178,7 +185,7 @@ fn draw_distribution(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     panel.render(area, f.buffer_mut());
 
     let mut tag_counts: HashMap<String, usize> = HashMap::new();
-    for task in &app.tasks {
+    for task in &app.data.tasks {
         if task.tags.is_empty() {
             *tag_counts.entry("(sin tag)".into()).or_default() += 1;
         }
@@ -195,11 +202,7 @@ fn draw_distribution(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
     let mut lines: Vec<Line> = Vec::new();
     for (i, (tag, count)) in entries.iter().enumerate() {
-        let pct = if total == 0 {
-            0
-        } else {
-            count * 100 / total
-        };
+        let pct = if total == 0 { 0 } else { count * 100 / total };
         let filled = (bar_max * pct / 100).max(1);
         let empty = bar_max.saturating_sub(filled);
         let color = palette[i % palette.len()];
@@ -208,18 +211,9 @@ fn draw_distribution(app: &AppState, f: &mut Frame<'_>, area: Rect) {
                 format!("  {:<10}", truncate(tag, 10)),
                 Style::default().fg(color).add_modifier(Modifier::BOLD),
             ),
-            Span::styled(
-                "▰".repeat(filled),
-                Style::default().fg(color),
-            ),
-            Span::styled(
-                "▱".repeat(empty),
-                Style::default().fg(t.border_inactive),
-            ),
-            Span::styled(
-                format!("  {:>2} ({}%)", count, pct),
-                t.muted(),
-            ),
+            Span::styled("▰".repeat(filled), Style::default().fg(color)),
+            Span::styled("▱".repeat(empty), Style::default().fg(t.border_inactive)),
+            Span::styled(format!("  {:>2} ({}%)", count, pct), t.muted()),
         ]));
     }
     f.render_widget(Paragraph::new(lines), inner);

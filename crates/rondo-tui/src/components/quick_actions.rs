@@ -34,10 +34,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(t.border_style(true))
-        .title(Span::styled(
-            " ⚙ acciones rápidas ",
-            t.accent_style(),
-        ));
+        .title(Span::styled(" ⚙ acciones rápidas ", t.accent_style()));
     let inner = block.inner(area);
     f.render_widget(block, area);
 
@@ -48,8 +45,9 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         .split(inner);
 
     for (row_idx, row) in GRID.iter().enumerate() {
-        let cols: Vec<Constraint> =
-            (0..row.len()).map(|_| Constraint::Ratio(1, row.len() as u32)).collect();
+        let cols: Vec<Constraint> = (0..row.len())
+            .map(|_| Constraint::Ratio(1, row.len() as u32))
+            .collect();
         let col_areas = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(cols)
@@ -59,9 +57,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
                 Span::raw(" "),
                 Span::styled(
                     format!("[{}]", key),
-                    Style::default()
-                        .fg(t.accent)
-                        .add_modifier(Modifier::BOLD),
+                    Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
                 ),
                 Span::raw(" "),
                 Span::styled(label.to_string(), Style::default().fg(t.fg)),

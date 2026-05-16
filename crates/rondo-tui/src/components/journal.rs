@@ -10,7 +10,7 @@ use ratatui::{
 
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
-    if app.journal_notes.is_empty() {
+    if app.data.journal_notes.is_empty() {
         let lines = vec![
             Line::raw(""),
             Line::raw(""),
@@ -32,6 +32,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         .split(area);
 
     let items: Vec<ListItem> = app
+        .data
         .journal_notes
         .iter()
         .map(|n| {
@@ -48,40 +49,36 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let list = List::new(items)
         .block(t.panel("Days", false))
         .highlight_style(t.selection());
-    f.render_stateful_widget(list, chunks[0], &mut app.journal_list_state);
+    f.render_stateful_widget(list, chunks[0], &mut app.data.journal_list_state);
 
     let mut content_lines: Vec<Line> = Vec::new();
-    if let Some(note) = app.journal_notes.get(app.selected_journal) {
+    if let Some(note) = app.data.journal_notes.get(app.data.selected_journal) {
         content_lines.push(Line::from(Span::styled(
             note.date
                 .format("%A, %B %-d, %Y")
                 .to_string()
                 .to_uppercase(),
-            Style::default()
-                .fg(t.accent)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
         )));
         content_lines.push(Line::from(Span::styled(
             "━".repeat(40),
             Style::default().fg(t.border_inactive),
         )));
         content_lines.push(Line::raw(""));
-        if app.journal_entries.is_empty() {
+        if app.data.journal_entries.is_empty() {
             content_lines.push(Line::from(Span::styled(
                 "  (no entries this day)",
                 Style::default().fg(t.fg_muted),
             )));
         }
-        for entry in &app.journal_entries {
+        for entry in &app.data.journal_entries {
             content_lines.push(Line::from(Span::styled(
                 entry
                     .created_at
                     .with_timezone(&Local)
                     .format("  %H:%M  ")
                     .to_string(),
-                Style::default()
-                    .fg(t.fg_muted)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(t.fg_muted).add_modifier(Modifier::BOLD),
             )));
             for l in markdown::render(&entry.body, t).lines {
                 content_lines.push(l);

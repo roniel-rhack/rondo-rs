@@ -11,11 +11,8 @@ use tui_big_text::{BigText, PixelSize};
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
     // Dim backdrop over everything outside the modal
-    let backdrop = Block::default().style(
-        Style::default()
-            .fg(t.fg_muted)
-            .add_modifier(Modifier::DIM),
-    );
+    let backdrop =
+        Block::default().style(Style::default().fg(t.fg_muted).add_modifier(Modifier::DIM));
     f.render_widget(backdrop, f.area());
 
     f.render_widget(Clear, area);
@@ -25,9 +22,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         .border_style(Style::default().fg(t.danger))
         .title(Span::styled(
             " ◉ Focus Session ",
-            Style::default()
-                .fg(t.danger)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(t.danger).add_modifier(Modifier::BOLD),
         ));
     let inner = block.inner(area);
     f.render_widget(block, area);
@@ -49,9 +44,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     f.render_widget(
         Paragraph::new(Line::from(vec![Span::styled(
             phase,
-            Style::default()
-                .fg(t.accent)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
         )]))
         .alignment(Alignment::Center),
         chunks[0],
@@ -59,8 +52,9 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
 
     // Row 1: task title
     let task_label = app
+        .data
         .tasks
-        .get(app.selected_task)
+        .get(app.data.selected_task)
         .map(|t| t.title.as_str())
         .unwrap_or("(no task selected)");
     f.render_widget(
@@ -71,21 +65,18 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
 
     // Row 2-5: big text timer (mm:ss)
     let (elapsed, total) = (
-        app.pomodoro_started
+        app.modals
+            .pomodoro_started
             .map(|s| s.elapsed().as_secs())
             .unwrap_or(0),
-        app.pomodoro_total.as_secs(),
+        app.modals.pomodoro_total.as_secs(),
     );
     let remaining = total.saturating_sub(elapsed);
     let mm_ss = format!("{:02}:{:02}", remaining / 60, remaining % 60);
 
     let big = BigText::builder()
         .pixel_size(PixelSize::Quadrant)
-        .style(
-            Style::default()
-                .fg(t.danger)
-                .add_modifier(Modifier::BOLD),
-        )
+        .style(Style::default().fg(t.danger).add_modifier(Modifier::BOLD))
         .lines(vec![mm_ss.into()])
         .alignment(Alignment::Center)
         .build();

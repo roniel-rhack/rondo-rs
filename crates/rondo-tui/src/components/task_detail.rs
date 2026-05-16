@@ -16,7 +16,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
     let active = !app.focus_left();
 
-    let task = match app.tasks.get(app.selected_task) {
+    let task = match app.data.tasks.get(app.data.selected_task) {
         Some(x) => x,
         None => {
             return draw_empty(t, active, f, area);
@@ -131,8 +131,8 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     // ─── SUBTASKS ───────────────────────────────────────────
     let (done, total) = task.subtask_progress();
     if total > 0 {
-        let section_active = app.focus.pane == Pane::Detail
-            && app.focus.section == DetailSection::Subtasks;
+        let section_active =
+            app.ui.focus.pane == Pane::Detail && app.ui.focus.section == DetailSection::Subtasks;
         lines.push(Line::raw(""));
         section_header(
             &mut lines,
@@ -160,10 +160,13 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         ]));
         lines.push(Line::raw(""));
         for (i, st) in task.subtasks.iter().enumerate() {
-            let cursor_here = section_active && app.focus.section_item == i;
+            let cursor_here = section_active && app.ui.focus.section_item == i;
             let flashing = app.is_flashing(FlashTarget::Subtask(st.id));
             let gutter = if flashing {
-                Span::styled("◉ ", Style::default().fg(t.warn).add_modifier(Modifier::BOLD))
+                Span::styled(
+                    "◉ ",
+                    Style::default().fg(t.warn).add_modifier(Modifier::BOLD),
+                )
             } else if cursor_here {
                 Span::styled("▌ ", Style::default().fg(t.accent))
             } else {
@@ -200,8 +203,8 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
     // ─── DEPENDENCIES ───────────────────────────────────────
     if task.is_blocked() || !task.blocks_ids.is_empty() {
-        let section_active = app.focus.pane == Pane::Detail
-            && app.focus.section == DetailSection::Dependencies;
+        let section_active = app.ui.focus.pane == Pane::Detail
+            && app.ui.focus.section == DetailSection::Dependencies;
         lines.push(Line::raw(""));
         section_header(
             &mut lines,
@@ -274,7 +277,10 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
             ),
             Span::styled("  ·  ", Style::default().fg(t.border_inactive)),
             Span::styled(
-                format!("media {}", format_duration(total_secs / task.time_logs.len() as i64)),
+                format!(
+                    "media {}",
+                    format_duration(total_secs / task.time_logs.len() as i64)
+                ),
                 Style::default().fg(t.fg_muted),
             ),
         ]));
@@ -282,8 +288,8 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
     // ─── NOTAS ─────────────────────────────────────────────
     if !task.notes.is_empty() {
-        let section_active = app.focus.pane == Pane::Detail
-            && app.focus.section == DetailSection::Notes;
+        let section_active =
+            app.ui.focus.pane == Pane::Detail && app.ui.focus.section == DetailSection::Notes;
         lines.push(Line::raw(""));
         section_header(
             &mut lines,
@@ -294,9 +300,12 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
             t,
         );
         for (i, n) in task.notes.iter().take(3).enumerate() {
-            let cursor_here = section_active && app.focus.section_item == i;
+            let cursor_here = section_active && app.ui.focus.section_item == i;
             let gutter = if cursor_here {
-                Span::styled("▌", Style::default().fg(t.accent).add_modifier(Modifier::BOLD))
+                Span::styled(
+                    "▌",
+                    Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
+                )
             } else {
                 Span::raw(" ")
             };

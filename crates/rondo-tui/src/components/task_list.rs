@@ -93,14 +93,22 @@ fn build_row(
     let is_selected = Some(idx) == selected;
     let in_visual = app.selection.contains(&task.id);
     let flashing = app.is_flashing(FlashTarget::Task(task.id));
-    let gutter = if flashing {
-        Span::styled("◉ ", Style::default().fg(t.warn).add_modifier(Modifier::BOLD))
-    } else if in_visual {
-        Span::styled("● ", Style::default().fg(t.danger).add_modifier(Modifier::BOLD))
-    } else if is_selected {
-        Span::styled("▌ ", Style::default().fg(t.accent))
-    } else {
-        Span::raw("  ")
+    let gutter = || -> Span<'static> {
+        if flashing {
+            Span::styled(
+                "◉ ",
+                Style::default().fg(t.warn).add_modifier(Modifier::BOLD),
+            )
+        } else if in_visual {
+            Span::styled(
+                "● ",
+                Style::default().fg(t.danger).add_modifier(Modifier::BOLD),
+            )
+        } else if is_selected {
+            Span::styled("▌ ", Style::default().fg(t.accent))
+        } else {
+            Span::raw("  ")
+        }
     };
     let spine = priority_spine::glyph(task.priority, t);
     let checkbox = match task.status {
@@ -113,56 +121,70 @@ fn build_row(
             .fg(t.fg_muted)
             .add_modifier(Modifier::CROSSED_OUT)
     } else {
-        Style::default().fg(t.fg)
+        Style::default().fg(t.fg).add_modifier(Modifier::BOLD)
     };
 
-    // First line: gutter | spine | checkbox | priority pill | title | tags | due
-    let mut spans: Vec<Span<'static>> = vec![
-        gutter,
-        spine,
+    // ROW 1 — primary identity: gutter · spine · checkbox · title · badges
+    let mut primary: Vec<Span<'static>> = vec![
+        gutter(),
+        spine.clone(),
         Span::raw(" "),
         checkbox,
-        Span::raw("  "),
+        Span::raw("   "),
         priority_badge::span(task.priority, t),
         Span::raw("  "),
-        Span::styled(truncate(&task.title, 38), title_style),
+        Span::styled(truncate(&task.title, 50), title_style),
     ];
     if let Some(b) = due_badge::span(task.due_date, t) {
-        spans.push(Span::raw("  "));
-        spans.push(b);
+        primary.push(Span::raw("   "));
+        primary.push(b);
     }
     if task.is_blocked() {
-        spans.push(Span::raw("  "));
-        spans.push(Span::styled(
-            "blocked",
+        primary.push(Span::raw("   "));
+        primary.push(Span::styled(
+            "⛒ blocked",
             Style::default().fg(t.danger).add_modifier(Modifier::BOLD),
         ));
     }
     let (done, total) = task.subtask_progress();
     if total > 0 {
-        spans.push(Span::raw("  "));
-        spans.push(ring::glyph(done, total, t));
-        spans.push(Span::styled(
-            format!(" {}/{}", done, total),
-            t.muted(),
-        ));
+        primary.push(Span::raw("   "));
+        primary.push(ring::glyph(done, total, t));
+        primary.push(Span::styled(format!(" {}/{}", done, total), t.muted()));
     }
-    if !task.tags.is_empty() {
-        spans.push(Span::styled(
-            format!("  #{}", task.tags.join(" #")),
-            t.muted(),
-        ));
-    }
-    let mut lines = vec![Line::from(spans)];
 
-    // Inline preview: first incomplete subtask shown indented under parent.
-    if let Some(next_sub) = task.subtasks.iter().find(|s| !s.completed) {
+    // ROW 2..N — indented subtask previews + tag chips
+    let mut lines = vec![Line::from(primary)];
+
+    // Indent depth matches gutter(2) + spine(1) + space(1) + checkbox(3) + 3 = 10 cols
+    let indent = "          ";
+
+    let incomplete: Vec<_> = task.subtasks.iter().filter(|s| !s.completed).take(2).collect();
+    for st in &incomplete {
         lines.push(Line::from(vec![
-            Span::raw("        "),
+            Span::raw(indent),
             Span::styled("↳ ", Style::default().fg(t.fg_muted)),
-            Span::styled(truncate(&next_sub.title, 60), t.muted()),
+            Span::styled(truncate(&st.title, 60), t.muted()),
         ]));
     }
+
+    if !task.tags.is_empty() {
+        let mut tag_spans: Vec<Span<'static>> = vec![Span::raw(indent)];
+        for (i, tag) in task.tags.iter().enumerate() {
+            if i > 0 {
+                tag_spans.push(Span::raw("  "));
+            }
+            tag_spans.push(Span::styled(
+                format!("#{}", tag),
+                Style::default().fg(t.accent),
+            ));
+        }
+        lines.push(Line::from(tag_spans));
+    }
+
+    // ROW final — blank separator for breathing room (NEXUS-style).
+    lines.push(Line::raw(""));
+
     ListItem::new(lines)
 }
 

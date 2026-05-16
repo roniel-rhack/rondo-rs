@@ -54,6 +54,10 @@ pub enum Action {
     QuickAddUpdate(String),
     SubmitQuickAdd(String),
 
+    OpenSortOverlay,
+    CloseSortOverlay,
+    SetSortOrder(crate::app::ui_state::SortOrder),
+
     Error(String),
 }
 

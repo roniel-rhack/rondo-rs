@@ -16,6 +16,7 @@ pub struct ModalsState {
     pub quick_actions_open: bool,
     pub quick_add_open: bool,
     pub quick_add_buf: String,
+    pub sort_overlay_open: bool,
 }
 
 impl Default for ModalsState {
@@ -33,6 +34,7 @@ impl Default for ModalsState {
             quick_actions_open: false,
             quick_add_open: false,
             quick_add_buf: String::new(),
+            sort_overlay_open: false,
         }
     }
 }
@@ -46,6 +48,7 @@ impl ModalsState {
             || self.search_open
             || self.quick_actions_open
             || self.quick_add_open
+            || self.sort_overlay_open
     }
 
     /// Pure modal mutations that don't need cross-substate access.
@@ -97,6 +100,14 @@ impl ModalsState {
             }
             Action::QuickAddUpdate(s) => {
                 self.quick_add_buf = s;
+                None
+            }
+            Action::OpenSortOverlay => {
+                self.sort_overlay_open = true;
+                None
+            }
+            Action::CloseSortOverlay => {
+                self.sort_overlay_open = false;
                 None
             }
             _ => None,

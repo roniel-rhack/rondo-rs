@@ -238,9 +238,16 @@ impl AppState {
                 self.modals.pomodoro_started = None;
             }
             Action::SubmitCommand(cmd) => self.handle_command(cmd),
+            Action::SetSortOrder(order) => {
+                self.ui.sort_order = order;
+                self.modals.sort_overlay_open = false;
+                self.toast(format!("sort: {}", order.label()));
+            }
             Action::EscapeContext => {
                 if self.modals.help_open {
                     self.modals.help_open = false;
+                } else if self.modals.sort_overlay_open {
+                    self.modals.sort_overlay_open = false;
                 } else if self.modals.quick_actions_open {
                     self.modals.quick_actions_open = false;
                 } else if self.modals.quick_add_open {

@@ -15,6 +15,9 @@ pub fn map(ev: Event, app: &AppState) -> Option<Action> {
     if app.modals.quick_add_open {
         return quick_add_key(ev, app);
     }
+    if app.modals.sort_overlay_open {
+        return sort_overlay_key(ev);
+    }
     if app.ui.leader_goto {
         if let Event::Key(k) = ev {
             if let KeyCode::Char(c) = k.code {
@@ -97,6 +100,22 @@ fn search_key(ev: Event, app: &AppState) -> Option<Action> {
     })
 }
 
+fn sort_overlay_key(ev: Event) -> Option<Action> {
+    use crate::app::ui_state::SortOrder;
+    let Event::Key(k) = ev else {
+        return None;
+    };
+    Some(match k.code {
+        KeyCode::Esc => Action::CloseSortOverlay,
+        KeyCode::Char(c) if c.is_ascii_digit() => {
+            let idx = (c as u8).saturating_sub(b'1') as usize;
+            let order = SortOrder::ALL.get(idx).copied()?;
+            Action::SetSortOrder(order)
+        }
+        _ => return None,
+    })
+}
+
 fn quick_add_key(ev: Event, app: &AppState) -> Option<Action> {
     let Event::Key(k) = ev else {
         return None;
@@ -149,6 +168,7 @@ fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
         KeyCode::Char('?') => Action::ToggleHelp,
         KeyCode::Char('f') => Action::LeaderGoto,
         KeyCode::Char('.') => Action::ToggleQuickActions,
+        KeyCode::Char('s') => Action::OpenSortOverlay,
         KeyCode::Char('<') => Action::ResizeSplit { delta: -5 },
         KeyCode::Char('>') => Action::ResizeSplit { delta: 5 },
         KeyCode::Char('=') => Action::ResetSplit,

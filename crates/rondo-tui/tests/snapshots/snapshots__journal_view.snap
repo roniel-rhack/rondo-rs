@@ -1,13 +1,13 @@
 ---
 source: crates/rondo-tui/tests/snapshots.rs
-expression: s
+expression: scrubbed
 ---
 " RonDO  ·  Tasks  Journal                                                                                               "
 "┌ Days ──────────────────────┐╭ Journal ───────────────────────────────────────────────────────────────────────────────╮"
 "│ Today      2026-05-16      ││SATURDAY, MAY 16, 2026                                                                  │"
 "│ Yesterday  2026-05-15      ││━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                                                │"
 "│                            ││                                                                                        │"
-"│                            ││  10:36                                                                                 │"
+"│                            ││  HH:MM                                                                                 │"
 "│                            ││▍▍ Thursday standup                                                                     │"
 "│                            ││                                                                                        │"
 "│                            ││Shipped v2.1 with new API endpoint. Carlos reviewed at 1:30 PM.                         │"
@@ -16,7 +16,7 @@ expression: s
 "│                            ││  · Blocked by infra ticket #1023                                                       │"
 "│                            ││  · Pair coded with Sarah on gRPC proto                                                 │"
 "│                            ││                                                                                        │"
-"│                            ││  12:36                                                                                 │"
+"│                            ││  HH:MM                                                                                 │"
 "│                            ││▎ Reflections                                                                           │"
 "│                            ││                                                                                        │"
 "│                            ││Started strong but hit complexity in auth refactor. Good recovery.                      │"

@@ -56,7 +56,10 @@ fn tasks_blocked() {
 #[test]
 fn journal_view() {
     let s = snapshot("journal_view", 120, 32, |a| a.page = Page::Journal);
-    assert_snapshot!(s);
+    // Redact timestamps (HH:MM) that drift between test runs based on wall clock.
+    let re = regex::Regex::new(r"\d{2}:\d{2}").unwrap();
+    let scrubbed = re.replace_all(&s, "HH:MM").to_string();
+    assert_snapshot!(scrubbed);
 }
 
 #[test]

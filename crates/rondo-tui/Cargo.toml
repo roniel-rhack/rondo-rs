@@ -34,4 +34,5 @@ chrono = { workspace = true }
 [dev-dependencies]
 insta = { version = "1.40", features = ["yaml"] }
 tempfile = "3.10"
+regex = "1"
 rusqlite = { workspace = true }

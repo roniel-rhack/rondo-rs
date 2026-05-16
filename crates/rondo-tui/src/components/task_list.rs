@@ -67,7 +67,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
                 gutter,
                 spine,
                 Span::raw(" "),
-                Span::styled(format!("{}", task.status.icon()), Style::default().fg(icon_color)),
+                Span::styled(task.status.icon().to_string(), Style::default().fg(icon_color)),
                 Span::raw("  "),
                 Span::styled(task.title.clone(), title_style),
                 Span::raw("   "),

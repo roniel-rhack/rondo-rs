@@ -501,10 +501,10 @@ impl AppState {
     fn dispatch_plugin_ticks(&mut self) {
         use rondo_plugin_api::action::PluginAction;
         use rondo_plugin_api::plugin::PluginContext;
-        let ctx = PluginContext::now();
-        let ids: Vec<&'static str> = self.plugins.iter_meta().map(|m| m.id).collect();
+        let ids = self.plugins.ids();
         for id in ids {
-            if let Some(p) = self.plugins.get_mut(id) {
+            if let Some(p) = self.plugins.get_mut(&id) {
+                let ctx = PluginContext::new(&id);
                 let _ = p.handle(PluginAction::Tick { delta_ms: 100 }, &ctx);
             }
         }

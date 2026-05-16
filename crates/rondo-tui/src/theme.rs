@@ -7,6 +7,7 @@ use rondo_core::domain::task::Priority;
 /// Cohesive 7-token semantic palette.
 /// Designed to feel warm and restrained, not Material-Design rainbow.
 pub struct Theme {
+    pub name: &'static str,
     pub bg: Color,
     pub surface: Color,
     pub fg: Color,
@@ -22,6 +23,7 @@ pub struct Theme {
 impl Theme {
     pub fn dark() -> Self {
         Self {
+            name: "dark",
             bg: Color::Rgb(0x0F, 0x11, 0x15),
             surface: Color::Rgb(0x18, 0x1B, 0x22),
             fg: Color::Rgb(0xE6, 0xE1, 0xCF),
@@ -33,6 +35,50 @@ impl Theme {
             border_active: Color::Rgb(0x7F, 0xDB, 0xCA),
             border_inactive: Color::Rgb(0x2A, 0x2E, 0x36),
         }
+    }
+
+    pub fn light() -> Self {
+        Self {
+            name: "light",
+            bg: Color::Rgb(0xFA, 0xFA, 0xFA),
+            surface: Color::Rgb(0xEE, 0xEE, 0xEE),
+            fg: Color::Rgb(0x21, 0x21, 0x21),
+            fg_muted: Color::Rgb(0x61, 0x61, 0x61),
+            accent: Color::Rgb(0x00, 0x83, 0x95),
+            danger: Color::Rgb(0xC6, 0x28, 0x28),
+            warn: Color::Rgb(0xF9, 0xA8, 0x25),
+            success: Color::Rgb(0x2E, 0x7D, 0x32),
+            border_active: Color::Rgb(0x00, 0x83, 0x95),
+            border_inactive: Color::Rgb(0xBD, 0xBD, 0xBD),
+        }
+    }
+
+    pub fn high_contrast() -> Self {
+        Self {
+            name: "high-contrast",
+            bg: Color::Rgb(0, 0, 0),
+            surface: Color::Rgb(0x0A, 0x0A, 0x0A),
+            fg: Color::Rgb(0xFF, 0xFF, 0xFF),
+            fg_muted: Color::Rgb(0xBD, 0xBD, 0xBD),
+            accent: Color::Rgb(0xFF, 0xD4, 0x00),
+            danger: Color::Rgb(0xFF, 0x17, 0x44),
+            warn: Color::Rgb(0xFF, 0xAB, 0x00),
+            success: Color::Rgb(0x00, 0xE6, 0x76),
+            border_active: Color::Rgb(0xFF, 0xD4, 0x00),
+            border_inactive: Color::Rgb(0x80, 0x80, 0x80),
+        }
+    }
+
+    pub fn by_name(name: &str) -> Self {
+        match name {
+            "light" => Self::light(),
+            "high-contrast" | "hc" => Self::high_contrast(),
+            _ => Self::dark(),
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        self.name
     }
 
     pub fn priority_color(&self, p: Priority) -> Color {
@@ -97,5 +143,30 @@ impl Theme {
                 format!(" {} ", title),
                 self.accent_style(),
             ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn by_name_resolves_variants() {
+        assert_eq!(Theme::by_name("dark").name(), "dark");
+        assert_eq!(Theme::by_name("light").name(), "light");
+        assert_eq!(Theme::by_name("high-contrast").name(), "high-contrast");
+        assert_eq!(Theme::by_name("hc").name(), "high-contrast");
+    }
+
+    #[test]
+    fn unknown_name_falls_back_to_dark() {
+        assert_eq!(Theme::by_name("garbage").name(), "dark");
+    }
+
+    #[test]
+    fn each_variant_has_distinct_fg_bg() {
+        for t in [Theme::dark(), Theme::light(), Theme::high_contrast()] {
+            assert_ne!(t.fg, t.bg, "{} fg==bg", t.name());
+        }
     }
 }

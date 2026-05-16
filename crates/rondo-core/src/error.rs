@@ -8,6 +8,8 @@ pub enum Error {
     Json(#[from] serde_json::Error),
     #[error("not found: {0}")]
     NotFound(String),
+    #[error("migration: {0}")]
+    Migration(#[from] crate::store::migrations::MigrationError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

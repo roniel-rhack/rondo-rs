@@ -42,6 +42,7 @@ fn main() -> Result<()> {
         );
         std::process::exit(2);
     }
+    let mut _lock_guard: Option<rondo_core::store::lock::LockGuard> = None;
     let store = if cli.write {
         let backup_dir = rondo_core::store::backup::default_backup_dir();
         rondo_core::store::backup::rotate(&backup_dir, 30);
@@ -49,6 +50,20 @@ fn main() -> Result<()> {
             Ok(p) => tracing::info!("backup snapshot: {}", p.display()),
             Err(e) => tracing::warn!("backup failed (continuing without): {}", e),
         }
+        let lock_path = rondo_core::store::lock::LockGuard::default_path();
+        _lock_guard = Some(
+            match rondo_core::store::lock::LockGuard::acquire(lock_path.clone()) {
+                Ok(g) => g,
+                Err(rondo_core::store::lock::LockError::Conflict(pid)) => {
+                    eprintln!(
+                        "another rondo process holds the lock (PID {pid}). If you're sure none is running, remove {}",
+                        lock_path.display()
+                    );
+                    std::process::exit(2);
+                }
+                Err(e) => return Err(e.into()),
+            },
+        );
         Arc::new(rondo_core::store::sqlite::SqliteStore::open_readwrite(
             &db_path,
         )?)

@@ -253,6 +253,56 @@ impl SqliteStore {
             created_id: None,
         })
     }
+
+    /// Adds `blocked_by` as a dependency of `task_id`. Rejects with
+    /// `Error::CycleDetected` if this edge would create a cycle in the
+    /// dependency DAG. Idempotent: re-adding the same edge is a no-op.
+    pub fn add_dependency(&self, task_id: i64, blocked_by: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        if would_create_cycle(&conn, task_id, blocked_by)? {
+            return Err(crate::error::Error::CycleDetected(task_id, blocked_by));
+        }
+        conn.execute(
+            super::queries::INSERT_DEPENDENCY,
+            params![task_id, blocked_by],
+        )?;
+        Ok(())
+    }
+
+    /// Removes a dependency edge. Returns Ok even if the edge didn't exist.
+    pub fn remove_dependency(&self, task_id: i64, blocked_by: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            super::queries::DELETE_DEPENDENCY,
+            params![task_id, blocked_by],
+        )?;
+        Ok(())
+    }
+}
+
+fn would_create_cycle(conn: &Connection, task_id: i64, blocked_by: i64) -> Result<bool> {
+    if task_id == blocked_by {
+        return Ok(true);
+    }
+    let mut stack = vec![blocked_by];
+    let mut visited = std::collections::HashSet::new();
+    while let Some(current) = stack.pop() {
+        if !visited.insert(current) {
+            continue;
+        }
+        if current == task_id {
+            return Ok(true);
+        }
+        let mut stmt = conn.prepare(super::queries::BLOCKED_BY)?;
+        let rows = stmt.query_map(params![current], |r| r.get::<_, i64>(0))?;
+        for row in rows {
+            let next = row?;
+            if !visited.contains(&next) {
+                stack.push(next);
+            }
+        }
+    }
+    Ok(false)
 }
 
 fn row_to_task_shallow(r: &Row<'_>) -> rusqlite::Result<Task> {

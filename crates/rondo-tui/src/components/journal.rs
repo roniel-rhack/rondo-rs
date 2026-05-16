@@ -4,7 +4,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
+    widgets::{List, ListItem, Paragraph, Wrap},
     Frame,
 };
 
@@ -30,13 +30,8 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         })
         .collect();
     let list = List::new(items)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(t.border_inactive))
-                .title(Span::styled(" Days ", t.accent_style())),
-        )
-        .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+        .block(t.panel("Days", false))
+        .highlight_style(t.selection());
     f.render_stateful_widget(list, chunks[0], &mut app.journal_list_state);
 
     let mut content_lines: Vec<Line> = Vec::new();
@@ -86,12 +81,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     f.render_widget(
         Paragraph::new(content_lines)
             .wrap(Wrap { trim: false })
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(t.border_active))
-                    .title(Span::styled(" Journal ", t.accent_style())),
-            ),
+            .block(t.panel("Journal", true)),
         chunks[1],
     );
 }

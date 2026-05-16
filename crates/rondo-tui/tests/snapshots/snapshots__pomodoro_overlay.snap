@@ -3,11 +3,11 @@ source: crates/rondo-tui/tests/snapshots.rs
 expression: s
 ---
 " RonDO  ·  Tasks  Journal                                                                                               "
-"┌ Tasks (4) ───────────────────────────────────────────────┐┌ Detail · #4 ─────────────────────────────────────────────┐"
-"│ ○ Refactor pomodoro module  URG in 1d  BLOCKED   [refacto││Refactor pomodoro module                                  │"
-"│ ○ Buy groceries  low in 2d  [personal]                   ││                                                          │"
-"│ ◐ Review API spec  high today  1/5  [backend,work]       ││Status   ○  Pending                                       │"
-"│ ✓ Deploy v2.1  med overdue                               ││Priority URG                                              │"
+"╭ Tasks (4) ───────────────────────────────────────────────╮┌ Detail · #4 ─────────────────────────────────────────────┐"
+"│▌ ▌ ○  Refactor pomodoro module   URG   in 1d   blocked   ││Refactor pomodoro module                                  │"
+"│  ▏ ○  Buy groceries   low   in 2d   #personal            ││                                                          │"
+"│  ▍ ◐  Review API spec   high   today   1/5   #backend #wo││Status   ○  Pending                                       │"
+"│  ▎ ✓  Deploy v2.1   med   overdue                        ││Priority URG                                              │"
 "│                                                          ││Due      in 1d  2026-05-17                                │"
 "│                                                          ││Tags     #refactor  ·  #work                              │"
 "│                                                          ││                                                          │"
@@ -32,5 +32,5 @@ expression: s
 "│                                                          ││                                                          │"
 "│                                                          ││                                                          │"
 "│                                                          ││                                                          │"
-"└──────────────────────────────────────────────────────────┘└──────────────────────────────────────────────────────────┘"
+"╰──────────────────────────────────────────────────────────╯└──────────────────────────────────────────────────────────┘"
 " p toggle  Esc close  ? help  q quit                                                                                    "

@@ -4,45 +4,48 @@ use ratatui::{
     layout::Rect,
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Paragraph, Wrap},
     Frame,
 };
 use rondo_core::domain::task::Status;
 
 pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
-    let border = if !app.focus_left {
-        t.border_active
-    } else {
-        t.border_inactive
-    };
+    let active = !app.focus_left;
 
     let task = match app.tasks.get(app.selected_task) {
         Some(x) => x,
         None => {
-            let block = Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(border))
-                .title(" Detail ");
-            f.render_widget(
-                Paragraph::new(Span::styled(
-                    "No task selected",
-                    Style::default().fg(t.fg_muted),
-                ))
-                .block(block),
-                area,
-            );
+            let block = t.panel("Detail", active);
+            let lines = vec![
+                Line::raw(""),
+                Line::from(Span::styled(
+                    "  No task selected",
+                    t.muted(),
+                )),
+                Line::raw(""),
+                Line::from(vec![
+                    Span::raw("  "),
+                    Span::styled("j/k", t.kbd()),
+                    Span::raw(" "),
+                    Span::styled("navigate", t.muted()),
+                    Span::raw("    "),
+                    Span::styled("/", t.kbd()),
+                    Span::raw(" "),
+                    Span::styled("search", t.muted()),
+                    Span::raw("    "),
+                    Span::styled("?", t.kbd()),
+                    Span::raw(" "),
+                    Span::styled("help", t.muted()),
+                ]),
+            ];
+            f.render_widget(Paragraph::new(lines).block(block), area);
             return;
         }
     };
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(border))
-        .title(Span::styled(
-            format!(" Detail · #{} ", task.id),
-            t.accent_style(),
-        ));
+    let title = format!("Detail · #{}", task.id);
+    let block = t.panel(&title, active);
 
     let mut lines: Vec<Line> = Vec::new();
     lines.push(Line::from(Span::styled(

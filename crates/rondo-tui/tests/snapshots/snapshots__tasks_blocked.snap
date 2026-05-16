@@ -3,11 +3,11 @@ source: crates/rondo-tui/tests/snapshots.rs
 expression: s
 ---
 " RonDO  ·  Tasks  Journal                                                                                               "
-"┌ Tasks (4) ───────────────────────────────────────────────┐┌ Detail · #2 ─────────────────────────────────────────────┐"
-"│ ○ Refactor pomodoro module  URG in 1d  BLOCKED   [refacto││Deploy v2.1                                               │"
-"│ ○ Buy groceries  low in 2d  [personal]                   ││                                                          │"
-"│ ◐ Review API spec  high today  1/5  [backend,work]       ││Status   ✓  Done                                          │"
-"│ ✓ Deploy v2.1  med overdue                               ││Priority med                                              │"
+"╭ Tasks (4) ───────────────────────────────────────────────╮┌ Detail · #2 ─────────────────────────────────────────────┐"
+"│▌ ▌ ○  Refactor pomodoro module   URG   in 1d   blocked   ││Deploy v2.1                                               │"
+"│  ▏ ○  Buy groceries   low   in 2d   #personal            ││                                                          │"
+"│  ▍ ◐  Review API spec   high   today   1/5   #backend #wo││Status   ✓  Done                                          │"
+"│  ▎ ✓  Deploy v2.1   med   overdue                        ││Priority med                                              │"
 "│                                                          ││Due      overdue  2026-05-15                              │"
 "│                                                          ││                                                          │"
 "│                                                          ││Description                                               │"
@@ -32,5 +32,5 @@ expression: s
 "│                                                          ││                                                          │"
 "│                                                          ││                                                          │"
 "│                                                          ││                                                          │"
-"└──────────────────────────────────────────────────────────┘└──────────────────────────────────────────────────────────┘"
+"╰──────────────────────────────────────────────────────────╯└──────────────────────────────────────────────────────────┘"
 " j/k nav  Tab focus  / search  : cmd  ? help  q quit                                                                    "

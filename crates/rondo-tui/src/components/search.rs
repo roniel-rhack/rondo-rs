@@ -20,12 +20,10 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let match_count = matching_tasks(app);
     let line = Line::from(vec![
         Span::styled(" / ", t.accent_style()),
-        Span::styled(app.search_buf.clone(), t.fg_style()),
+        Span::styled(app.modals.search_buf.clone(), t.fg_style()),
         Span::styled(
             "▏",
-            Style::default()
-                .fg(t.fg)
-                .add_modifier(Modifier::SLOW_BLINK),
+            Style::default().fg(t.fg).add_modifier(Modifier::SLOW_BLINK),
         ),
         Span::raw("   "),
         Span::styled(
@@ -41,11 +39,12 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 }
 
 fn matching_tasks(app: &AppState) -> usize {
-    let q = app.search_buf.trim().to_lowercase();
+    let q = app.modals.search_buf.trim().to_lowercase();
     if q.is_empty() {
-        return app.tasks.len();
+        return app.data.tasks.len();
     }
-    app.tasks
+    app.data
+        .tasks
         .iter()
         .filter(|t| {
             t.title.to_lowercase().contains(&q)

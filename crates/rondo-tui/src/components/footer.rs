@@ -14,8 +14,8 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
     let mut spans: Vec<Span<'static>> = Vec::new();
     spans.push(Span::raw(" "));
-    let mode_label = if mode == Mode::Visual && !app.selection.is_empty() {
-        format!("[VIS·{}]", app.selection.len())
+    let mode_label = if mode == Mode::Visual && !app.ui.selection.is_empty() {
+        format!("[VIS·{}]", app.ui.selection.len())
     } else {
         format!("[{}]", mode.tag())
     };
@@ -49,10 +49,10 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 }
 
 fn current_mode(app: &AppState) -> Mode {
-    if app.command_palette_open || app.search_open {
+    if app.modals.command_palette_open || app.modals.search_open {
         Mode::Insert
     } else {
-        app.mode
+        app.ui.mode
     }
 }
 
@@ -66,20 +66,16 @@ fn mode_color(mode: Mode, t: &crate::theme::Theme) -> ratatui::style::Color {
 
 /// Context-aware hint dispatcher. Caps at 5 hints; `?` appended separately.
 fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
-    if app.help_open {
+    if app.modals.help_open {
         return vec![("Esc", "close")];
     }
-    if app.command_palette_open {
-        return vec![
-            ("Enter", "run"),
-            ("Tab", "complete"),
-            ("Esc", "cancel"),
-        ];
+    if app.modals.command_palette_open {
+        return vec![("Enter", "run"), ("Tab", "complete"), ("Esc", "cancel")];
     }
-    if app.search_open {
+    if app.modals.search_open {
         return vec![("Enter", "apply"), ("Esc", "cancel")];
     }
-    if app.pomodoro_open {
+    if app.modals.pomodoro_open {
         return vec![
             ("p", "toggle"),
             ("Esc", "close"),
@@ -88,7 +84,7 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
         ];
     }
 
-    if app.mode == Mode::Visual {
+    if app.ui.mode == Mode::Visual {
         return vec![
             ("j/k", "extend"),
             ("d", "bulk done"),
@@ -97,7 +93,7 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
             (":", "cmd"),
         ];
     }
-    match app.focus.pane {
+    match app.ui.focus.pane {
         Pane::Sidebar => vec![
             ("j/k", "move"),
             ("Enter", "aplicar filtro"),
@@ -112,7 +108,7 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
             ("v", "select"),
             ("/", "search"),
         ],
-        Pane::Detail => match app.focus.section {
+        Pane::Detail => match app.ui.focus.section {
             DetailSection::Header => vec![
                 ("Tab", "next sect"),
                 ("h", "list"),

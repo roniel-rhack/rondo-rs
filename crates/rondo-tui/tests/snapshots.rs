@@ -21,12 +21,7 @@ fn fixture_store() -> Arc<SqliteStore> {
     Arc::new(SqliteStore::open_readonly(tmp.path()).unwrap())
 }
 
-fn snapshot(
-    _name: &str,
-    width: u16,
-    height: u16,
-    mutate: impl FnOnce(&mut AppState),
-) -> String {
+fn snapshot(_name: &str, width: u16, height: u16, mutate: impl FnOnce(&mut AppState)) -> String {
     let mut app = AppState::new(fixture_store()).unwrap();
     mutate(&mut app);
     let backend = TestBackend::new(width, height);
@@ -49,27 +44,29 @@ fn tasks_default() {
 
 #[test]
 fn tasks_selected_second() {
-    let s = snapshot("tasks_selected_second", 120, 32, |a| a.selected_task = 1);
+    let s = snapshot("tasks_selected_second", 120, 32, |a| {
+        a.data.selected_task = 1
+    });
     assert_snapshot!(s);
 }
 
 #[test]
 fn tasks_blocked() {
-    let s = snapshot("tasks_blocked", 120, 32, |a| a.selected_task = 3);
+    let s = snapshot("tasks_blocked", 120, 32, |a| a.data.selected_task = 3);
     assert_snapshot!(s);
 }
 
 #[test]
 fn journal_view() {
-    let s = snapshot("journal_view", 120, 32, |a| a.page = Page::Journal);
+    let s = snapshot("journal_view", 120, 32, |a| a.ui.page = Page::Journal);
     assert_snapshot!(s);
 }
 
 #[test]
 fn pomodoro_overlay() {
     let s = snapshot("pomodoro_overlay", 120, 32, |a| {
-        a.pomodoro_open = true;
-        a.pomodoro_started = Some(std::time::Instant::now());
+        a.modals.pomodoro_open = true;
+        a.modals.pomodoro_started = Some(std::time::Instant::now());
     });
     assert_snapshot!(s);
 }
@@ -77,8 +74,8 @@ fn pomodoro_overlay() {
 #[test]
 fn command_palette() {
     let s = snapshot("command_palette", 120, 32, |a| {
-        a.command_palette_open = true;
-        a.command_buf = "p".to_string();
+        a.modals.command_palette_open = true;
+        a.modals.command_buf = "p".to_string();
     });
     assert_snapshot!(s);
 }
@@ -103,15 +100,15 @@ fn full_dashboard_140x42() {
 
 #[test]
 fn help_overlay() {
-    let s = snapshot("help_overlay", 120, 32, |a| a.help_open = true);
+    let s = snapshot("help_overlay", 120, 32, |a| a.modals.help_open = true);
     assert_snapshot!(s);
 }
 
 #[test]
 fn search_overlay() {
     let s = snapshot("search_overlay", 120, 32, |a| {
-        a.search_open = true;
-        a.search_buf = "deploy".to_string();
+        a.modals.search_open = true;
+        a.modals.search_buf = "deploy".to_string();
     });
     assert_snapshot!(s);
 }
@@ -119,8 +116,8 @@ fn search_overlay() {
 #[test]
 fn empty_tasks() {
     let s = snapshot("empty_tasks", 120, 32, |a| {
-        a.tasks.clear();
-        a.task_list_state.select(None);
+        a.data.tasks.clear();
+        a.data.task_list_state.select(None);
     });
     assert_snapshot!(s);
 }
@@ -128,11 +125,11 @@ fn empty_tasks() {
 #[test]
 fn visual_mode_multi_select() {
     let s = snapshot("visual_mode_multi_select", 120, 32, |a| {
-        a.mode = rondo_tui::focus::Mode::Visual;
-        a.selection.insert(1);
-        a.selection.insert(2);
-        a.selected_task = 1;
-        a.task_list_state.select(Some(1));
+        a.ui.mode = rondo_tui::focus::Mode::Visual;
+        a.ui.selection.insert(1);
+        a.ui.selection.insert(2);
+        a.data.selected_task = 1;
+        a.data.task_list_state.select(Some(1));
     });
     assert_snapshot!(s);
 }
@@ -140,8 +137,8 @@ fn visual_mode_multi_select() {
 #[test]
 fn sidebar_focused() {
     let s = snapshot("sidebar_focused", 140, 32, |a| {
-        a.focus.pane = rondo_tui::focus::Pane::Sidebar;
-        a.focus.sidebar_item = 1; // HOY
+        a.ui.focus.pane = rondo_tui::focus::Pane::Sidebar;
+        a.ui.focus.sidebar_item = 1; // HOY
     });
     assert_snapshot!(s);
 }
@@ -149,7 +146,7 @@ fn sidebar_focused() {
 #[test]
 fn filter_today_applied() {
     let s = snapshot("filter_today_applied", 140, 32, |a| {
-        a.active_filter = rondo_tui::filter::Filter::Today;
+        a.data.active_filter = rondo_tui::filter::Filter::Today;
     });
     assert_snapshot!(s);
 }
@@ -157,7 +154,7 @@ fn filter_today_applied() {
 #[test]
 fn filter_completed_applied() {
     let s = snapshot("filter_completed_applied", 140, 32, |a| {
-        a.active_filter = rondo_tui::filter::Filter::Completed;
+        a.data.active_filter = rondo_tui::filter::Filter::Completed;
     });
     assert_snapshot!(s);
 }
@@ -165,7 +162,7 @@ fn filter_completed_applied() {
 #[test]
 fn quick_actions_overlay() {
     let s = snapshot("quick_actions_overlay", 140, 32, |a| {
-        a.quick_actions_open = true;
+        a.modals.quick_actions_open = true;
     });
     assert_snapshot!(s);
 }
@@ -173,9 +170,9 @@ fn quick_actions_overlay() {
 #[test]
 fn quick_add_overlay() {
     let s = snapshot("quick_add_overlay", 120, 32, |a| {
-        a.quick_add_open = true;
-        a.quick_add_buf = "ship the demo #work !p3 due:tmrw".to_string();
-        a.mode = rondo_tui::focus::Mode::Insert;
+        a.modals.quick_add_open = true;
+        a.modals.quick_add_buf = "ship the demo #work !p3 due:tmrw".to_string();
+        a.ui.mode = rondo_tui::focus::Mode::Insert;
     });
     assert_snapshot!(s);
 }
@@ -183,11 +180,11 @@ fn quick_add_overlay() {
 #[test]
 fn detail_focused_subtasks_section() {
     let s = snapshot("detail_focused_subtasks_section", 120, 32, |a| {
-        a.focus.pane = rondo_tui::focus::Pane::Detail;
-        a.focus.section = rondo_tui::focus::DetailSection::Subtasks;
-        a.focus.section_item = 1;
-        a.selected_task = 2; // Review API spec has 5 subtasks
-        a.task_list_state.select(Some(2));
+        a.ui.focus.pane = rondo_tui::focus::Pane::Detail;
+        a.ui.focus.section = rondo_tui::focus::DetailSection::Subtasks;
+        a.ui.focus.section_item = 1;
+        a.data.selected_task = 2; // Review API spec has 5 subtasks
+        a.data.task_list_state.select(Some(2));
     });
     assert_snapshot!(s);
 }
@@ -195,10 +192,10 @@ fn detail_focused_subtasks_section() {
 #[test]
 fn empty_journal() {
     let s = snapshot("empty_journal", 120, 32, |a| {
-        a.page = Page::Journal;
-        a.journal_notes.clear();
-        a.journal_entries.clear();
-        a.journal_list_state.select(None);
+        a.ui.page = Page::Journal;
+        a.data.journal_notes.clear();
+        a.data.journal_entries.clear();
+        a.data.journal_list_state.select(None);
     });
     assert_snapshot!(s);
 }

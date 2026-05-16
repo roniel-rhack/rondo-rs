@@ -3,19 +3,19 @@ use crate::app::AppState;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 pub fn map(ev: Event, app: &AppState) -> Option<Action> {
-    if app.help_open {
+    if app.modals.help_open {
         return help_key(ev);
     }
-    if app.command_palette_open {
+    if app.modals.command_palette_open {
         return palette_key(ev, app);
     }
-    if app.search_open {
+    if app.modals.search_open {
         return search_key(ev, app);
     }
-    if app.quick_add_open {
+    if app.modals.quick_add_open {
         return quick_add_key(ev, app);
     }
-    if app.leader_goto {
+    if app.ui.leader_goto {
         if let Event::Key(k) = ev {
             if let KeyCode::Char(c) = k.code {
                 if let Some(f) = crate::filter::by_shortcut(c) {
@@ -26,7 +26,7 @@ pub fn map(ev: Event, app: &AppState) -> Option<Action> {
         // Any other key cancels leader.
         return Some(Action::EscapeContext);
     }
-    if app.focus.pane == crate::focus::Pane::Sidebar {
+    if app.ui.focus.pane == crate::focus::Pane::Sidebar {
         if let Event::Key(k) = ev {
             if let KeyCode::Char(c) = k.code {
                 if let Some(f) = crate::filter::by_shortcut(c) {
@@ -61,14 +61,14 @@ fn palette_key(ev: Event, app: &AppState) -> Option<Action> {
     };
     Some(match k.code {
         KeyCode::Esc => Action::CloseCommandPalette,
-        KeyCode::Enter => Action::SubmitCommand(app.command_buf.clone()),
+        KeyCode::Enter => Action::SubmitCommand(app.modals.command_buf.clone()),
         KeyCode::Backspace => Action::SearchInput({
-            let mut s = app.command_buf.clone();
+            let mut s = app.modals.command_buf.clone();
             s.pop();
             s
         }),
         KeyCode::Char(c) => Action::SearchInput({
-            let mut s = app.command_buf.clone();
+            let mut s = app.modals.command_buf.clone();
             s.push(c);
             s
         }),
@@ -84,12 +84,12 @@ fn search_key(ev: Event, app: &AppState) -> Option<Action> {
         KeyCode::Esc => Action::CloseSearch,
         KeyCode::Enter => Action::CloseSearch,
         KeyCode::Backspace => Action::SearchUpdate({
-            let mut s = app.search_buf.clone();
+            let mut s = app.modals.search_buf.clone();
             s.pop();
             s
         }),
         KeyCode::Char(c) => Action::SearchUpdate({
-            let mut s = app.search_buf.clone();
+            let mut s = app.modals.search_buf.clone();
             s.push(c);
             s
         }),
@@ -103,14 +103,14 @@ fn quick_add_key(ev: Event, app: &AppState) -> Option<Action> {
     };
     Some(match k.code {
         KeyCode::Esc => Action::EscapeContext,
-        KeyCode::Enter => Action::SubmitQuickAdd(app.quick_add_buf.clone()),
+        KeyCode::Enter => Action::SubmitQuickAdd(app.modals.quick_add_buf.clone()),
         KeyCode::Backspace => Action::QuickAddUpdate({
-            let mut s = app.quick_add_buf.clone();
+            let mut s = app.modals.quick_add_buf.clone();
             s.pop();
             s
         }),
         KeyCode::Char(c) => Action::QuickAddUpdate({
-            let mut s = app.quick_add_buf.clone();
+            let mut s = app.modals.quick_add_buf.clone();
             s.push(c);
             s
         }),
@@ -120,8 +120,8 @@ fn quick_add_key(ev: Event, app: &AppState) -> Option<Action> {
 
 fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
     let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
-    let in_visual = app.mode == crate::focus::Mode::Visual;
-    let in_sidebar = app.focus.pane == crate::focus::Pane::Sidebar;
+    let in_visual = app.ui.mode == crate::focus::Mode::Visual;
+    let in_sidebar = app.ui.focus.pane == crate::focus::Pane::Sidebar;
     Some(match k.code {
         KeyCode::Enter if in_sidebar => Action::ApplySidebarSelection,
         KeyCode::Char('q') if !ctrl => Action::Quit,

@@ -19,12 +19,10 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
     let line = Line::from(vec![
         Span::styled(" + ", t.accent_style()),
-        Span::styled(app.quick_add_buf.clone(), Style::default().fg(t.fg)),
+        Span::styled(app.modals.quick_add_buf.clone(), Style::default().fg(t.fg)),
         Span::styled(
             "▏",
-            Style::default()
-                .fg(t.fg)
-                .add_modifier(Modifier::SLOW_BLINK),
+            Style::default().fg(t.fg).add_modifier(Modifier::SLOW_BLINK),
         ),
     ]);
     let hint = Line::from(vec![

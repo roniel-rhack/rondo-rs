@@ -28,27 +28,23 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
                 " › ",
                 Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
             ),
-            Span::styled(app.command_buf.clone(), Style::default().fg(t.fg)),
+            Span::styled(app.modals.command_buf.clone(), Style::default().fg(t.fg)),
             Span::styled(
                 "▏",
-                Style::default()
-                    .fg(t.fg)
-                    .add_modifier(Modifier::SLOW_BLINK),
+                Style::default().fg(t.fg).add_modifier(Modifier::SLOW_BLINK),
             ),
         ])),
         chunks[0],
     );
 
-    let suggestions = filter_suggestions(&app.command_buf);
+    let suggestions = filter_suggestions(&app.modals.command_buf);
     let items: Vec<ListItem> = suggestions
         .iter()
         .map(|s| {
             ListItem::new(Line::from(vec![
                 Span::styled(
                     format!("  {:<10} ", s.cmd),
-                    Style::default()
-                        .fg(t.accent)
-                        .add_modifier(Modifier::BOLD),
+                    Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(s.desc, Style::default().fg(t.fg_muted)),
             ]))

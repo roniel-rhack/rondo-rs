@@ -1,0 +1,134 @@
+use crate::action::{Action, Page};
+use crate::focus::{FocusState, Mode, Pane};
+use ratatui::layout::Rect;
+use std::collections::HashSet;
+use std::time::Instant;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlashTarget {
+    Task(i64),
+    Subtask(i64),
+}
+
+pub const FLASH_DURATION_MS: u128 = 220;
+
+/// View-level state: page, focus, mode, splits, flashes, cached rects.
+pub struct UiState {
+    pub page: Page,
+    pub focus: FocusState,
+    pub mode: Mode,
+    pub split_ratio: u16,
+    pub selection: HashSet<i64>,
+    pub flash: Option<(FlashTarget, Instant)>,
+    pub leader_goto: bool,
+    pub last_footer_rect: Rect,
+    pub last_task_list_rect: Rect,
+    pub last_detail_rect: Rect,
+    pub last_body_rect: Rect,
+    pub last_pomodoro_rect: Rect,
+    pub last_quick_add_rect: Rect,
+}
+
+impl Default for UiState {
+    fn default() -> Self {
+        Self {
+            page: Page::Tasks,
+            focus: FocusState::default(),
+            mode: Mode::Normal,
+            split_ratio: 50,
+            selection: HashSet::new(),
+            flash: None,
+            leader_goto: false,
+            last_footer_rect: Rect::default(),
+            last_task_list_rect: Rect::default(),
+            last_detail_rect: Rect::default(),
+            last_body_rect: Rect::default(),
+            last_pomodoro_rect: Rect::default(),
+            last_quick_add_rect: Rect::default(),
+        }
+    }
+}
+
+impl UiState {
+    /// Is `target` currently flashing? Does not auto-clear (see `expire_flash`).
+    pub fn is_flashing(&self, target: FlashTarget) -> bool {
+        match self.flash {
+            Some((t, when)) if t == target => when.elapsed().as_millis() < FLASH_DURATION_MS,
+            _ => false,
+        }
+    }
+
+    /// Periodic housekeeping (called on tick).
+    pub fn expire_flash(&mut self) {
+        if let Some((_, when)) = self.flash {
+            if when.elapsed().as_millis() >= FLASH_DURATION_MS {
+                self.flash = None;
+            }
+        }
+    }
+
+    /// Backward-compat shim — still used by some pane-render code paths to color borders.
+    pub fn focus_left(&self) -> bool {
+        matches!(self.focus.pane, Pane::List | Pane::Sidebar)
+    }
+
+    /// Pure UI mutations that don't need cross-substate access.
+    /// Returns optional follow-up for the dispatcher.
+    pub fn update(&mut self, action: Action) -> Option<Action> {
+        match action {
+            Action::FocusLeft => {
+                self.focus.pane = match self.focus.pane {
+                    Pane::Detail => Pane::List,
+                    Pane::List | Pane::Sidebar => Pane::Sidebar,
+                };
+                self.focus.section_item = 0;
+                None
+            }
+            Action::FocusRight => {
+                self.focus.pane = match self.focus.pane {
+                    Pane::Sidebar => Pane::List,
+                    Pane::List | Pane::Detail => Pane::Detail,
+                };
+                self.focus.section_item = 0;
+                None
+            }
+            Action::FocusNext => {
+                self.focus.pane = match self.focus.pane {
+                    Pane::Sidebar => Pane::List,
+                    Pane::List => Pane::Detail,
+                    Pane::Detail => Pane::Sidebar,
+                };
+                self.focus.section_item = 0;
+                None
+            }
+            Action::NextSection => {
+                if self.focus.pane == Pane::Detail {
+                    self.focus.section = self.focus.section.next();
+                    self.focus.section_item = 0;
+                }
+                None
+            }
+            Action::PrevSection => {
+                if self.focus.pane == Pane::Detail {
+                    self.focus.section = self.focus.section.prev();
+                    self.focus.section_item = 0;
+                }
+                None
+            }
+            Action::ResetSplit => {
+                self.split_ratio = 50;
+                None
+            }
+            Action::ResizeSplit { delta } => {
+                let new = self.split_ratio as i32 + delta as i32;
+                self.split_ratio = new.clamp(20, 80) as u16;
+                None
+            }
+            Action::LeaderGoto => {
+                self.leader_goto = true;
+                None
+            }
+            _ => None,
+        }
+    }
+}

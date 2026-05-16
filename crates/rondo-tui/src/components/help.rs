@@ -61,10 +61,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         .iter()
         .map(|(key, label)| {
             if label.is_empty() && !key.is_empty() {
-                Line::from(Span::styled(
-                    format!("  {}", key),
-                    t.accent_style(),
-                ))
+                Line::from(Span::styled(format!("  {}", key), t.accent_style()))
             } else if key.is_empty() {
                 Line::raw("")
             } else {

@@ -18,26 +18,29 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         .split(area);
 
     let mut chips: Vec<Span<'static>> = vec![Span::raw(" ")];
-    if !app.search_buf.is_empty() {
+    if !app.modals.search_buf.is_empty() {
         chips.push(Span::styled(" filter: ", Style::default().fg(t.fg_muted)));
-        chips.push(chip(&format!("/{}", app.search_buf), t.accent, t));
+        chips.push(chip(&format!("/{}", app.modals.search_buf), t.accent, t));
     }
     f.render_widget(Paragraph::new(Line::from(chips)), chunks[0]);
 
-    let active = app.tasks.iter().filter(|x| {
-        matches!(
-            x.status,
-            rondo_core::domain::task::Status::Pending
-                | rondo_core::domain::task::Status::InProgress
-        )
-    }).count();
-    let done = app.tasks.len() - active;
+    let active = app
+        .data
+        .tasks
+        .iter()
+        .filter(|x| {
+            matches!(
+                x.status,
+                rondo_core::domain::task::Status::Pending
+                    | rondo_core::domain::task::Status::InProgress
+            )
+        })
+        .count();
+    let done = app.data.tasks.len() - active;
     let counts = Line::from(vec![
         Span::styled(
             format!("{} active", active),
-            Style::default()
-                .fg(t.fg)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(t.fg).add_modifier(Modifier::BOLD),
         ),
         Span::styled(" · ", Style::default().fg(t.border_inactive)),
         Span::styled(format!("{} done ", done), Style::default().fg(t.fg_muted)),

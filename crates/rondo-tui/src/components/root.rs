@@ -14,10 +14,10 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1), // brand strip
-            Constraint::Min(1),    // body (sidebar + content)
+            Constraint::Length(1),                // brand strip
+            Constraint::Min(1),                   // body (sidebar + content)
             Constraint::Length(analytics_height), // analytics row (optional)
-            Constraint::Length(1), // footer
+            Constraint::Length(1),                // footer
         ])
         .split(area);
 
@@ -27,28 +27,28 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
         components::analytics::draw(app, f, chunks[2]);
     }
     components::footer::draw(app, f, chunks[3]);
-    app.last_footer_rect = chunks[3];
+    app.ui.last_footer_rect = chunks[3];
 
-    if app.pomodoro_open {
+    if app.modals.pomodoro_open {
         let r = centered(60, 14, area);
-        app.last_pomodoro_rect = r;
+        app.ui.last_pomodoro_rect = r;
         components::pomodoro::draw(app, f, r);
     }
-    if app.search_open {
+    if app.modals.search_open {
         components::search::draw(app, f, search_rect(area));
     }
-    if app.quick_add_open {
+    if app.modals.quick_add_open {
         let r = search_rect(area);
-        app.last_quick_add_rect = r;
+        app.ui.last_quick_add_rect = r;
         components::quick_add::draw(app, f, r);
     }
-    if app.command_palette_open {
+    if app.modals.command_palette_open {
         components::command_palette::draw(app, f, palette_rect(area));
     }
-    if app.help_open {
+    if app.modals.help_open {
         components::help::draw(app, f, centered(60, 40, area));
     }
-    if app.quick_actions_open {
+    if app.modals.quick_actions_open {
         components::quick_actions::draw(app, f, centered(72, 7, area));
     }
 
@@ -72,28 +72,28 @@ fn body_with_sidebar(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
 }
 
 fn body(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
-    app.last_body_rect = area;
+    app.ui.last_body_rect = area;
     let narrow = area.width < NARROW_BREAKPOINT;
-    match app.page {
+    match app.ui.page {
         Page::Tasks => {
             if narrow {
                 if app.focus_left() {
-                    app.last_task_list_rect = area;
+                    app.ui.last_task_list_rect = area;
                     components::task_list::draw(app, f, area);
                 } else {
-                    app.last_detail_rect = area;
+                    app.ui.last_detail_rect = area;
                     components::task_detail::draw(app, f, area);
                 }
             } else {
                 let split = Layout::default()
                     .direction(Direction::Horizontal)
                     .constraints([
-                        Constraint::Percentage(app.split_ratio),
-                        Constraint::Percentage(100 - app.split_ratio),
+                        Constraint::Percentage(app.ui.split_ratio),
+                        Constraint::Percentage(100 - app.ui.split_ratio),
                     ])
                     .split(area);
-                app.last_task_list_rect = split[0];
-                app.last_detail_rect = split[1];
+                app.ui.last_task_list_rect = split[0];
+                app.ui.last_detail_rect = split[1];
                 components::task_list::draw(app, f, split[0]);
                 components::task_detail::draw(app, f, split[1]);
             }

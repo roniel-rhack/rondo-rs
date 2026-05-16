@@ -6,6 +6,7 @@
 use color_eyre::eyre::{eyre, Result};
 use rondo_core::domain::task::{NewTask, Status, Task};
 use rondo_core::store::sqlite::SqliteStore;
+use std::io::BufRead;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -39,6 +40,79 @@ pub enum Command {
         #[command(subcommand)]
         action: PluginsAction,
     },
+    /// Delete a task by id
+    Delete { id: i64 },
+    /// Journal operations
+    Journal {
+        #[command(subcommand)]
+        action: JournalAction,
+    },
+    /// Focus session operations
+    Focus {
+        #[command(subcommand)]
+        action: FocusAction,
+    },
+    /// Print a summary of tasks / focus streak / journal counts
+    Stats,
+    /// Read NDJSON ops from stdin (one per line) and apply them
+    Batch,
+    /// Recurrence helpers
+    Recur {
+        #[command(subcommand)]
+        action: RecurAction,
+    },
+    /// Task dependency operations
+    Dep {
+        #[command(subcommand)]
+        action: DepAction,
+    },
+    /// Task tag operations
+    Tag {
+        #[command(subcommand)]
+        action: TagAction,
+    },
+    /// Emit shell completion script (bash|zsh|fish|powershell|elvish)
+    Completion {
+        shell: clap_complete::Shell,
+    },
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum JournalAction {
+    /// Append an entry to today's note
+    Add { body: Vec<String> },
+    /// List recent journal notes
+    List,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum FocusAction {
+    /// Start a 25-minute Work focus session
+    Start,
+    /// Print streak + total completed today
+    Stats,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum RecurAction {
+    /// List pending recurrent spawns without creating them
+    Preview,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum DepAction {
+    /// Add `task_id` is blocked by `blocked_by`
+    Add { task_id: i64, blocked_by: i64 },
+    /// Remove the edge `task_id` -> `blocked_by`
+    Remove { task_id: i64, blocked_by: i64 },
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum TagAction {
+    /// Attach a tag to a task
+    Add { task_id: i64, name: String },
+    /// Detach a tag from a task
+    Remove { task_id: i64, name: String },
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -56,7 +130,7 @@ pub enum PluginsAction {
 /// Subcommands that do not need a SQLite database. Used by `main.rs` to skip
 /// the DB-existence check when only metadata work is requested.
 pub fn needs_db(cmd: &Command) -> bool {
-    !matches!(cmd, Command::Plugins { .. })
+    !matches!(cmd, Command::Plugins { .. } | Command::Completion { .. })
 }
 
 /// Shared CLI options used by every subcommand.
@@ -72,6 +146,19 @@ pub fn run(cmd: Command, opts: &CliOpts, db_path: &Path) -> Result<()> {
         Command::Done { id } => cli_done(db_path, opts, id),
         Command::Export { format } => cli_export(db_path, opts, &format),
         Command::Plugins { action } => cli_plugins(opts, action),
+        Command::Delete { id } => cli_delete(db_path, opts, id),
+        Command::Journal { action } => cli_journal(db_path, opts, action),
+        Command::Focus { action } => cli_focus(db_path, opts, action),
+        Command::Stats => cli_stats(db_path, opts),
+        Command::Batch => cli_batch(db_path, opts),
+        Command::Recur { action } => cli_recur(db_path, opts, action),
+        Command::Dep { action } => cli_dep(db_path, opts, action),
+        Command::Tag { action } => cli_tag(db_path, opts, action),
+        Command::Completion { .. } => {
+            // Completion is handled in main.rs where the full Cli struct is in
+            // scope. Reaching here means main forgot to intercept it.
+            Err(eyre!("completion must be handled by the binary entrypoint"))
+        }
     }
 }
 
@@ -439,6 +526,316 @@ fn plugins_remove(dir: &Path, id: &str) -> Result<()> {
     std::fs::remove_dir_all(&target)?;
     println!("removed `{}` ({})", id, target.display());
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// M9 rest: delete / journal / focus / stats / batch / recur / dep / tag
+// ---------------------------------------------------------------------------
+
+fn cli_delete(db_path: &Path, opts: &CliOpts, id: i64) -> Result<()> {
+    require_write(opts, "delete")?;
+    let (store, _guard) = open_rw_store(db_path)?;
+    let _undo = store.delete_task(id)?;
+    if opts.json {
+        println!("{}", serde_json::json!({ "id": id, "deleted": true }));
+    } else {
+        println!("task {id} deleted");
+    }
+    Ok(())
+}
+
+fn cli_journal(db_path: &Path, opts: &CliOpts, action: JournalAction) -> Result<()> {
+    match action {
+        JournalAction::Add { body } => cli_journal_add(db_path, opts, body),
+        JournalAction::List => cli_journal_list(db_path, opts),
+    }
+}
+
+fn cli_journal_add(db_path: &Path, opts: &CliOpts, body: Vec<String>) -> Result<()> {
+    require_write(opts, "journal add")?;
+    if body.is_empty() {
+        return Err(eyre!("journal add: body required"));
+    }
+    let (store, _guard) = open_rw_store(db_path)?;
+    let note = store.create_or_get_today_note()?;
+    let body_str = body.join(" ");
+    let entry_id = store.add_journal_entry(note.id, &body_str)?;
+    if opts.json {
+        println!(
+            "{}",
+            serde_json::json!({ "entry_id": entry_id, "note_id": note.id })
+        );
+    } else {
+        println!("journal entry {entry_id} added to note {}", note.id);
+    }
+    Ok(())
+}
+
+fn cli_journal_list(db_path: &Path, opts: &CliOpts) -> Result<()> {
+    let store = SqliteStore::open_readonly(db_path)?;
+    let notes = store.list_journal_notes()?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&notes)?);
+        return Ok(());
+    }
+    if notes.is_empty() {
+        println!("(no journal notes)");
+        return Ok(());
+    }
+    println!("{:>4}  {:<12}  HIDDEN", "ID", "DATE");
+    for n in &notes {
+        let date = n.date.format("%Y-%m-%d").to_string();
+        println!("{:>4}  {:<12}  {}", n.id, date, n.hidden);
+    }
+    Ok(())
+}
+
+fn cli_focus(db_path: &Path, opts: &CliOpts, action: FocusAction) -> Result<()> {
+    match action {
+        FocusAction::Start => cli_focus_start(db_path, opts),
+        FocusAction::Stats => cli_focus_stats(db_path, opts),
+    }
+}
+
+fn cli_focus_start(db_path: &Path, opts: &CliOpts) -> Result<()> {
+    require_write(opts, "focus start")?;
+    let (store, _guard) = open_rw_store(db_path)?;
+    let id = store.start_focus_session(
+        None,
+        rondo_core::domain::focus::SessionKind::Work,
+        25 * 60,
+    )?;
+    if opts.json {
+        println!("{}", serde_json::json!({ "session_id": id }));
+    } else {
+        println!("focus session {id} started");
+    }
+    Ok(())
+}
+
+fn cli_focus_stats(db_path: &Path, opts: &CliOpts) -> Result<()> {
+    let store = SqliteStore::open_readonly(db_path)?;
+    let streak = store.focus_streak().unwrap_or(0);
+    let sessions = store.list_focus_sessions().unwrap_or_default();
+    let today = chrono::Utc::now().date_naive();
+    let completed_today = sessions
+        .iter()
+        .filter(|s| {
+            s.completed_at
+                .map(|c| c.date_naive() == today)
+                .unwrap_or(false)
+                && matches!(s.kind, rondo_core::domain::focus::SessionKind::Work)
+        })
+        .count();
+    if opts.json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "streak_days": streak,
+                "completed_today": completed_today,
+            })
+        );
+    } else {
+        println!("focus streak: {streak} day(s)");
+        println!("completed today: {completed_today} session(s)");
+    }
+    Ok(())
+}
+
+fn cli_stats(db_path: &Path, opts: &CliOpts) -> Result<()> {
+    let store = SqliteStore::open_readonly(db_path)?;
+    let tasks = store.list_tasks()?;
+    let total = tasks.len();
+    let done = tasks
+        .iter()
+        .filter(|t| matches!(t.status, Status::Done))
+        .count();
+    let pending = total - done;
+    let streak = store.focus_streak().unwrap_or(0);
+    let journal = store.list_journal_notes().map(|n| n.len()).unwrap_or(0);
+    if opts.json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "tasks": { "total": total, "done": done, "pending": pending },
+                "focus_streak": streak,
+                "journal_notes": journal,
+            })
+        );
+    } else {
+        println!("tasks: {total} total ({done} done, {pending} pending)");
+        println!("focus streak: {streak} day(s)");
+        println!("journal notes: {journal}");
+    }
+    Ok(())
+}
+
+fn cli_batch(db_path: &Path, opts: &CliOpts) -> Result<()> {
+    require_write(opts, "batch")?;
+    let (store, _guard) = open_rw_store(db_path)?;
+    let stdin = std::io::stdin();
+    let mut count: usize = 0;
+    let mut errors: Vec<String> = Vec::new();
+    for line in stdin.lock().lines() {
+        let line = line?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let v: serde_json::Value = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(e) => {
+                errors.push(format!("parse: {e}"));
+                continue;
+            }
+        };
+        let op = v.get("op").and_then(|s| s.as_str()).unwrap_or("");
+        match op {
+            "add" => {
+                let title = v.get("title").and_then(|t| t.as_str()).unwrap_or("");
+                if title.is_empty() {
+                    errors.push("add: empty title".into());
+                    continue;
+                }
+                match store.create_task(NewTask::quick(title)) {
+                    Ok(_) => count += 1,
+                    Err(e) => errors.push(format!("add: {e}")),
+                }
+            }
+            "done" => {
+                let id = v.get("id").and_then(|i| i.as_i64()).unwrap_or(0);
+                if id == 0 {
+                    errors.push("done: missing id".into());
+                    continue;
+                }
+                match store.set_status(id, Status::Done) {
+                    Ok(_) => count += 1,
+                    Err(e) => errors.push(format!("done: {e}")),
+                }
+            }
+            other => errors.push(format!("unknown op: {other}")),
+        }
+    }
+    if opts.json {
+        println!(
+            "{}",
+            serde_json::json!({ "processed": count, "errors": errors.len() })
+        );
+    } else {
+        println!("processed {count} ops, {} errors", errors.len());
+        for e in &errors {
+            eprintln!("  - {e}");
+        }
+    }
+    Ok(())
+}
+
+fn cli_recur(db_path: &Path, opts: &CliOpts, action: RecurAction) -> Result<()> {
+    match action {
+        RecurAction::Preview => cli_recur_preview(db_path, opts),
+    }
+}
+
+fn cli_recur_preview(db_path: &Path, opts: &CliOpts) -> Result<()> {
+    let store = SqliteStore::open_readonly(db_path)?;
+    let tasks = store.list_tasks()?;
+    let now = chrono::Utc::now().date_naive();
+    let pending: Vec<_> = tasks
+        .iter()
+        .filter(|t| matches!(t.status, Status::Done))
+        .filter_map(|t| {
+            rondo_core::recurrence::next_occurrence(t, now)
+                .map(|next| (t.id, t.title.clone(), next))
+        })
+        .collect();
+    if opts.json {
+        let arr: Vec<serde_json::Value> = pending
+            .iter()
+            .map(|(id, title, next)| {
+                serde_json::json!({ "id": id, "title": title, "next": next.to_string() })
+            })
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&arr)?);
+    } else if pending.is_empty() {
+        println!("(no pending recurrent spawns)");
+    } else {
+        for (id, title, next) in &pending {
+            println!("[#{id}] {title} -> next {next}");
+        }
+    }
+    Ok(())
+}
+
+fn cli_dep(db_path: &Path, opts: &CliOpts, action: DepAction) -> Result<()> {
+    match action {
+        DepAction::Add { task_id, blocked_by } => {
+            require_write(opts, "dep add")?;
+            let (store, _guard) = open_rw_store(db_path)?;
+            store.add_dependency(task_id, blocked_by)?;
+            if opts.json {
+                println!(
+                    "{}",
+                    serde_json::json!({ "task_id": task_id, "blocked_by": blocked_by, "added": true })
+                );
+            } else {
+                println!("dep added: {task_id} blocked by {blocked_by}");
+            }
+            Ok(())
+        }
+        DepAction::Remove { task_id, blocked_by } => {
+            require_write(opts, "dep remove")?;
+            let (store, _guard) = open_rw_store(db_path)?;
+            store.remove_dependency(task_id, blocked_by)?;
+            if opts.json {
+                println!(
+                    "{}",
+                    serde_json::json!({ "task_id": task_id, "blocked_by": blocked_by, "removed": true })
+                );
+            } else {
+                println!("dep removed: {task_id} blocked by {blocked_by}");
+            }
+            Ok(())
+        }
+    }
+}
+
+fn cli_tag(db_path: &Path, opts: &CliOpts, action: TagAction) -> Result<()> {
+    match action {
+        TagAction::Add { task_id, name } => {
+            require_write(opts, "tag add")?;
+            let (store, _guard) = open_rw_store(db_path)?;
+            let _undo = store.add_tag(task_id, &name)?;
+            if opts.json {
+                println!(
+                    "{}",
+                    serde_json::json!({ "task_id": task_id, "tag": name, "added": true })
+                );
+            } else {
+                println!("tag `{name}` added to task {task_id}");
+            }
+            Ok(())
+        }
+        TagAction::Remove { task_id, name } => {
+            require_write(opts, "tag remove")?;
+            let (store, _guard) = open_rw_store(db_path)?;
+            let _undo = store.remove_tag(task_id, &name)?;
+            if opts.json {
+                println!(
+                    "{}",
+                    serde_json::json!({ "task_id": task_id, "tag": name, "removed": true })
+                );
+            } else {
+                println!("tag `{name}` removed from task {task_id}");
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Emit a shell-completion script for the binary using the provided clap
+/// command (passed in by `main.rs` since the top-level `Cli` lives there).
+pub fn emit_completion(shell: clap_complete::Shell, cmd: &mut clap::Command) {
+    let name = cmd.get_name().to_string();
+    clap_complete::generate(shell, cmd, name, &mut std::io::stdout());
 }
 
 fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {

@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use color_eyre::eyre::Result;
 use crossterm::event;
 use std::sync::Arc;
@@ -44,6 +44,11 @@ fn main() -> Result<()> {
     let cli_args = Cli::parse();
     let db_path = cli_args.db.clone().unwrap_or_else(default_db_path);
     if let Some(cmd) = cli_args.command {
+        if let cli::Command::Completion { shell } = cmd {
+            let mut command = Cli::command();
+            cli::emit_completion(shell, &mut command);
+            return Ok(());
+        }
         if cli::needs_db(&cmd) && !db_path.exists() {
             eprintln!(
                 "DB no encontrado en {}. Usa --db o setea RONDO_DB.",

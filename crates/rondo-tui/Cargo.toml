@@ -20,6 +20,7 @@ rondo-plugin-host = { path = "../rondo-plugin-host" }
 ratatui = { workspace = true }
 crossterm = { workspace = true }
 clap = { workspace = true }
+clap_complete = "4"
 color-eyre = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

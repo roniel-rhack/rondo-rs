@@ -121,9 +121,13 @@ pub mod presets {
     }
 
     pub fn detail_refresh(accent: Color) -> Effect {
-        fx::sequence(&[
-            fx::dissolve(EffectTimer::from_ms(160, Interpolation::QuadOut)),
-            fx::fade_from_fg(rgb_color(accent), EffectTimer::from_ms(140, Interpolation::QuadIn)),
+        // Single coalesce: assembles cells from blank → fully-painted in one
+        // pass. Cleaner than dissolve→fade because dissolve fully clears the
+        // panel before sequence advances; some frames would land between
+        // effects and look black/partial.
+        fx::parallel(&[
+            fx::coalesce(EffectTimer::from_ms(220, Interpolation::CubicOut)),
+            fx::fade_from_fg(rgb_color(accent), EffectTimer::from_ms(180, Interpolation::QuadOut)),
         ])
     }
 

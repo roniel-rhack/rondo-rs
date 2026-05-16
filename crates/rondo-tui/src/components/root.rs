@@ -5,7 +5,7 @@ use ratatui::{
 };
 
 const NARROW_BREAKPOINT: u16 = 100;
-const SIDEBAR_WIDTH: u16 = 22;
+const SIDEBAR_WIDTH: u16 = 26;
 
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
     let area = f.area();
@@ -41,7 +41,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
         components::command_palette::draw(app, f, palette_rect(area));
     }
     if app.help_open {
-        components::help::draw(app, f, centered(56, 28, area));
+        components::help::draw(app, f, centered(60, 40, area));
     }
     if app.quick_actions_open {
         components::quick_actions::draw(app, f, centered(72, 7, area));

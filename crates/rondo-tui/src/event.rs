@@ -15,6 +15,26 @@ pub fn map(ev: Event, app: &AppState) -> Option<Action> {
     if app.quick_add_open {
         return quick_add_key(ev, app);
     }
+    if app.leader_goto {
+        if let Event::Key(k) = ev {
+            if let KeyCode::Char(c) = k.code {
+                if let Some(f) = crate::filter::by_shortcut(c) {
+                    return Some(Action::ApplyFilter(f));
+                }
+            }
+        }
+        // Any other key cancels leader.
+        return Some(Action::EscapeContext);
+    }
+    if app.focus.pane == crate::focus::Pane::Sidebar {
+        if let Event::Key(k) = ev {
+            if let KeyCode::Char(c) = k.code {
+                if let Some(f) = crate::filter::by_shortcut(c) {
+                    return Some(Action::ApplyFilter(f));
+                }
+            }
+        }
+    }
     match ev {
         Event::Key(k) => key_to_action(k, app),
         Event::Resize(w, h) => Some(Action::Resize {
@@ -127,6 +147,7 @@ fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
         KeyCode::Char(':') => Action::OpenCommandPalette,
         KeyCode::Char('/') => Action::OpenSearch,
         KeyCode::Char('?') => Action::ToggleHelp,
+        KeyCode::Char('f') => Action::LeaderGoto,
         KeyCode::Char('.') => Action::ToggleQuickActions,
         KeyCode::Char('<') => Action::ResizeSplit { delta: -5 },
         KeyCode::Char('>') => Action::ResizeSplit { delta: 5 },

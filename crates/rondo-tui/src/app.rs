@@ -45,6 +45,7 @@ pub struct AppState {
     pub store: Arc<rondo_core::store::sqlite::SqliteStore>,
     pub flash: Option<(FlashTarget, Instant)>,
     pub active_filter: Filter,
+    pub leader_goto: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -151,10 +152,15 @@ impl AppState {
             store,
             flash: None,
             active_filter: Filter::Inbox,
+            leader_goto: false,
         })
     }
 
     pub fn update(&mut self, action: Action) {
+        // Clear pending leader on any action other than the leader itself.
+        if !matches!(action, Action::LeaderGoto) {
+            self.leader_goto = false;
+        }
         match action {
             Action::Quit => self.should_quit = true,
             Action::JumpTop => self.jump_selection(0),
@@ -237,6 +243,8 @@ impl AppState {
                     self.apply_sidebar_selection();
                 }
             }
+            Action::ApplyFilter(f) => self.apply_filter(f),
+            Action::LeaderGoto => self.leader_goto = true,
             Action::EnterVisual => {
                 if self.focus.pane == Pane::List && self.page == Page::Tasks {
                     self.mode = Mode::Visual;
@@ -450,10 +458,20 @@ impl AppState {
     /// Apply currently-highlighted sidebar item as the active filter.
     pub fn apply_sidebar_selection(&mut self) {
         let idx = self.focus.sidebar_item.min(crate::filter::SIDEBAR_ITEMS.len() - 1);
-        let new_filter = crate::filter::SIDEBAR_ITEMS[idx];
+        self.apply_filter(crate::filter::SIDEBAR_ITEMS[idx]);
+    }
+
+    /// Switch active filter and reset cursor. Works regardless of current focus.
+    pub fn apply_filter(&mut self, new_filter: Filter) {
         self.active_filter = new_filter;
         self.status_msg = Some(format!("filter: {}", new_filter.label()));
-        // Reset cursor to first visible task.
+        // Move sidebar cursor onto the applied item so visual matches state.
+        if let Some(pos) = crate::filter::SIDEBAR_ITEMS
+            .iter()
+            .position(|f| *f == new_filter)
+        {
+            self.focus.sidebar_item = pos;
+        }
         let visible = self.visible_task_indices();
         if let Some(&first) = visible.first() {
             self.selected_task = first;

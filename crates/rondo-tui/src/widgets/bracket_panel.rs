@@ -7,9 +7,10 @@ use ratatui::{
     widgets::Widget,
 };
 
-/// Aerospace-HUD style panel: only corner brackets + title rail.
-/// Heavy `┏┓┗┛` when active, light `┌┐└┘` when not.
-/// The middle horizontal/vertical edges are NOT drawn — content owns the body.
+/// Full-bordered panel with asymmetric title rail.
+/// Heavy `┏━━┓ ┃ ┗━━┛` when active, light `┌──┐ │ └──┘` when not.
+/// Title sits inline in the top rail (left-aligned with `━ title `).
+/// Optional badge appears at the right end of the top rail.
 pub struct BracketPanel<'a> {
     title: &'a str,
     badge: Option<&'a str>,
@@ -35,7 +36,7 @@ impl<'a> BracketPanel<'a> {
         self
     }
 
-    /// Returns the inner area for body content (1 col gutter inside brackets).
+    /// Returns the inner area for body content (1 col gutter inside borders).
     pub fn inner(&self, area: Rect) -> Rect {
         Rect {
             x: area.x + 2,
@@ -52,10 +53,10 @@ impl<'a> Widget for BracketPanel<'a> {
             return;
         }
         let t = self.theme;
-        let (tl, tr, bl, br, h, color) = if self.active {
-            ("┏", "┓", "┗", "┛", "━", t.border_active)
+        let (tl, tr, bl, br, h, v, color) = if self.active {
+            ("┏", "┓", "┗", "┛", "━", "┃", t.border_active)
         } else {
-            ("┌", "┐", "└", "┘", "─", t.border_inactive)
+            ("┌", "┐", "└", "┘", "─", "│", t.border_inactive)
         };
         let style = Style::default().fg(color);
 
@@ -64,19 +65,25 @@ impl<'a> Widget for BracketPanel<'a> {
         let x1 = area.x + area.width - 1;
         let y1 = area.y + area.height - 1;
 
+        // Corners
         buf[(x0, y0)].set_symbol(tl).set_style(style);
         buf[(x1, y0)].set_symbol(tr).set_style(style);
         buf[(x0, y1)].set_symbol(bl).set_style(style);
         buf[(x1, y1)].set_symbol(br).set_style(style);
 
-        // Top rail: ┏━ title ━━…
-        let rail_start_x = x0 + 1;
-        let rail_end_x = x1.saturating_sub(1);
-        for x in rail_start_x..=rail_end_x {
+        // Top + bottom rails
+        for x in (x0 + 1)..x1 {
             buf[(x, y0)].set_symbol(h).set_style(style);
+            buf[(x, y1)].set_symbol(h).set_style(style);
         }
 
-        // Title overlay
+        // Left + right verticals
+        for y in (y0 + 1)..y1 {
+            buf[(x0, y)].set_symbol(v).set_style(style);
+            buf[(x1, y)].set_symbol(v).set_style(style);
+        }
+
+        // Title overlay on the top rail
         let title_spans = vec![
             Span::styled(format!("{} ", h), style),
             Span::styled(
@@ -92,7 +99,7 @@ impl<'a> Widget for BracketPanel<'a> {
         for span in title_line.spans {
             let s = span.style;
             for grapheme in span.content.chars() {
-                if title_x > rail_end_x {
+                if title_x > x1.saturating_sub(1) {
                     break;
                 }
                 buf[(title_x, y0)]
@@ -102,7 +109,7 @@ impl<'a> Widget for BracketPanel<'a> {
             }
         }
 
-        // Right-side badge
+        // Right-side badge on the top rail
         if let Some(b) = self.badge {
             let badge_text = format!(" {} {}", b, h);
             let badge_len = badge_text.chars().count() as u16;
@@ -120,11 +127,6 @@ impl<'a> Widget for BracketPanel<'a> {
                     bx += 1;
                 }
             }
-        }
-
-        // Bottom rail: ┗━━━━┛
-        for x in (x0 + 1)..x1 {
-            buf[(x, y1)].set_symbol(h).set_style(style);
         }
     }
 }

@@ -45,6 +45,8 @@ pub enum Action {
     ToggleQuickActions,
     CloseQuickActions,
     ApplySidebarSelection,
+    ApplyFilter(crate::filter::Filter),
+    LeaderGoto,
     EnterVisual,
     BulkDone,
     BulkPriority,

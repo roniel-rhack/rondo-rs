@@ -66,9 +66,18 @@ fn main() -> Result<()> {
                 Err(e) => return Err(e.into()),
             },
         );
-        Arc::new(rondo_core::store::sqlite::SqliteStore::open_readwrite(
+        let store = Arc::new(rondo_core::store::sqlite::SqliteStore::open_readwrite(
             &db_path,
-        )?)
+        )?);
+        let today = chrono::Utc::now().date_naive();
+        match rondo_core::recurrence::spawn_recurrent_instances(&store, today) {
+            Ok(ids) if !ids.is_empty() => {
+                tracing::info!("recurrence: spawned {} instances", ids.len())
+            }
+            Ok(_) => {}
+            Err(e) => tracing::warn!("recurrence spawn failed: {}", e),
+        }
+        store
     } else {
         Arc::new(rondo_core::store::sqlite::SqliteStore::open_readonly(
             &db_path,

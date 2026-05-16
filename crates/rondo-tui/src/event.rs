@@ -21,6 +21,12 @@ pub fn map(ev: Event, app: &AppState) -> Option<Action> {
     if app.modals.sort_overlay_open {
         return sort_overlay_key(ev);
     }
+    if app.modals.confirm_delete_open {
+        return confirm_delete_key(ev);
+    }
+    if app.modals.edit_title_open {
+        return edit_title_key(ev, app);
+    }
     if app.ui.leader_goto {
         if let Event::Key(k) = ev {
             if let KeyCode::Char(c) = k.code {
@@ -147,6 +153,40 @@ fn sort_overlay_key(ev: Event) -> Option<Action> {
     })
 }
 
+fn confirm_delete_key(ev: Event) -> Option<Action> {
+    let Event::Key(k) = ev else {
+        return None;
+    };
+    Some(match k.code {
+        KeyCode::Char('y') | KeyCode::Char('Y') => Action::ConfirmDeleteTask,
+        KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => Action::CancelDelete,
+        _ => return None,
+    })
+}
+
+fn edit_title_key(ev: Event, app: &AppState) -> Option<Action> {
+    let Event::Key(k) = ev else {
+        return None;
+    };
+    let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
+    Some(match k.code {
+        KeyCode::Esc => Action::CancelEditTitle,
+        KeyCode::Enter => Action::SubmitEditTitle(app.modals.edit_title_buf.clone()),
+        KeyCode::Char('s') if ctrl => Action::SubmitEditTitle(app.modals.edit_title_buf.clone()),
+        KeyCode::Backspace => Action::EditTitleInput({
+            let mut s = app.modals.edit_title_buf.clone();
+            s.pop();
+            s
+        }),
+        KeyCode::Char(c) => Action::EditTitleInput({
+            let mut s = app.modals.edit_title_buf.clone();
+            s.push(c);
+            s
+        }),
+        _ => return None,
+    })
+}
+
 fn quick_add_key(ev: Event, app: &AppState) -> Option<Action> {
     let Event::Key(k) = ev else {
         return None;
@@ -195,6 +235,8 @@ fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
         KeyCode::Char('v') => Action::EnterVisual,
         KeyCode::Char('a') => Action::OpenQuickAdd,
         KeyCode::Char('d') if in_visual => Action::BulkDone,
+        KeyCode::Char('d') if !in_visual && !in_sidebar => Action::RequestDeleteTask,
+        KeyCode::Char('e') if !in_sidebar => Action::RequestEditTitle,
         KeyCode::Char('P') if in_visual => Action::BulkPriority,
         KeyCode::Char('1') => Action::TogglePage(Page::Tasks),
         KeyCode::Char('2') => Action::TogglePage(Page::Journal),

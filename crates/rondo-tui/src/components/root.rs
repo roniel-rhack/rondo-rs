@@ -58,6 +58,12 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
         let h = crate::app::ui_state::SortOrder::ALL.len() as u16 + 2;
         components::sort_overlay::draw(app, f, centered(48, h, area));
     }
+    if app.modals.edit_title_open {
+        components::edit_title::draw(app, f, search_rect(area));
+    }
+    if app.modals.confirm_delete_open {
+        components::confirm::draw(app, f, centered(60, 7, area));
+    }
 
     // Run live effects after all widgets have painted; effects mutate cells in
     // place to produce fades/sweeps/dissolves.

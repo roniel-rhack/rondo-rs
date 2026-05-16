@@ -170,29 +170,61 @@ impl AppState {
             Action::BulkDone => {
                 if self.ui.mode == Mode::Visual {
                     let ids: Vec<i64> = self.ui.selection.iter().copied().collect();
-                    for t in self.data.tasks.iter_mut() {
-                        if ids.contains(&t.id) {
-                            t.status = match t.status {
-                                rondo_core::domain::task::Status::Done => {
-                                    rondo_core::domain::task::Status::Pending
-                                }
-                                _ => rondo_core::domain::task::Status::Done,
-                            };
+                    if self.writable {
+                        let mut ok = 0usize;
+                        let mut err: Option<String> = None;
+                        for id in &ids {
+                            match self.data.store.set_status(
+                                *id,
+                                rondo_core::domain::task::Status::Done,
+                            ) {
+                                Ok(_) => ok += 1,
+                                Err(e) => err = Some(format!("{}", e)),
+                            }
                         }
+                        self.data.refresh_tasks();
+                        if let Some(first) = ids.first() {
+                            self.ui.flash = Some((FlashTarget::Task(*first), Instant::now()));
+                        }
+                        if self.ui.last_task_list_rect.width > 0 {
+                            let eff = crate::fx::presets::task_done_sweep(self.theme.fg_muted);
+                            self.fx.spawn(
+                                crate::fx::EffectId::TaskDone(ids.first().copied().unwrap_or(0)),
+                                eff,
+                                self.ui.last_task_list_rect,
+                            );
+                        }
+                        match err {
+                            Some(e) => self.toast(format!("bulk done: {} ok, error: {}", ok, e)),
+                            None => self.toast(format!("marked {} tasks done", ok)),
+                        }
+                    } else {
+                        for t in self.data.tasks.iter_mut() {
+                            if ids.contains(&t.id) {
+                                t.status = match t.status {
+                                    rondo_core::domain::task::Status::Done => {
+                                        rondo_core::domain::task::Status::Pending
+                                    }
+                                    _ => rondo_core::domain::task::Status::Done,
+                                };
+                            }
+                        }
+                        if let Some(first) = ids.first() {
+                            self.ui.flash = Some((FlashTarget::Task(*first), Instant::now()));
+                        }
+                        if self.ui.last_task_list_rect.width > 0 {
+                            let eff = crate::fx::presets::task_done_sweep(self.theme.fg_muted);
+                            self.fx.spawn(
+                                crate::fx::EffectId::TaskDone(ids.first().copied().unwrap_or(0)),
+                                eff,
+                                self.ui.last_task_list_rect,
+                            );
+                        }
+                        self.toast(format!(
+                            "toggled {} tasks (read-only, in-memory)",
+                            self.ui.selection.len()
+                        ));
                     }
-                    if let Some(first) = ids.first() {
-                        self.ui.flash = Some((FlashTarget::Task(*first), Instant::now()));
-                    }
-                    if self.ui.last_task_list_rect.width > 0 {
-                        let eff = crate::fx::presets::task_done_sweep(self.theme.fg_muted);
-                        self.fx.spawn(
-                            crate::fx::EffectId::TaskDone(ids.first().copied().unwrap_or(0)),
-                            eff,
-                            self.ui.last_task_list_rect,
-                        );
-                    }
-                    let count = self.ui.selection.len();
-                    self.toast(format!("toggled {} tasks (in-memory)", count));
                     self.ui.selection.clear();
                     self.ui.mode = Mode::Normal;
                 }
@@ -300,9 +332,77 @@ impl AppState {
                 self.modals.sort_overlay_open = false;
                 self.toast(format!("sort: {}", order.label()));
             }
+            Action::RequestDeleteTask => {
+                if !self.writable {
+                    self.toast("delete: read-only (start with --write)");
+                } else if self.data.selected_task_id().is_some() {
+                    self.modals.confirm_delete_open = true;
+                }
+            }
+            Action::ConfirmDeleteTask => {
+                self.modals.confirm_delete_open = false;
+                if let Some(id) = self.data.selected_task_id() {
+                    match self.data.store.delete_task(id) {
+                        Ok(_) => {
+                            self.data.refresh_tasks();
+                            self.toast("task deleted");
+                        }
+                        Err(e) => self.toast(format!("delete failed: {}", e)),
+                    }
+                }
+            }
+            Action::CancelDelete => self.modals.confirm_delete_open = false,
+            Action::RequestEditTitle => {
+                if !self.writable {
+                    self.toast("edit: read-only (start with --write)");
+                } else if let Some(t) = self.data.selected_task() {
+                    self.modals.edit_title_buf = t.title.clone();
+                    self.modals.edit_title_open = true;
+                    self.ui.mode = Mode::Insert;
+                }
+            }
+            Action::SubmitEditTitle(new_title) => {
+                let trimmed = new_title.trim().to_string();
+                if !trimmed.is_empty() {
+                    if let Some(id) = self.data.selected_task_id() {
+                        let patch = rondo_core::domain::task::TaskPatch {
+                            title: Some(trimmed),
+                            ..Default::default()
+                        };
+                        match self.data.store.update_task(id, patch) {
+                            Ok(_) => {
+                                self.data.refresh_tasks();
+                                self.toast("title updated");
+                            }
+                            Err(e) => self.toast(format!("update failed: {}", e)),
+                        }
+                    }
+                }
+                self.modals.edit_title_open = false;
+                self.modals.edit_title_buf.clear();
+                self.ui.mode = Mode::Normal;
+            }
+            Action::CancelEditTitle => {
+                self.modals.edit_title_open = false;
+                self.modals.edit_title_buf.clear();
+                self.ui.mode = Mode::Normal;
+            }
+            Action::ToggleFocusedSubtask => {
+                if self.ui.focus.pane == Pane::Detail
+                    && self.ui.focus.section == DetailSection::Subtasks
+                {
+                    self.toggle_focused_subtask();
+                }
+            }
             Action::EscapeContext => {
                 if self.modals.help_open {
                     self.modals.help_open = false;
+                } else if self.modals.confirm_delete_open {
+                    self.modals.confirm_delete_open = false;
+                } else if self.modals.edit_title_open {
+                    self.modals.edit_title_open = false;
+                    self.modals.edit_title_buf.clear();
+                    self.ui.mode = Mode::Normal;
                 } else if self.modals.sort_overlay_open {
                     self.modals.sort_overlay_open = false;
                 } else if self.modals.quick_actions_open {
@@ -496,22 +596,36 @@ impl AppState {
             return;
         }
         if self.ui.focus.section == DetailSection::Subtasks {
-            let task_id = match self.data.tasks.get(self.data.selected_task) {
-                Some(t) => t.id,
+            self.toggle_focused_subtask();
+        }
+    }
+
+    /// Toggle the subtask under the Detail::Subtasks cursor. Persists when
+    /// `writable`; otherwise mutates the in-memory copy and toasts.
+    fn toggle_focused_subtask(&mut self) {
+        let item_idx = self.ui.focus.section_item;
+        let subtask_id = match self.data.tasks.get(self.data.selected_task) {
+            Some(t) => match t.subtasks.get(item_idx) {
+                Some(s) => s.id,
                 None => return,
-            };
-            let item_idx = self.ui.focus.section_item;
-            let mut flashed: Option<i64> = None;
-            if let Some(task) = self.data.tasks.get_mut(self.data.selected_task) {
-                if let Some(st) = task.subtasks.get_mut(item_idx) {
-                    st.completed = !st.completed;
-                    flashed = Some(st.id);
-                    let _ = task_id;
+            },
+            None => return,
+        };
+        if self.writable {
+            match self.data.store.toggle_subtask(subtask_id) {
+                Ok(_) => {
+                    self.data.refresh_tasks();
+                    self.ui.flash = Some((FlashTarget::Subtask(subtask_id), Instant::now()));
+                    self.toast(format!("subtask #{} toggled", subtask_id));
                 }
+                Err(e) => self.toast(format!("subtask toggle failed: {}", e)),
             }
-            if let Some(id) = flashed {
+        } else if let Some(task) = self.data.tasks.get_mut(self.data.selected_task) {
+            if let Some(st) = task.subtasks.get_mut(item_idx) {
+                st.completed = !st.completed;
+                let id = st.id;
                 self.ui.flash = Some((FlashTarget::Subtask(id), Instant::now()));
-                self.toast(format!("subtask #{} toggled (in-memory)", id));
+                self.toast(format!("subtask #{} toggled (read-only, in-memory)", id));
             }
         }
     }
@@ -537,18 +651,37 @@ impl AppState {
         if parsed.title.is_empty() {
             return;
         }
-        if self.ui.last_task_list_rect.width > 0 {
-            let eff = crate::fx::presets::quick_add_slide(self.theme.bg);
-            self.fx.spawn(
-                crate::fx::EffectId::QuickAddInsert,
-                eff,
-                self.ui.last_task_list_rect,
-            );
+        if !self.writable {
+            self.toast("quick-add: read-only (start with --write)");
+            return;
         }
-        self.toast(format!(
-            "queued: '{}' (tags={:?} prio={:?} due={:?})",
-            parsed.title, parsed.tags, parsed.priority, parsed.due
-        ));
+        let new_task = rondo_core::domain::task::NewTask {
+            title: parsed.title.clone(),
+            description: None,
+            status: rondo_core::domain::task::Status::Pending,
+            priority: parsed
+                .priority
+                .unwrap_or(rondo_core::domain::task::Priority::Low),
+            due_date: None,
+            recur_freq: rondo_core::domain::task::RecurFreq::None,
+            recur_interval: 0,
+            tags: parsed.tags.clone(),
+        };
+        match self.data.store.create_task(new_task) {
+            Ok(_) => {
+                self.data.refresh_tasks();
+                if self.ui.last_task_list_rect.width > 0 {
+                    let eff = crate::fx::presets::quick_add_slide(self.theme.bg);
+                    self.fx.spawn(
+                        crate::fx::EffectId::QuickAddInsert,
+                        eff,
+                        self.ui.last_task_list_rect,
+                    );
+                }
+                self.toast(format!("added: '{}'", parsed.title));
+            }
+            Err(e) => self.toast(format!("add failed: {}", e)),
+        }
     }
 
     fn submit_journal_entry(&mut self) {

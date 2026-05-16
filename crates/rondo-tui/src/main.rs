@@ -5,24 +5,30 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use rondo_tui::{
-    a11y, action::Action, app::AppState, components, event as ev, fx::FxManager, theme::Theme, tui,
+    a11y, action::Action, app::AppState, cli, components, event as ev, fx::FxManager,
+    theme::Theme, tui,
 };
 
 #[derive(Parser)]
 #[command(name = "rondo-tui", version, about = "Rust + ratatui MVP of rondo")]
 struct Cli {
     /// Path to SQLite DB (default: ~/.todo-app/todo.db)
-    #[arg(long, env = "RONDO_DB")]
+    #[arg(long, env = "RONDO_DB", global = true)]
     db: Option<std::path::PathBuf>,
     /// Use Color::Reset for all styling (honor NO_COLOR spec)
-    #[arg(long)]
+    #[arg(long, global = true)]
     no_color: bool,
     /// Disable all animations
-    #[arg(long)]
+    #[arg(long, global = true)]
     reduced_motion: bool,
     /// Enable write access. Default: read-only (safer during M1-M3).
-    #[arg(long)]
+    #[arg(long, global = true)]
     write: bool,
+    /// Emit JSON to stdout where applicable (CLI subcommands only)
+    #[arg(long, global = true)]
+    json: bool,
+    #[command(subcommand)]
+    command: Option<cli::Command>,
 }
 
 fn main() -> Result<()> {
@@ -35,8 +41,8 @@ fn main() -> Result<()> {
     rondo_core::telemetry::rotate_old_logs(&log_dir, 7);
     let _log_guard = rondo_core::telemetry::init_logging(log_dir.clone()).ok();
     rondo_core::telemetry::install_panic_hook(log_dir);
-    let cli = Cli::parse();
-    let db_path = cli.db.unwrap_or_else(default_db_path);
+    let cli_args = Cli::parse();
+    let db_path = cli_args.db.clone().unwrap_or_else(default_db_path);
     if !db_path.exists() {
         eprintln!(
             "DB no encontrado en {}. Usa --db o setea RONDO_DB.",
@@ -44,8 +50,15 @@ fn main() -> Result<()> {
         );
         std::process::exit(2);
     }
+    if let Some(cmd) = cli_args.command {
+        let opts = cli::CliOpts {
+            json: cli_args.json,
+            write: cli_args.write,
+        };
+        return cli::run(cmd, &opts, &db_path);
+    }
     let mut _lock_guard: Option<rondo_core::store::lock::LockGuard> = None;
-    let store = if cli.write {
+    let store = if cli_args.write {
         let backup_dir = rondo_core::store::backup::default_backup_dir();
         rondo_core::store::backup::rotate(&backup_dir, 30);
         match rondo_core::store::backup::snapshot(&db_path, &backup_dir) {
@@ -83,9 +96,9 @@ fn main() -> Result<()> {
             &db_path,
         )?)
     };
-    let no_color_active = a11y::no_color() || cli.no_color;
-    let reduced = a11y::reduced_motion(cli.reduced_motion);
-    let mut app = AppState::with_writable(store, cli.write)?;
+    let no_color_active = a11y::no_color() || cli_args.no_color;
+    let reduced = a11y::reduced_motion(cli_args.reduced_motion);
+    let mut app = AppState::with_writable(store, cli_args.write)?;
     app.theme = if no_color_active {
         Theme::no_color()
     } else {

@@ -1,0 +1,35 @@
+# Empty `[workspace]` keeps this crate isolated from the parent workspace;
+# we build it standalone for `wasm32-wasip1`, while the workspace targets the
+# host triple.
+[workspace]
+
+[package]
+name = "sync-localdir"
+version = "0.1.0"
+edition = "2021"
+
+# Sample plugin demonstrating `Capability::Syncer` + `TickHandler`. The
+# manifest carries `[syncer] name = "localdir"`; once extism host-functions
+# expose filesystem I/O, this plugin will copy the DB into
+# `~/.todo-app/sync/` on a cadence. For now it round-trips KvSet + Notify
+# follow-ups to exercise the contract.
+#
+# Built standalone for `wasm32-wasip1` via the local `.cargo/config.toml`.
+# Run `cargo build --release` from this directory (the workspace targets
+# the host triple).
+
+[dependencies]
+rondo-plugin-api = { path = "../../../crates/rondo-plugin-api" }
+extism-pdk = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true

@@ -140,6 +140,63 @@ impl Task {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct NewTask {
+    pub title: String,
+    pub description: Option<String>,
+    pub status: Status,
+    pub priority: Priority,
+    pub due_date: Option<NaiveDate>,
+    pub recur_freq: RecurFreq,
+    pub recur_interval: i64,
+    pub tags: Vec<String>,
+}
+
+impl NewTask {
+    pub fn quick(title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            description: None,
+            status: Status::Pending,
+            priority: Priority::Low,
+            due_date: None,
+            recur_freq: RecurFreq::None,
+            recur_interval: 0,
+            tags: vec![],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct TaskPatch {
+    pub title: Option<String>,
+    pub description: Option<Option<String>>,
+    pub status: Option<Status>,
+    pub priority: Option<Priority>,
+    pub due_date: Option<Option<NaiveDate>>,
+    pub recur_freq: Option<RecurFreq>,
+    pub recur_interval: Option<i64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UndoKind {
+    Create,
+    Update,
+    Delete,
+    SetStatus,
+    AddSubtask,
+    ToggleSubtask,
+    AddTag,
+    RemoveTag,
+}
+
+#[derive(Debug, Clone)]
+pub struct UndoSnapshot {
+    pub kind: UndoKind,
+    pub task_before: Option<Task>,
+    pub created_id: Option<i64>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

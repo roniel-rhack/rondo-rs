@@ -1,6 +1,9 @@
 use crate::domain::{
     journal::{Entry, Note},
-    task::{Priority, RecurFreq, Status, Subtask, Task, TaskNote, TimeLog},
+    task::{
+        NewTask, Priority, RecurFreq, Status, Subtask, Task, TaskNote, TaskPatch, TimeLog,
+        UndoKind, UndoSnapshot,
+    },
 };
 use crate::error::Result;
 use chrono::{DateTime, NaiveDate, Utc};
@@ -75,6 +78,180 @@ impl SqliteStore {
             .query_map(params![note_id], row_to_entry)?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
+    }
+
+    pub fn create_task(&self, input: NewTask) -> Result<(i64, UndoSnapshot)> {
+        let due = input.due_date.map(|d| d.format("%Y-%m-%d").to_string());
+        let created_at = Utc::now().to_rfc3339();
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        tx.execute(
+            super::queries::INSERT_TASK,
+            params![
+                input.title,
+                input.description,
+                input.status as i64,
+                input.priority as i64,
+                due,
+                created_at,
+                input.recur_freq as i64,
+                input.recur_interval,
+            ],
+        )?;
+        let id = tx.last_insert_rowid();
+        for tag in &input.tags {
+            tx.execute(super::queries::INSERT_TAG, params![id, tag])?;
+        }
+        tx.commit()?;
+        Ok((
+            id,
+            UndoSnapshot {
+                kind: UndoKind::Create,
+                task_before: None,
+                created_id: Some(id),
+            },
+        ))
+    }
+
+    pub fn update_task(&self, id: i64, patch: TaskPatch) -> Result<UndoSnapshot> {
+        let before = self.task_by_id(id)?;
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        if let Some(title) = patch.title.as_ref() {
+            tx.execute(super::queries::UPDATE_TASK_TITLE, params![title, id])?;
+        }
+        if let Some(desc) = &patch.description {
+            tx.execute(super::queries::UPDATE_TASK_DESCRIPTION, params![desc, id])?;
+        }
+        if let Some(s) = patch.status {
+            tx.execute(super::queries::UPDATE_TASK_STATUS, params![s as i64, id])?;
+        }
+        if let Some(p) = patch.priority {
+            tx.execute(super::queries::UPDATE_TASK_PRIORITY, params![p as i64, id])?;
+        }
+        if let Some(due) = &patch.due_date {
+            let s = due.map(|d| d.format("%Y-%m-%d").to_string());
+            tx.execute(super::queries::UPDATE_TASK_DUE_DATE, params![s, id])?;
+        }
+        if let Some(r) = patch.recur_freq {
+            tx.execute(super::queries::UPDATE_TASK_RECUR_FREQ, params![r as i64, id])?;
+        }
+        if let Some(ri) = patch.recur_interval {
+            tx.execute(super::queries::UPDATE_TASK_RECUR_INTERVAL, params![ri, id])?;
+        }
+        tx.commit()?;
+        Ok(UndoSnapshot {
+            kind: UndoKind::Update,
+            task_before: Some(before),
+            created_id: None,
+        })
+    }
+
+    pub fn delete_task(&self, id: i64) -> Result<UndoSnapshot> {
+        let before = self.task_by_id(id)?;
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        tx.execute(super::queries::DELETE_TASK, params![id])?;
+        tx.commit()?;
+        Ok(UndoSnapshot {
+            kind: UndoKind::Delete,
+            task_before: Some(before),
+            created_id: None,
+        })
+    }
+
+    pub fn set_status(&self, id: i64, status: Status) -> Result<UndoSnapshot> {
+        let before = self.task_by_id(id)?;
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        tx.execute(
+            super::queries::UPDATE_TASK_STATUS,
+            params![status as i64, id],
+        )?;
+        tx.commit()?;
+        Ok(UndoSnapshot {
+            kind: UndoKind::SetStatus,
+            task_before: Some(before),
+            created_id: None,
+        })
+    }
+
+    pub fn add_subtask(&self, task_id: i64, title: &str) -> Result<(i64, UndoSnapshot)> {
+        let before = self.task_by_id(task_id)?;
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        let position: i64 = tx.query_row(
+            super::queries::NEXT_SUBTASK_POSITION,
+            params![task_id],
+            |r| r.get(0),
+        )?;
+        tx.execute(super::queries::INSERT_SUBTASK, params![task_id, title, position])?;
+        let id = tx.last_insert_rowid();
+        tx.commit()?;
+        Ok((
+            id,
+            UndoSnapshot {
+                kind: UndoKind::AddSubtask,
+                task_before: Some(before),
+                created_id: Some(id),
+            },
+        ))
+    }
+
+    pub fn toggle_subtask(&self, id: i64) -> Result<(bool, UndoSnapshot)> {
+        let task_id: i64;
+        let new_completed: i64;
+        {
+            let mut conn = self.conn.lock().unwrap();
+            let tx = conn.transaction()?;
+            let (tid, completed): (i64, i64) = tx.query_row(
+                super::queries::SUBTASK_LOOKUP,
+                params![id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )?;
+            task_id = tid;
+            new_completed = if completed == 0 { 1 } else { 0 };
+            tx.execute(
+                super::queries::UPDATE_SUBTASK_COMPLETED,
+                params![new_completed, id],
+            )?;
+            tx.commit()?;
+        }
+        let before = self.task_by_id(task_id)?;
+        Ok((
+            new_completed != 0,
+            UndoSnapshot {
+                kind: UndoKind::ToggleSubtask,
+                task_before: Some(before),
+                created_id: None,
+            },
+        ))
+    }
+
+    pub fn add_tag(&self, task_id: i64, name: &str) -> Result<UndoSnapshot> {
+        let before = self.task_by_id(task_id)?;
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        tx.execute(super::queries::INSERT_TAG, params![task_id, name])?;
+        tx.commit()?;
+        Ok(UndoSnapshot {
+            kind: UndoKind::AddTag,
+            task_before: Some(before),
+            created_id: None,
+        })
+    }
+
+    pub fn remove_tag(&self, task_id: i64, name: &str) -> Result<UndoSnapshot> {
+        let before = self.task_by_id(task_id)?;
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        tx.execute(super::queries::DELETE_TAG, params![task_id, name])?;
+        tx.commit()?;
+        Ok(UndoSnapshot {
+            kind: UndoKind::RemoveTag,
+            task_before: Some(before),
+            created_id: None,
+        })
     }
 }
 

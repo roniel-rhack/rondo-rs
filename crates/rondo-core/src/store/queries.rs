@@ -47,3 +47,31 @@ pub const ENTRIES_FOR_NOTE: &str = r#"
 SELECT id, note_id, body, created_at
 FROM journal_entries WHERE note_id = ?1 ORDER BY created_at ASC
 "#;
+
+pub const INSERT_TASK: &str = r#"
+INSERT INTO tasks (title, description, status, priority, due_date, created_at, recur_freq, recur_interval, metadata)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, '{}')
+"#;
+
+pub const UPDATE_TASK_TITLE: &str = "UPDATE tasks SET title = ?1 WHERE id = ?2";
+pub const UPDATE_TASK_DESCRIPTION: &str = "UPDATE tasks SET description = ?1 WHERE id = ?2";
+pub const UPDATE_TASK_STATUS: &str = "UPDATE tasks SET status = ?1 WHERE id = ?2";
+pub const UPDATE_TASK_PRIORITY: &str = "UPDATE tasks SET priority = ?1 WHERE id = ?2";
+pub const UPDATE_TASK_DUE_DATE: &str = "UPDATE tasks SET due_date = ?1 WHERE id = ?2";
+pub const UPDATE_TASK_RECUR_FREQ: &str = "UPDATE tasks SET recur_freq = ?1 WHERE id = ?2";
+pub const UPDATE_TASK_RECUR_INTERVAL: &str = "UPDATE tasks SET recur_interval = ?1 WHERE id = ?2";
+
+pub const DELETE_TASK: &str = "DELETE FROM tasks WHERE id = ?1";
+
+pub const NEXT_SUBTASK_POSITION: &str =
+    "SELECT COALESCE(MAX(position), -1) + 1 FROM subtasks WHERE task_id = ?1";
+
+pub const INSERT_SUBTASK: &str =
+    "INSERT INTO subtasks (task_id, title, completed, position) VALUES (?1, ?2, 0, ?3)";
+
+pub const SUBTASK_LOOKUP: &str = "SELECT task_id, completed FROM subtasks WHERE id = ?1";
+
+pub const UPDATE_SUBTASK_COMPLETED: &str = "UPDATE subtasks SET completed = ?1 WHERE id = ?2";
+
+pub const INSERT_TAG: &str = "INSERT INTO tags (task_id, name) VALUES (?1, ?2)";
+pub const DELETE_TAG: &str = "DELETE FROM tags WHERE task_id = ?1 AND name = ?2";

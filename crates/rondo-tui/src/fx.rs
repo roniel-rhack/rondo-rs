@@ -25,7 +25,7 @@ pub fn rgb_color(c: Color) -> Color {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum EffectId {
     StatusToast,
-    SubtaskToggle(i64),
+    DetailRefresh,
     TaskDone(i64),
     PomodoroOpen,
     QuickAddInsert,
@@ -120,10 +120,10 @@ pub mod presets {
         ])
     }
 
-    pub fn subtask_dissolve(success: Color) -> Effect {
+    pub fn detail_refresh(accent: Color) -> Effect {
         fx::sequence(&[
-            fx::dissolve(EffectTimer::from_ms(200, Interpolation::QuadOut)),
-            fx::fade_from_fg(rgb_color(success), EffectTimer::from_ms(140, Interpolation::QuadIn)),
+            fx::dissolve(EffectTimer::from_ms(160, Interpolation::QuadOut)),
+            fx::fade_from_fg(rgb_color(accent), EffectTimer::from_ms(140, Interpolation::QuadIn)),
         ])
     }
 

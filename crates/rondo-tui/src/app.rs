@@ -430,8 +430,12 @@ impl AppState {
     fn jump_selection(&mut self, idx: usize) {
         match self.page {
             Page::Tasks if !self.tasks.is_empty() => {
+                let prev = self.selected_task;
                 self.selected_task = idx.min(self.tasks.len() - 1);
                 self.task_list_state.select(Some(self.selected_task));
+                if prev != self.selected_task {
+                    self.spawn_detail_refresh();
+                }
             }
             Page::Journal if !self.journal_notes.is_empty() => {
                 self.selected_journal = idx.min(self.journal_notes.len() - 1);
@@ -481,7 +485,9 @@ impl AppState {
                     .unwrap_or(0);
                 let len = visible.len() as i32;
                 let next = (cur as i32 + delta).rem_euclid(len) as usize;
-                self.selected_task = visible[next];
+                let new_task = visible[next];
+                let changed = new_task != self.selected_task;
+                self.selected_task = new_task;
                 // ListState position is relative to visible slice, not full tasks.
                 self.task_list_state.select(Some(next));
                 self.focus.section_item = 0;
@@ -489,6 +495,9 @@ impl AppState {
                     if let Some(t) = self.tasks.get(self.selected_task) {
                         self.selection.insert(t.id);
                     }
+                }
+                if changed {
+                    self.spawn_detail_refresh();
                 }
             }
             Page::Journal => {
@@ -586,19 +595,24 @@ impl AppState {
             }
             if let Some(id) = flashed {
                 self.flash = Some((FlashTarget::Subtask(id), Instant::now()));
-                if self.last_detail_rect.width > 0 {
-                    let eff = crate::fx::presets::subtask_dissolve(self.theme.success);
-                    self.fx.spawn(
-                        crate::fx::EffectId::SubtaskToggle(id),
-                        eff,
-                        self.last_detail_rect,
-                    );
-                }
                 self.toast(format!(
                     "subtask #{} toggled (in-memory)",
                     id
                 ));
             }
+        }
+    }
+
+    /// Trigger the detail-pane refresh animation. Called whenever the cursor
+    /// lands on a different task so the detail panel visibly re-paints.
+    fn spawn_detail_refresh(&mut self) {
+        if self.last_detail_rect.width > 0 {
+            let eff = crate::fx::presets::detail_refresh(self.theme.accent);
+            self.fx.spawn(
+                crate::fx::EffectId::DetailRefresh,
+                eff,
+                self.last_detail_rect,
+            );
         }
     }
 

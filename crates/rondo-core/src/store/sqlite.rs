@@ -34,6 +34,7 @@ impl SqliteStore {
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
+        super::migrations::migrate(&conn)?;
         Ok(Self {
             conn: Mutex::new(conn),
         })

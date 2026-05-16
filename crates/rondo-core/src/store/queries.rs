@@ -73,6 +73,8 @@ pub const SUBTASK_LOOKUP: &str = "SELECT task_id, completed FROM subtasks WHERE 
 
 pub const UPDATE_SUBTASK_COMPLETED: &str = "UPDATE subtasks SET completed = ?1 WHERE id = ?2";
 
+pub const DELETE_SUBTASK: &str = "DELETE FROM subtasks WHERE id = ?1";
+
 pub const INSERT_TAG: &str = "INSERT INTO tags (task_id, name) VALUES (?1, ?2)";
 pub const DELETE_TAG: &str = "DELETE FROM tags WHERE task_id = ?1 AND name = ?2";
 

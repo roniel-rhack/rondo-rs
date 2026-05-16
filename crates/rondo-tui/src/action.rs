@@ -76,6 +76,8 @@ pub enum Action {
     CancelEditTitle,
     ToggleFocusedSubtask,
 
+    Undo,
+
     Error(String),
 }
 

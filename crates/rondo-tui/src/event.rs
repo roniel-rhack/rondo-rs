@@ -217,6 +217,7 @@ fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
         KeyCode::Enter if in_sidebar => Action::ApplySidebarSelection,
         KeyCode::Char('q') if !ctrl => Action::Quit,
         KeyCode::Char('c') if ctrl => Action::Quit,
+        KeyCode::Char('z') if ctrl => Action::Undo,
         KeyCode::Char('d') if ctrl => Action::HalfPageDown,
         KeyCode::Char('u') if ctrl => Action::HalfPageUp,
         KeyCode::Char('j') | KeyCode::Down => Action::NextItem,

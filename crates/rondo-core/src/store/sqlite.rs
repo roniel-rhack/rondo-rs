@@ -1,4 +1,5 @@
 use crate::domain::{
+    focus::{Session, SessionKind},
     journal::{Entry, Note},
     task::{
         NewTask, Priority, RecurFreq, Status, Subtask, Task, TaskNote, TaskPatch, TimeLog,
@@ -134,7 +135,10 @@ impl SqliteStore {
             tx.execute(super::queries::UPDATE_TASK_DUE_DATE, params![s, id])?;
         }
         if let Some(r) = patch.recur_freq {
-            tx.execute(super::queries::UPDATE_TASK_RECUR_FREQ, params![r as i64, id])?;
+            tx.execute(
+                super::queries::UPDATE_TASK_RECUR_FREQ,
+                params![r as i64, id],
+            )?;
         }
         if let Some(ri) = patch.recur_interval {
             tx.execute(super::queries::UPDATE_TASK_RECUR_INTERVAL, params![ri, id])?;
@@ -185,7 +189,10 @@ impl SqliteStore {
             params![task_id],
             |r| r.get(0),
         )?;
-        tx.execute(super::queries::INSERT_SUBTASK, params![task_id, title, position])?;
+        tx.execute(
+            super::queries::INSERT_SUBTASK,
+            params![task_id, title, position],
+        )?;
         let id = tx.last_insert_rowid();
         tx.commit()?;
         Ok((
@@ -204,11 +211,10 @@ impl SqliteStore {
         {
             let mut conn = self.conn.lock().unwrap();
             let tx = conn.transaction()?;
-            let (tid, completed): (i64, i64) = tx.query_row(
-                super::queries::SUBTASK_LOOKUP,
-                params![id],
-                |r| Ok((r.get(0)?, r.get(1)?)),
-            )?;
+            let (tid, completed): (i64, i64) =
+                tx.query_row(super::queries::SUBTASK_LOOKUP, params![id], |r| {
+                    Ok((r.get(0)?, r.get(1)?))
+                })?;
             task_id = tid;
             new_completed = if completed == 0 { 1 } else { 0 };
             tx.execute(
@@ -277,6 +283,80 @@ impl SqliteStore {
             params![task_id, blocked_by],
         )?;
         Ok(())
+    }
+
+    /// Persist a freshly started focus session. Returns the row id.
+    pub fn start_focus_session(
+        &self,
+        task_id: Option<i64>,
+        kind: SessionKind,
+        duration_secs: u64,
+    ) -> Result<i64> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().to_rfc3339();
+        conn.execute(
+            super::queries::INSERT_FOCUS_SESSION,
+            params![task_id, kind as i64, &now, duration_secs as i64],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    /// Mark a previously-started session as completed (sets `completed_at`).
+    pub fn complete_focus_session(&self, id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().to_rfc3339();
+        conn.execute(super::queries::COMPLETE_FOCUS_SESSION, params![&now, id])?;
+        Ok(())
+    }
+
+    /// Count of consecutive days (going back from today, UTC) with at least
+    /// one completed Work session. Returns 0 if today has none.
+    pub fn focus_streak(&self) -> Result<u32> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(super::queries::FOCUS_STREAK_DATES)?;
+        let dates: Vec<String> = stmt
+            .query_map([], |r| r.get::<_, String>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        if dates.is_empty() {
+            return Ok(0);
+        }
+        let today = Utc::now().date_naive();
+        let mut streak: u32 = 0;
+        let mut expected = today;
+        for d in dates {
+            let parsed = chrono::NaiveDate::parse_from_str(&d, "%Y-%m-%d").ok();
+            match parsed {
+                Some(p) if p == expected => {
+                    streak += 1;
+                    expected = expected.pred_opt().unwrap_or(expected);
+                }
+                Some(p) if p < expected => break,
+                _ => break,
+            }
+        }
+        Ok(streak)
+    }
+
+    /// All focus sessions, newest first (capped to 1000).
+    pub fn list_focus_sessions(&self) -> Result<Vec<Session>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(super::queries::LIST_FOCUS_SESSIONS)?;
+        let rows = stmt
+            .query_map([], |r| {
+                let started: String = r.get(3)?;
+                let completed: Option<String> = r.get(4)?;
+                Ok(Session {
+                    id: Some(r.get::<_, i64>(0)?),
+                    task_id: r.get::<_, Option<i64>>(1)?,
+                    kind: SessionKind::from_db(r.get::<_, i64>(2)?),
+                    cycle_pos: 0,
+                    started_at: parse_dt(&started),
+                    completed_at: completed.as_deref().map(parse_dt),
+                    duration_secs: r.get::<_, i64>(5)? as u64,
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
     }
 }
 
@@ -402,9 +482,8 @@ fn row_to_note(r: &Row<'_>) -> rusqlite::Result<Note> {
     let date_str: String = r.get(1)?;
     Ok(Note {
         id: r.get(0)?,
-        date: NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").unwrap_or_else(|_| {
-            NaiveDate::from_ymd_opt(1970, 1, 1).expect("epoch date is valid")
-        }),
+        date: NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+            .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).expect("epoch date is valid")),
         hidden: r.get::<_, i64>(2)? != 0,
         created_at: parse_dt(&r.get::<_, String>(3)?),
         updated_at: parse_dt(&r.get::<_, String>(4)?),

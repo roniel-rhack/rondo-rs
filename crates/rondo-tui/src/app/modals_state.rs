@@ -8,6 +8,9 @@ pub struct ModalsState {
     pub pomodoro_started: Option<Instant>,
     pub pomodoro_total: Duration,
     pub pomodoro_throbber: ThrobberState,
+    /// Row id of the in-flight `focus_sessions` row, if any. None when running
+    /// against a read-only store or when no session is active.
+    pub pomodoro_session_id: Option<i64>,
     pub command_palette_open: bool,
     pub command_buf: String,
     pub help_open: bool,
@@ -25,6 +28,7 @@ impl Default for ModalsState {
             pomodoro_started: None,
             pomodoro_total: Duration::from_secs(25 * 60),
             pomodoro_throbber: ThrobberState::default(),
+            pomodoro_session_id: None,
             command_palette_open: false,
             command_buf: String::new(),
             help_open: false,

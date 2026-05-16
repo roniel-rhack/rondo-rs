@@ -74,7 +74,7 @@ fn main() -> Result<()> {
     };
     let no_color_active = a11y::no_color() || cli.no_color;
     let reduced = a11y::reduced_motion(cli.reduced_motion);
-    let mut app = AppState::new(store)?;
+    let mut app = AppState::with_writable(store, cli.write)?;
     app.theme = if no_color_active {
         Theme::no_color()
     } else {

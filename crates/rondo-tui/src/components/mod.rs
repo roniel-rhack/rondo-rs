@@ -8,5 +8,6 @@ pub mod pomodoro;
 pub mod quick_add;
 pub mod root;
 pub mod search;
+pub mod sidebar;
 pub mod task_detail;
 pub mod task_list;

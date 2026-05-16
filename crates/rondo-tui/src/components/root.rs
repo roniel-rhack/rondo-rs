@@ -4,54 +4,60 @@ use ratatui::{
     Frame,
 };
 
+const NARROW_BREAKPOINT: u16 = 100;
+const SIDEBAR_WIDTH: u16 = 22;
+
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
+    let area = f.area();
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),
-            Constraint::Length(1),
-            Constraint::Min(1),
-            Constraint::Length(1),
+            Constraint::Length(1), // brand strip
+            Constraint::Min(1),    // body (sidebar + content)
+            Constraint::Length(1), // footer
         ])
-        .split(f.area());
+        .split(area);
+
     components::header::draw(app, f, chunks[0]);
-    components::filter_strip::draw(app, f, chunks[1]);
-    body(app, f, chunks[2]);
-    components::footer::draw(app, f, chunks[3]);
+    body_with_sidebar(app, f, chunks[1]);
+    components::footer::draw(app, f, chunks[2]);
+
     if app.pomodoro_open {
-        components::pomodoro::draw(app, f, centered(60, 14, f.area()));
+        components::pomodoro::draw(app, f, centered(60, 14, area));
     }
     if app.search_open {
-        components::search::draw(app, f, search_rect(f.area()));
+        components::search::draw(app, f, search_rect(area));
     }
     if app.quick_add_open {
-        components::quick_add::draw(app, f, search_rect(f.area()));
+        components::quick_add::draw(app, f, search_rect(area));
     }
     if app.command_palette_open {
-        components::command_palette::draw(app, f, palette_rect(f.area()));
+        components::command_palette::draw(app, f, palette_rect(area));
     }
     if app.help_open {
-        components::help::draw(app, f, centered(56, 28, f.area()));
+        components::help::draw(app, f, centered(56, 28, area));
     }
 }
 
-fn search_rect(area: Rect) -> Rect {
-    let h = 3u16.min(area.height.saturating_sub(4));
-    let [_, anchored] = Layout::vertical([Constraint::Min(0), Constraint::Length(h)])
-        .flex(Flex::End)
-        .margin(2)
-        .areas(area);
-    anchored
+fn body_with_sidebar(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
+    let show_sidebar = area.width >= NARROW_BREAKPOINT;
+    if show_sidebar {
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Length(SIDEBAR_WIDTH), Constraint::Min(1)])
+            .split(area);
+        components::sidebar::draw(app, f, cols[0]);
+        body(app, f, cols[1]);
+    } else {
+        body(app, f, area);
+    }
 }
-
-const NARROW_BREAKPOINT: u16 = 100;
 
 fn body(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let narrow = area.width < NARROW_BREAKPOINT;
     match app.page {
         Page::Tasks => {
             if narrow {
-                // Single-pane: show whichever side has focus.
                 if app.focus_left() {
                     components::task_list::draw(app, f, area);
                 } else {
@@ -85,6 +91,15 @@ fn centered(w: u16, h: u16, area: Rect) -> Rect {
 
 fn palette_rect(area: Rect) -> Rect {
     let h = 12u16.min(area.height.saturating_sub(4));
+    let [_, anchored] = Layout::vertical([Constraint::Min(0), Constraint::Length(h)])
+        .flex(Flex::End)
+        .margin(2)
+        .areas(area);
+    anchored
+}
+
+fn search_rect(area: Rect) -> Rect {
+    let h = 4u16.min(area.height.saturating_sub(4));
     let [_, anchored] = Layout::vertical([Constraint::Min(0), Constraint::Length(h)])
         .flex(Flex::End)
         .margin(2)

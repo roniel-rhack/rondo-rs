@@ -46,6 +46,8 @@ pub struct AppState {
     pub flash: Option<(FlashTarget, Instant)>,
     pub active_filter: Filter,
     pub leader_goto: bool,
+    pub fx: crate::fx::FxManager,
+    pub last_footer_rect: ratatui::layout::Rect,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,7 +61,21 @@ pub const FLASH_DURATION_MS: u128 = 220;
 impl AppState {
     /// Returns true when an animation requires periodic redraw without user input.
     pub fn needs_animation_tick(&self) -> bool {
-        self.pomodoro_open || self.flash.is_some()
+        self.pomodoro_open || self.flash.is_some() || self.fx.any_running()
+    }
+
+    /// Spawn a status-toast effect on the footer area.
+    pub fn toast(&mut self, msg: impl Into<String>) {
+        self.status_msg = Some(msg.into());
+        if self.last_footer_rect.width > 0 {
+            let effect =
+                crate::fx::presets::status_toast(self.theme.accent, self.theme.fg_muted);
+            self.fx.spawn(
+                crate::fx::EffectId::StatusToast,
+                effect,
+                self.last_footer_rect,
+            );
+        }
     }
 
     /// Indices of tasks that pass the current filter, in the order they appear in `tasks`.
@@ -153,6 +169,8 @@ impl AppState {
             flash: None,
             active_filter: Filter::Inbox,
             leader_goto: false,
+            fx: crate::fx::FxManager::new(),
+            last_footer_rect: ratatui::layout::Rect::default(),
         })
     }
 
@@ -464,7 +482,7 @@ impl AppState {
     /// Switch active filter and reset cursor. Works regardless of current focus.
     pub fn apply_filter(&mut self, new_filter: Filter) {
         self.active_filter = new_filter;
-        self.status_msg = Some(format!("filter: {}", new_filter.label()));
+        self.toast(format!("filter: {}", new_filter.label()));
         // Move sidebar cursor onto the applied item so visual matches state.
         if let Some(pos) = crate::filter::SIDEBAR_ITEMS
             .iter()

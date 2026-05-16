@@ -27,6 +27,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
         components::analytics::draw(app, f, chunks[2]);
     }
     components::footer::draw(app, f, chunks[3]);
+    app.last_footer_rect = chunks[3];
 
     if app.pomodoro_open {
         components::pomodoro::draw(app, f, centered(60, 14, area));
@@ -46,6 +47,10 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
     if app.quick_actions_open {
         components::quick_actions::draw(app, f, centered(72, 7, area));
     }
+
+    // Run live effects after all widgets have painted; effects mutate cells in
+    // place to produce fades/sweeps/dissolves.
+    app.fx.tick_and_render(f);
 }
 
 fn body_with_sidebar(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {

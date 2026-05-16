@@ -25,6 +25,7 @@ tui-textarea = "0.7"
 tui-input = "0.11"
 throbber-widgets-tui = "0.8"
 tui-big-text = "0.7"
+tachyonfx = { version = "0.13", default-features = false, features = ["crossterm"] }
 strum = { version = "0.26", features = ["derive"] }
 pulldown-cmark = "0.12"
 thiserror = "1"

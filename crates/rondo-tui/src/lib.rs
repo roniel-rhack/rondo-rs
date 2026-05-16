@@ -4,6 +4,7 @@ pub mod components;
 pub mod event;
 pub mod filter;
 pub mod focus;
+pub mod fx;
 pub mod plugins;
 pub mod theme;
 pub mod tui;

@@ -82,14 +82,16 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
     if !task.tags.is_empty() {
         let mut row: Vec<Span> = vec![Span::styled("Tags     ", Style::default().fg(t.fg_muted))];
-        for tag in &task.tags {
+        for (i, tag) in task.tags.iter().enumerate() {
+            if i > 0 {
+                row.push(Span::styled("  ·  ", Style::default().fg(t.fg_muted)));
+            }
             row.push(Span::styled(
-                format!(" {} ", tag),
+                format!("#{}", tag),
                 Style::default()
                     .fg(t.accent)
-                    .add_modifier(Modifier::REVERSED),
+                    .add_modifier(Modifier::BOLD),
             ));
-            row.push(Span::raw(" "));
         }
         lines.push(Line::from(row));
     }

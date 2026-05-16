@@ -2,14 +2,14 @@
 source: crates/rondo-tui/tests/snapshots.rs
 expression: s
 ---
-" RonDO  │  Tasks   Journal  │ 4 tasks                                                                                   "
+" RonDO  ·  Tasks  Journal                                                                                               "
 "┌ Tasks (4) ───────────────────────────────────────────────┐┌ Detail · #3 ─────────────────────────────────────────────┐"
-"│ ○ Refactor pomodoro module   URG!   UPCOMING   BLOCKED   ││Buy groceries                                             │"
-"│ ○ Buy groceries   LOW   UPCOMING   [personal]            ││                                                          │"
-"│ ◐ Review API spec   HIGH   TODAY   1/5  [backend,work]   ││Status   ○  Pending                                       │"
-"│ ✓ Deploy v2.1   MED   OVERDUE                            ││Priority  LOW                                             │"
-"│                                                          ││Due       UPCOMING   2026-05-18                           │"
-"│                                                          ││Tags      personal                                        │"
+"│ ○ Refactor pomodoro module  URG in 1d  BLOCKED   [refacto││Buy groceries                                             │"
+"│ ○ Buy groceries  low in 2d  [personal]                   ││                                                          │"
+"│ ◐ Review API spec  high today  1/5  [backend,work]       ││Status   ○  Pending                                       │"
+"│ ✓ Deploy v2.1  med overdue                               ││Priority low                                              │"
+"│                                                          ││Due      in 2d  2026-05-18                                │"
+"│                                                          ││Tags     #personal                                        │"
 "│                                                          ││                                                          │"
 "│                                                          ││Description                                               │"
 "│                                                          ││Milk, eggs, bread                                         │"
@@ -33,4 +33,4 @@ expression: s
 "│                                                          ││                                                          │"
 "│                                                          ││                                                          │"
 "└──────────────────────────────────────────────────────────┘└──────────────────────────────────────────────────────────┘"
-" j/k nav   Tab focus   1/2 page   p pomodoro   : cmd   </> resize   q quit                                              "
+" j/k nav  Tab focus  / search  : cmd  ? help  q quit                                                                    "

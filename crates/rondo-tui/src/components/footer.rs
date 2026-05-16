@@ -9,24 +9,15 @@ use ratatui::{
 
 pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
-    let mut spans = vec![
-        kbd(" j/k ", t.accent),
-        muted("nav  ", t),
-        kbd(" Tab ", t.accent),
-        muted("focus  ", t),
-        kbd(" 1/2 ", t.accent),
-        muted("page  ", t),
-        kbd(" p ", t.accent),
-        muted("pomodoro  ", t),
-        kbd(" : ", t.accent),
-        muted("cmd  ", t),
-        kbd(" </> ", t.accent),
-        muted("resize  ", t),
-        kbd(" q ", t.accent),
-        muted("quit", t),
-    ];
+    let mut spans = vec![Span::raw(" ")];
+    for (key, label) in hints(app) {
+        spans.push(Span::styled(key, t.kbd()));
+        spans.push(Span::raw(" "));
+        spans.push(Span::styled(label, t.muted()));
+        spans.push(Span::raw("  "));
+    }
     if let Some(msg) = &app.status_msg {
-        spans.push(Span::raw("  │  "));
+        spans.push(Span::styled("· ", t.muted()));
         spans.push(Span::styled(
             msg.clone(),
             Style::default().fg(t.warn),
@@ -35,15 +26,28 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     f.render_widget(Paragraph::new(Line::from(spans)), area);
 }
 
-fn kbd(text: &'static str, color: ratatui::style::Color) -> Span<'static> {
-    Span::styled(
-        text,
-        Style::default()
-            .fg(color)
-            .add_modifier(ratatui::style::Modifier::REVERSED),
-    )
-}
-
-fn muted(text: &'static str, t: &crate::theme::Theme) -> Span<'static> {
-    Span::styled(text, Style::default().fg(t.fg_muted))
+/// Context-aware hints: 4-5 most relevant for the current page/overlay.
+fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
+    if app.command_palette_open {
+        return vec![
+            ("Enter", "run"),
+            ("Esc", "cancel"),
+        ];
+    }
+    if app.pomodoro_open {
+        return vec![
+            ("p", "toggle"),
+            ("Esc", "close"),
+            ("?", "help"),
+            ("q", "quit"),
+        ];
+    }
+    vec![
+        ("j/k", "nav"),
+        ("Tab", "focus"),
+        ("/", "search"),
+        (":", "cmd"),
+        ("?", "help"),
+        ("q", "quit"),
+    ]
 }

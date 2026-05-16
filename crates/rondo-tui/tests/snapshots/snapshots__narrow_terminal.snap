@@ -2,14 +2,14 @@
 source: crates/rondo-tui/tests/snapshots.rs
 expression: s
 ---
-" RonDO  │  Tasks   Journal  │ 4 tasks                                           "
+" RonDO  ·  Tasks  Journal                                                       "
 "┌ Tasks (4) ───────────────────────────┐┌ Detail · #4 ─────────────────────────┐"
-"│ ○ Refactor pomodoro module   URG!   U││Refactor pomodoro module              │"
-"│ ○ Buy groceries   LOW   UPCOMING   [p││                                      │"
-"│ ◐ Review API spec   HIGH   TODAY   1/││Status   ○  Pending                   │"
-"│ ✓ Deploy v2.1   MED   OVERDUE        ││Priority  URG!                        │"
-"│                                      ││Due       UPCOMING   2026-05-17       │"
-"│                                      ││Tags      refactor   work             │"
+"│ ○ Refactor pomodoro module  URG in 1d││Refactor pomodoro module              │"
+"│ ○ Buy groceries  low in 2d  [personal││                                      │"
+"│ ◐ Review API spec  high today  1/5  [││Status   ○  Pending                   │"
+"│ ✓ Deploy v2.1  med overdue           ││Priority URG                          │"
+"│                                      ││Due      in 1d  2026-05-17            │"
+"│                                      ││Tags     #refactor  ·  #work          │"
 "│                                      ││                                      │"
 "│                                      ││Description                           │"
 "│                                      ││Pending until Review API spec done.   │"
@@ -25,4 +25,4 @@ expression: s
 "│                                      ││                                      │"
 "│                                      ││                                      │"
 "└──────────────────────────────────────┘└──────────────────────────────────────┘"
-" j/k nav   Tab focus   1/2 page   p pomodoro   : cmd   </> resize   q quit      "
+" j/k nav  Tab focus  / search  : cmd  ? help  q quit                            "

@@ -34,6 +34,9 @@ pub struct AppState {
     pub help_open: bool,
     pub search_open: bool,
     pub search_buf: String,
+    pub selection: std::collections::HashSet<i64>,
+    pub quick_add_open: bool,
+    pub quick_add_buf: String,
     pub should_quit: bool,
     pub status_msg: Option<String>,
     pub plugins: PluginRegistry,
@@ -91,6 +94,9 @@ impl AppState {
             help_open: false,
             search_open: false,
             search_buf: String::new(),
+            selection: std::collections::HashSet::new(),
+            quick_add_open: false,
+            quick_add_buf: String::new(),
             should_quit: false,
             status_msg: None,
             plugins: PluginRegistry::new(),
@@ -166,6 +172,71 @@ impl AppState {
                 }
             }
             Action::ToggleSelected => self.handle_space(),
+            Action::EnterVisual => {
+                if self.focus.pane == Pane::List && self.page == Page::Tasks {
+                    self.mode = Mode::Visual;
+                    self.selection.clear();
+                    if let Some(t) = self.tasks.get(self.selected_task) {
+                        self.selection.insert(t.id);
+                    }
+                }
+            }
+            Action::BulkDone => {
+                if self.mode == Mode::Visual {
+                    let ids: Vec<i64> = self.selection.iter().copied().collect();
+                    for t in self.tasks.iter_mut() {
+                        if ids.contains(&t.id) {
+                            t.status = match t.status {
+                                rondo_core::domain::task::Status::Done => {
+                                    rondo_core::domain::task::Status::Pending
+                                }
+                                _ => rondo_core::domain::task::Status::Done,
+                            };
+                        }
+                    }
+                    self.status_msg = Some(format!(
+                        "toggled {} tasks (in-memory)",
+                        self.selection.len()
+                    ));
+                    self.selection.clear();
+                    self.mode = Mode::Normal;
+                }
+            }
+            Action::BulkPriority => {
+                // Placeholder: cycles priority on all selected.
+                if self.mode == Mode::Visual {
+                    let ids: Vec<i64> = self.selection.iter().copied().collect();
+                    for t in self.tasks.iter_mut() {
+                        if ids.contains(&t.id) {
+                            t.priority = match t.priority {
+                                rondo_core::domain::task::Priority::Low => {
+                                    rondo_core::domain::task::Priority::Med
+                                }
+                                rondo_core::domain::task::Priority::Med => {
+                                    rondo_core::domain::task::Priority::High
+                                }
+                                rondo_core::domain::task::Priority::High => {
+                                    rondo_core::domain::task::Priority::Urgent
+                                }
+                                rondo_core::domain::task::Priority::Urgent => {
+                                    rondo_core::domain::task::Priority::Low
+                                }
+                            };
+                        }
+                    }
+                    self.status_msg = Some(format!(
+                        "bumped priority on {} tasks",
+                        self.selection.len()
+                    ));
+                }
+            }
+            Action::OpenQuickAdd => {
+                self.quick_add_open = true;
+                self.quick_add_buf.clear();
+                self.mode = Mode::Insert;
+            }
+            Action::QuickAddUpdate(s) => self.quick_add_buf = s,
+            Action::SubmitQuickAdd(raw) => self.submit_quick_add(raw),
             Action::ResizeSplit { delta } => {
                 let new = self.split_ratio as i32 + delta as i32;
                 self.split_ratio = new.clamp(20, 80) as u16;
@@ -195,11 +266,18 @@ impl AppState {
             Action::EscapeContext => {
                 if self.help_open {
                     self.help_open = false;
+                } else if self.quick_add_open {
+                    self.quick_add_open = false;
+                    self.quick_add_buf.clear();
+                    self.mode = Mode::Normal;
                 } else if self.command_palette_open {
                     self.command_palette_open = false;
                 } else if self.search_open {
                     self.search_open = false;
                     self.search_buf.clear();
+                } else if self.mode == Mode::Visual {
+                    self.mode = Mode::Normal;
+                    self.selection.clear();
                 } else if self.pomodoro_open {
                     self.pomodoro_open = false;
                     self.pomodoro_started = None;
@@ -259,6 +337,11 @@ impl AppState {
                 self.selected_task = next as usize;
                 self.task_list_state.select(Some(self.selected_task));
                 self.focus.section_item = 0;
+                if self.mode == Mode::Visual {
+                    if let Some(t) = self.tasks.get(self.selected_task) {
+                        self.selection.insert(t.id);
+                    }
+                }
             }
             Page::Journal => {
                 if self.journal_notes.is_empty() {
@@ -325,6 +408,20 @@ impl AppState {
         }
     }
 
+    fn submit_quick_add(&mut self, raw: String) {
+        self.quick_add_open = false;
+        self.mode = Mode::Normal;
+        let parsed = parse_quick_add(&raw);
+        self.quick_add_buf.clear();
+        if parsed.title.is_empty() {
+            return;
+        }
+        self.status_msg = Some(format!(
+            "queued: '{}' (tags={:?} prio={:?} due={:?}) — read-only store",
+            parsed.title, parsed.tags, parsed.priority, parsed.due
+        ));
+    }
+
     fn handle_command(&mut self, cmd: String) {
         self.command_palette_open = false;
         match cmd.trim() {
@@ -350,5 +447,64 @@ impl AppState {
                 let _ = p.handle(PluginAction::Tick { delta_ms: 100 }, &ctx);
             }
         }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct QuickAddInput {
+    pub title: String,
+    pub tags: Vec<String>,
+    pub priority: Option<rondo_core::domain::task::Priority>,
+    pub due: Option<String>,
+}
+
+/// Parse quick-add syntax: `title with words #tag1 #tag2 !p3 due:tmrw`.
+pub fn parse_quick_add(raw: &str) -> QuickAddInput {
+    let mut out = QuickAddInput::default();
+    let mut title_parts: Vec<&str> = Vec::new();
+    for token in raw.split_whitespace() {
+        if let Some(tag) = token.strip_prefix('#') {
+            if !tag.is_empty() {
+                out.tags.push(tag.to_string());
+            }
+        } else if let Some(prio) = token.strip_prefix('!') {
+            out.priority = match prio.to_lowercase().as_str() {
+                "p1" | "low" => Some(rondo_core::domain::task::Priority::Low),
+                "p2" | "med" => Some(rondo_core::domain::task::Priority::Med),
+                "p3" | "high" => Some(rondo_core::domain::task::Priority::High),
+                "p4" | "urg" | "urgent" => Some(rondo_core::domain::task::Priority::Urgent),
+                _ => None,
+            };
+        } else if let Some(due) = token.strip_prefix("due:") {
+            out.due = Some(due.to_string());
+        } else {
+            title_parts.push(token);
+        }
+    }
+    out.title = title_parts.join(" ");
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rondo_core::domain::task::Priority;
+
+    #[test]
+    fn quick_add_parses_all_fields() {
+        let p = parse_quick_add("Refactor auth #work #backend !p3 due:tmrw");
+        assert_eq!(p.title, "Refactor auth");
+        assert_eq!(p.tags, vec!["work", "backend"]);
+        assert_eq!(p.priority, Some(Priority::High));
+        assert_eq!(p.due.as_deref(), Some("tmrw"));
+    }
+
+    #[test]
+    fn quick_add_title_only() {
+        let p = parse_quick_add("just a title");
+        assert_eq!(p.title, "just a title");
+        assert!(p.tags.is_empty());
+        assert!(p.priority.is_none());
+        assert!(p.due.is_none());
     }
 }

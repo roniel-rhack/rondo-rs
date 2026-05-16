@@ -44,7 +44,10 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         .enumerate()
         .map(|(idx, task)| {
             let is_selected = Some(idx) == selected;
-            let gutter = if is_selected {
+            let in_visual = app.selection.contains(&task.id);
+            let gutter = if in_visual {
+                Span::styled("● ", Style::default().fg(t.danger).add_modifier(Modifier::BOLD))
+            } else if is_selected {
                 Span::styled("▌ ", Style::default().fg(t.accent))
             } else {
                 Span::raw("  ")

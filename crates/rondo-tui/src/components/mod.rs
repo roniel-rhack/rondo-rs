@@ -5,6 +5,7 @@ pub mod header;
 pub mod help;
 pub mod journal;
 pub mod pomodoro;
+pub mod quick_add;
 pub mod root;
 pub mod search;
 pub mod task_detail;

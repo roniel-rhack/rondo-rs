@@ -12,8 +12,11 @@ pub fn map(ev: Event, app: &AppState) -> Option<Action> {
     if app.search_open {
         return search_key(ev, app);
     }
+    if app.quick_add_open {
+        return quick_add_key(ev, app);
+    }
     match ev {
-        Event::Key(k) => key_to_action(k),
+        Event::Key(k) => key_to_action(k, app),
         Event::Resize(w, h) => Some(Action::Resize {
             width: w,
             height: h,
@@ -74,8 +77,30 @@ fn search_key(ev: Event, app: &AppState) -> Option<Action> {
     })
 }
 
-fn key_to_action(k: KeyEvent) -> Option<Action> {
+fn quick_add_key(ev: Event, app: &AppState) -> Option<Action> {
+    let Event::Key(k) = ev else {
+        return None;
+    };
+    Some(match k.code {
+        KeyCode::Esc => Action::EscapeContext,
+        KeyCode::Enter => Action::SubmitQuickAdd(app.quick_add_buf.clone()),
+        KeyCode::Backspace => Action::QuickAddUpdate({
+            let mut s = app.quick_add_buf.clone();
+            s.pop();
+            s
+        }),
+        KeyCode::Char(c) => Action::QuickAddUpdate({
+            let mut s = app.quick_add_buf.clone();
+            s.push(c);
+            s
+        }),
+        _ => return None,
+    })
+}
+
+fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
     let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
+    let in_visual = app.mode == crate::focus::Mode::Visual;
     Some(match k.code {
         KeyCode::Char('q') if !ctrl => Action::Quit,
         KeyCode::Char('c') if ctrl => Action::Quit,
@@ -90,9 +115,13 @@ fn key_to_action(k: KeyEvent) -> Option<Action> {
         KeyCode::Tab => Action::NextSection,
         KeyCode::BackTab => Action::PrevSection,
         KeyCode::Char(' ') => Action::ToggleSelected,
+        KeyCode::Char('v') => Action::EnterVisual,
+        KeyCode::Char('a') => Action::OpenQuickAdd,
+        KeyCode::Char('d') if in_visual => Action::BulkDone,
+        KeyCode::Char('P') if in_visual => Action::BulkPriority,
         KeyCode::Char('1') => Action::TogglePage(Page::Tasks),
         KeyCode::Char('2') => Action::TogglePage(Page::Journal),
-        KeyCode::Char('p') => Action::TogglePomodoro,
+        KeyCode::Char('p') if !in_visual => Action::TogglePomodoro,
         KeyCode::Char(':') => Action::OpenCommandPalette,
         KeyCode::Char('/') => Action::OpenSearch,
         KeyCode::Char('?') => Action::ToggleHelp,

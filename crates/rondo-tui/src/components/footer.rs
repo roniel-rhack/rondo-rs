@@ -14,8 +14,13 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
     let mut spans: Vec<Span<'static>> = Vec::new();
     spans.push(Span::raw(" "));
+    let mode_label = if mode == Mode::Visual && !app.selection.is_empty() {
+        format!("[VIS·{}]", app.selection.len())
+    } else {
+        format!("[{}]", mode.tag())
+    };
     spans.push(Span::styled(
-        format!("[{}]", mode.tag()),
+        mode_label,
         Style::default()
             .fg(mode_color(mode, t))
             .add_modifier(Modifier::BOLD | Modifier::REVERSED),
@@ -83,13 +88,22 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
         ];
     }
 
+    if app.mode == Mode::Visual {
+        return vec![
+            ("j/k", "extend"),
+            ("d", "bulk done"),
+            ("P", "bulk prio"),
+            ("Esc", "cancel"),
+            (":", "cmd"),
+        ];
+    }
     match app.focus.pane {
         Pane::List => vec![
             ("j/k", "move"),
             ("l", "detail"),
-            ("space", "toggle done"),
+            ("a", "add"),
+            ("v", "select"),
             ("/", "search"),
-            (":", "cmd"),
         ],
         Pane::Detail => match app.focus.section {
             DetailSection::Header => vec![

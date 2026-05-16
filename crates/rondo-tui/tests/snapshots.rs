@@ -117,6 +117,28 @@ fn empty_tasks() {
 }
 
 #[test]
+fn visual_mode_multi_select() {
+    let s = snapshot("visual_mode_multi_select", 120, 32, |a| {
+        a.mode = rondo_tui::focus::Mode::Visual;
+        a.selection.insert(1);
+        a.selection.insert(2);
+        a.selected_task = 1;
+        a.task_list_state.select(Some(1));
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn quick_add_overlay() {
+    let s = snapshot("quick_add_overlay", 120, 32, |a| {
+        a.quick_add_open = true;
+        a.quick_add_buf = "ship the demo #work !p3 due:tmrw".to_string();
+        a.mode = rondo_tui::focus::Mode::Insert;
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
 fn detail_focused_subtasks_section() {
     let s = snapshot("detail_focused_subtasks_section", 120, 32, |a| {
         a.focus.pane = rondo_tui::focus::Pane::Detail;

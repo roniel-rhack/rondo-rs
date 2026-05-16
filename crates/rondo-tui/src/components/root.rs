@@ -24,6 +24,9 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
     if app.search_open {
         components::search::draw(app, f, search_rect(f.area()));
     }
+    if app.quick_add_open {
+        components::quick_add::draw(app, f, search_rect(f.area()));
+    }
     if app.command_palette_open {
         components::command_palette::draw(app, f, palette_rect(f.area()));
     }

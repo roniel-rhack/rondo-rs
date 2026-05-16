@@ -33,4 +33,4 @@ expression: scrubbed
 "│                            ││                                                                                        │"
 "│                            ││                                                                                        │"
 "└────────────────────────────┘╰────────────────────────────────────────────────────────────────────────────────────────╯"
-" [NOR]  [j/k → move] [l → detail] [space → toggle done] [/ → search] [: → cmd]  · ? more                                "
+" [NOR]  [j/k → move] [l → detail] [a → add] [v → select] [/ → search]  · ? more                                         "

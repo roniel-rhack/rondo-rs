@@ -38,13 +38,13 @@ impl LockGuard {
         Ok(Self { path })
     }
 
-    /// Default lock path: `~/.todo-app/.rondo-rust.lock`.
+    /// Default lock path: `~/.rondo-rs/rondo.lock`.
     pub fn default_path() -> PathBuf {
         std::env::var("HOME")
             .map(PathBuf::from)
             .unwrap_or_default()
-            .join(".todo-app")
-            .join(".rondo-rust.lock")
+            .join(".rondo-rs")
+            .join("rondo.lock")
     }
 
     pub fn path(&self) -> &std::path::Path {

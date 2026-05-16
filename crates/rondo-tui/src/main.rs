@@ -10,9 +10,10 @@ use rondo_tui::{
 };
 
 #[derive(Parser)]
-#[command(name = "rondo-tui", version, about = "Rust + ratatui MVP of rondo")]
+#[command(name = "rondo-tui", version, about = "Rust + ratatui port of rondo")]
 struct Cli {
-    /// Path to SQLite DB (default: ~/.todo-app/todo.db)
+    /// Path to SQLite DB (default: ~/.rondo-rs/todo.db).
+    /// First run creates the file and populates it with sample data.
     #[arg(long, env = "RONDO_DB", global = true)]
     db: Option<std::path::PathBuf>,
     /// Use Color::Reset for all styling (honor NO_COLOR spec)
@@ -21,9 +22,9 @@ struct Cli {
     /// Disable all animations
     #[arg(long, global = true)]
     reduced_motion: bool,
-    /// Enable write access. Default: read-only (safer during M1-M3).
+    /// Open the DB read-only (disables CRUD; default is read-write).
     #[arg(long, global = true)]
-    write: bool,
+    read_only: bool,
     /// Emit JSON to stdout where applicable (CLI subcommands only)
     #[arg(long, global = true)]
     json: bool,
@@ -33,16 +34,23 @@ struct Cli {
 
 fn main() -> Result<()> {
     color_eyre::install()?;
-    let log_dir = std::env::var("HOME")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_default()
-        .join(".todo-app")
-        .join("logs");
+    let log_dir = rondo_rs_dir().join("logs");
     rondo_core::telemetry::rotate_old_logs(&log_dir, 7);
     let _log_guard = rondo_core::telemetry::init_logging(log_dir.clone()).ok();
     rondo_core::telemetry::install_panic_hook(log_dir);
     let cli_args = Cli::parse();
     let db_path = cli_args.db.clone().unwrap_or_else(default_db_path);
+    let writable = !cli_args.read_only;
+    if writable {
+        match rondo_core::store::seed::ensure_seeded(&db_path) {
+            Ok(true) => tracing::info!("seeded new DB at {}", db_path.display()),
+            Ok(false) => {}
+            Err(e) => {
+                eprintln!("failed to seed DB at {}: {}", db_path.display(), e);
+                std::process::exit(2);
+            }
+        }
+    }
     if let Some(cmd) = cli_args.command {
         if let cli::Command::Completion { shell } = cmd {
             let mut command = Cli::command();
@@ -58,7 +66,7 @@ fn main() -> Result<()> {
         }
         let opts = cli::CliOpts {
             json: cli_args.json,
-            write: cli_args.write,
+            write: writable,
         };
         return cli::run(cmd, &opts, &db_path);
     }
@@ -70,7 +78,7 @@ fn main() -> Result<()> {
         std::process::exit(2);
     }
     let mut _lock_guard: Option<rondo_core::store::lock::LockGuard> = None;
-    let store = if cli_args.write {
+    let store = if writable {
         let backup_dir = rondo_core::store::backup::default_backup_dir();
         rondo_core::store::backup::rotate(&backup_dir, 30);
         match rondo_core::store::backup::snapshot(&db_path, &backup_dir) {
@@ -110,7 +118,7 @@ fn main() -> Result<()> {
     };
     let no_color_active = a11y::no_color() || cli_args.no_color;
     let reduced = a11y::reduced_motion(cli_args.reduced_motion);
-    let mut app = AppState::with_writable(store, cli_args.write)?;
+    let mut app = AppState::with_writable(store, writable)?;
     app.theme = if no_color_active {
         Theme::no_color()
     } else {
@@ -124,11 +132,15 @@ fn main() -> Result<()> {
     result
 }
 
+fn rondo_rs_dir() -> std::path::PathBuf {
+    std::env::var("HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_default()
+        .join(".rondo-rs")
+}
+
 fn default_db_path() -> std::path::PathBuf {
-    let home = std::env::var("HOME").unwrap_or_default();
-    std::path::PathBuf::from(home)
-        .join(".todo-app")
-        .join("todo.db")
+    rondo_rs_dir().join("todo.db")
 }
 
 fn register_builtin_plugins(app: &mut AppState) {

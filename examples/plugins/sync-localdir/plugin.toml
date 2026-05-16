@@ -8,5 +8,5 @@ capabilities = ["Syncer", "TickHandler"]
 name = "localdir"
 
 [wasi]
-allowed_paths = ["~/.todo-app/sync/"]
+allowed_paths = ["~/.rondo-rs/sync/"]
 allowed_hosts = []

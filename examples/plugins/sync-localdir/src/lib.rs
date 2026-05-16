@@ -2,7 +2,7 @@
 //!
 //! On `Tick`, when the current minute-of-hour is a multiple of 5, emits a
 //! `KvSet` follow-up recording `last_sync_at` plus a `Notify(System)`
-//! message indicating it would copy the DB into `~/.todo-app/sync/`. For
+//! message indicating it would copy the DB into `~/.rondo-rs/sync/`. For
 //! now the actual copy is performed by the HOST in response to the
 //! sentinel `KvSet` — real WASI file I/O is deferred to a follow-up so
 //! this scaffold stays portable.

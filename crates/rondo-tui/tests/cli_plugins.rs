@@ -2,7 +2,7 @@ use assert_cmd::Command;
 use predicates::prelude::*;
 
 fn plugin_dir_in(home: &std::path::Path) -> std::path::PathBuf {
-    home.join(".todo-app").join("plugins")
+    home.join(".rondo-rs").join("plugins")
 }
 
 #[test]

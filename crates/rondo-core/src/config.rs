@@ -1,6 +1,6 @@
 //! TOML configuration schema for ui/pomodoro/plugins.
 //!
-//! Loaded from `$RONDO_CONFIG` or `$HOME/.todo-app/config.toml`. Missing file
+//! Loaded from `$RONDO_CONFIG` or `$HOME/.rondo-rs/config.toml`. Missing file
 //! returns defaults; malformed file logs a warning and returns defaults.
 
 use std::collections::HashMap;
@@ -88,7 +88,7 @@ impl Config {
         std::env::var("HOME")
             .map(PathBuf::from)
             .unwrap_or_default()
-            .join(".todo-app")
+            .join(".rondo-rs")
             .join("config.toml")
     }
 

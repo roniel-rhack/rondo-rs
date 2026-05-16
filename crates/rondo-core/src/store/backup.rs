@@ -8,14 +8,13 @@ pub enum BackupError {
     Missing(PathBuf),
 }
 
-/// Default backup root: `~/.todo-app/backups/rust/`.
+/// Default backup root: `~/.rondo-rs/backups/`.
 pub fn default_backup_dir() -> PathBuf {
     std::env::var("HOME")
         .map(PathBuf::from)
         .unwrap_or_default()
-        .join(".todo-app")
+        .join(".rondo-rs")
         .join("backups")
-        .join("rust")
 }
 
 /// Copies `db_path` into `backup_dir` with ISO timestamp.

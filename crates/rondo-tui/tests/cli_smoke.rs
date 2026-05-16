@@ -94,13 +94,14 @@ fn export_ndjson_one_line_per_task() {
 }
 
 #[test]
-fn add_without_write_flag_errors() {
+fn add_with_read_only_flag_errors() {
     let db = make_db();
     let home = isolated_home();
     let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
+        .arg("--read-only")
         .arg("add")
         .arg("new task");
     cmd.assert().failure();
@@ -114,7 +115,7 @@ fn add_with_write_creates_task() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        .arg("--write")
+        
         .arg("add")
         .arg("CLI added");
     cmd.assert().success();
@@ -138,7 +139,7 @@ fn done_marks_task() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        .arg("--write")
+        
         .arg("done")
         .arg("3");
     cmd.assert().success();

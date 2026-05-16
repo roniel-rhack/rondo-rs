@@ -19,7 +19,7 @@ Minimal Syncer plugin demonstrating the `Capability::Syncer` contract.
 
 `Syncer`, `Notifier` and `CliSubcommand` are "dangerous" capabilities
 in the host policy and require an explicit grant in
-`~/.todo-app/config.toml`:
+`~/.rondo-rs/config.toml`:
 
 ```toml
 [plugins.permissions]

@@ -11,7 +11,7 @@ edition = "2021"
 # Sample plugin demonstrating `Capability::Syncer` + `TickHandler`. The
 # manifest carries `[syncer] name = "localdir"`; once extism host-functions
 # expose filesystem I/O, this plugin will copy the DB into
-# `~/.todo-app/sync/` on a cadence. For now it round-trips KvSet + Notify
+# `~/.rondo-rs/sync/` on a cadence. For now it round-trips KvSet + Notify
 # follow-ups to exercise the contract.
 #
 # Built standalone for `wasm32-wasip1` via the local `.cargo/config.toml`.

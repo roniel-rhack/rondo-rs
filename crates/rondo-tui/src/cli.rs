@@ -35,7 +35,7 @@ pub enum Command {
         #[arg(long, default_value = "md")]
         format: String,
     },
-    /// Manage plugins installed under ~/.todo-app/plugins/
+    /// Manage plugins installed under ~/.rondo-rs/plugins/
     Plugins {
         #[command(subcommand)]
         action: PluginsAction,
@@ -188,7 +188,7 @@ fn open_rw_store(db_path: &Path) -> Result<(Arc<SqliteStore>, rondo_core::store:
 
 fn require_write(opts: &CliOpts, action: &str) -> Result<()> {
     if !opts.write {
-        eprintln!("error: `{action}` needs --write");
+        eprintln!("error: `{action}` cannot run in --read-only mode");
         std::process::exit(2);
     }
     Ok(())
@@ -330,7 +330,7 @@ fn default_plugins_dir() -> PathBuf {
     std::env::var("HOME")
         .map(PathBuf::from)
         .unwrap_or_default()
-        .join(".todo-app")
+        .join(".rondo-rs")
         .join("plugins")
 }
 

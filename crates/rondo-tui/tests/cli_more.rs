@@ -22,13 +22,14 @@ fn isolated_home() -> tempfile::TempDir {
 }
 
 #[test]
-fn delete_without_write_errors() {
+fn delete_with_read_only_flag_errors() {
     let db = make_db();
     let home = isolated_home();
     let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
+        .arg("--read-only")
         .arg("delete")
         .arg("1");
     cmd.assert().failure();
@@ -42,7 +43,7 @@ fn delete_with_write_succeeds() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        .arg("--write")
+        
         .arg("delete")
         .arg("3");
     cmd.assert().success();
@@ -69,6 +70,7 @@ fn journal_add_requires_write() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
+        .arg("--read-only")
         .arg("journal")
         .arg("add")
         .arg("hello world");
@@ -83,7 +85,7 @@ fn journal_add_with_write_succeeds() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        .arg("--write")
+        
         .arg("journal")
         .arg("add")
         .arg("note body");
@@ -113,7 +115,7 @@ fn focus_start_with_write() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        .arg("--write")
+        
         .arg("focus")
         .arg("start");
     cmd.assert().success();
@@ -182,7 +184,7 @@ fn batch_processes_ndjson() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        .arg("--write")
+        
         .arg("batch")
         .write_stdin(
             "{\"op\":\"add\",\"title\":\"From batch\"}\n{\"op\":\"add\",\"title\":\"Another\"}\n",
@@ -201,7 +203,7 @@ fn batch_json_summary() {
         .env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        .arg("--write")
+        
         .arg("--json")
         .arg("batch")
         .write_stdin("{\"op\":\"add\",\"title\":\"X\"}\n{\"op\":\"unknown\"}\n")
@@ -221,6 +223,7 @@ fn dep_add_requires_write() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
+        .arg("--read-only")
         .arg("dep")
         .arg("add")
         .arg("1")
@@ -236,7 +239,7 @@ fn dep_add_creates_dependency() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        .arg("--write")
+        
         .arg("dep")
         .arg("add")
         .arg("1")
@@ -252,7 +255,7 @@ fn dep_remove_idempotent() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        .arg("--write")
+        
         .arg("dep")
         .arg("remove")
         .arg("1")
@@ -268,7 +271,7 @@ fn tag_add_works() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        .arg("--write")
+        
         .arg("tag")
         .arg("add")
         .arg("1")
@@ -285,7 +288,7 @@ fn tag_remove_works() {
         .env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        .arg("--write")
+        
         .arg("tag")
         .arg("add")
         .arg("1")
@@ -297,7 +300,7 @@ fn tag_remove_works() {
         .env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        .arg("--write")
+        
         .arg("tag")
         .arg("remove")
         .arg("1")

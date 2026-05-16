@@ -7,6 +7,7 @@ use rondo_core::domain::task::Priority;
 /// Cohesive 7-token semantic palette.
 /// Designed to feel warm and restrained, not Material-Design rainbow.
 pub struct Theme {
+    pub name: &'static str,
     pub bg: Color,
     pub surface: Color,
     pub fg: Color,
@@ -22,6 +23,7 @@ pub struct Theme {
 impl Theme {
     pub fn dark() -> Self {
         Self {
+            name: "dark",
             bg: Color::Rgb(0x0F, 0x11, 0x15),
             surface: Color::Rgb(0x18, 0x1B, 0x22),
             fg: Color::Rgb(0xE6, 0xE1, 0xCF),
@@ -32,6 +34,25 @@ impl Theme {
             success: Color::Rgb(0x98, 0xC3, 0x79),
             border_active: Color::Rgb(0x7F, 0xDB, 0xCA),
             border_inactive: Color::Rgb(0x2A, 0x2E, 0x36),
+        }
+    }
+
+    /// Monochrome theme honoring the NO_COLOR convention.
+    /// Every color falls back to `Color::Reset` so the terminal applies its
+    /// own default foreground/background.
+    pub fn no_color() -> Self {
+        Self {
+            name: "no-color",
+            bg: Color::Reset,
+            surface: Color::Reset,
+            fg: Color::Reset,
+            fg_muted: Color::Reset,
+            accent: Color::Reset,
+            danger: Color::Reset,
+            warn: Color::Reset,
+            success: Color::Reset,
+            border_active: Color::Reset,
+            border_inactive: Color::Reset,
         }
     }
 

@@ -1,3 +1,4 @@
+pub mod a11y;
 pub mod action;
 pub mod app;
 pub mod components;

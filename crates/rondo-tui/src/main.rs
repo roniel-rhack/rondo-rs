@@ -4,7 +4,7 @@ use crossterm::event;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use rondo_tui::{action::Action, app::AppState, components, event as ev, tui};
+use rondo_tui::{a11y, action::Action, app::AppState, components, event as ev, fx::FxManager, theme::Theme, tui};
 
 #[derive(Parser)]
 #[command(name = "rondo-tui", version, about = "Rust + ratatui MVP of rondo")]
@@ -12,6 +12,12 @@ struct Cli {
     /// Path to SQLite DB (default: ~/.todo-app/todo.db)
     #[arg(long, env = "RONDO_DB")]
     db: Option<std::path::PathBuf>,
+    /// Use Color::Reset for all styling (honor NO_COLOR spec)
+    #[arg(long)]
+    no_color: bool,
+    /// Disable all animations
+    #[arg(long)]
+    reduced_motion: bool,
 }
 
 fn main() -> Result<()> {
@@ -32,7 +38,15 @@ fn main() -> Result<()> {
     let store = Arc::new(rondo_core::store::sqlite::SqliteStore::open_readonly(
         &db_path,
     )?);
+    let no_color_active = a11y::no_color() || cli.no_color;
+    let reduced = a11y::reduced_motion(cli.reduced_motion);
     let mut app = AppState::new(store)?;
+    app.theme = if no_color_active {
+        Theme::no_color()
+    } else {
+        Theme::dark()
+    };
+    app.fx = FxManager::new_with_options(reduced);
     register_builtin_plugins(&mut app);
     let mut terminal = tui::init()?;
     let result = run(&mut terminal, &mut app);

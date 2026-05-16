@@ -7,6 +7,10 @@
 //! normalization, see `nucleo::Config::DEFAULT`).
 
 use nucleo::{Config, Matcher, Utf32Str};
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
+
+use crate::theme::Theme;
 
 pub struct SearchEngine {
     matcher: Matcher,
@@ -63,6 +67,70 @@ impl SearchEngine {
         let haystack_u32 = Utf32Str::new(haystack, &mut haystack_buf);
         self.matcher.fuzzy_match(haystack_u32, needle_u32)
     }
+}
+
+/// Rewrites `line`'s spans so that characters matched by the fuzzy
+/// query are styled with accent foreground + bold + underline, while
+/// every other char keeps its original `Span::style`. Preserves the
+/// `Line::style` and `Line::alignment`. Returns the input unchanged
+/// when `needle` is empty or no fuzzy match is found.
+///
+/// Used by the search overlay to surface matches in BOTH the task
+/// list and the detail panel (title, tags, description, subtasks,
+/// notes — every line gets the same treatment).
+pub fn highlight_line(line: Line<'static>, needle: &str, theme: &Theme) -> Line<'static> {
+    if needle.trim().is_empty() {
+        return line;
+    }
+    let mut full = String::new();
+    for s in &line.spans {
+        full.push_str(s.content.as_ref());
+    }
+    if full.is_empty() {
+        return line;
+    }
+    let mut engine = SearchEngine::new();
+    let Some((_, indices)) = engine.score(needle.trim(), &full) else {
+        return line;
+    };
+    if indices.is_empty() {
+        return line;
+    }
+    let match_set: std::collections::BTreeSet<u32> = indices.into_iter().collect();
+    let hl_extra = Modifier::UNDERLINED | Modifier::BOLD;
+    let line_style = line.style;
+    let line_alignment = line.alignment;
+    let original_spans = line.spans;
+
+    let mut out_spans: Vec<Span<'static>> = Vec::new();
+    let mut char_idx: u32 = 0;
+    for span in original_spans {
+        let base_style = span.style;
+        let hl_style = Style::default()
+            .patch(base_style)
+            .fg(theme.accent)
+            .add_modifier(hl_extra);
+        let mut buf = String::new();
+        let mut buf_hl: Option<bool> = None;
+        for ch in span.content.chars() {
+            let is_hl = match_set.contains(&char_idx);
+            char_idx += 1;
+            if buf_hl != Some(is_hl) && !buf.is_empty() {
+                let style = if buf_hl == Some(true) { hl_style } else { base_style };
+                out_spans.push(Span::styled(std::mem::take(&mut buf), style));
+            }
+            buf.push(ch);
+            buf_hl = Some(is_hl);
+        }
+        if !buf.is_empty() {
+            let style = if buf_hl == Some(true) { hl_style } else { base_style };
+            out_spans.push(Span::styled(buf, style));
+        }
+    }
+    let mut out = Line::from(out_spans);
+    out.style = line_style;
+    out.alignment = line_alignment;
+    out
 }
 
 #[cfg(test)]

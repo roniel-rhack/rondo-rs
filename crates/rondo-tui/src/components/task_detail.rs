@@ -327,6 +327,15 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         }
     }
 
+    let lines = if app.modals.search_open && !app.modals.search_buf.trim().is_empty() {
+        let q = app.modals.search_buf.trim().to_string();
+        lines
+            .into_iter()
+            .map(|l| crate::search::highlight_line(l, &q, t))
+            .collect::<Vec<_>>()
+    } else {
+        lines
+    };
     f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
 }
 

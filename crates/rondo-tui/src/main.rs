@@ -54,19 +54,33 @@ fn register_builtin_plugins(app: &mut AppState) {
 }
 
 fn run(terminal: &mut tui::Tui, app: &mut AppState) -> Result<()> {
-    let tick = Duration::from_millis(100);
-    let mut last = Instant::now();
+    let anim_tick = Duration::from_millis(100);
+    let idle_tick = Duration::from_secs(60);
+    let mut last_tick = Instant::now();
+    let mut dirty = true;
     while !app.should_quit {
-        terminal.draw(|f| components::root::draw(app, f))?;
-        let timeout = tick.saturating_sub(last.elapsed());
+        if dirty {
+            terminal.draw(|f| components::root::draw(app, f))?;
+            dirty = false;
+        }
+        let tick = if app.needs_animation_tick() {
+            anim_tick
+        } else {
+            idle_tick
+        };
+        let timeout = tick.saturating_sub(last_tick.elapsed());
         if event::poll(timeout)? {
             if let Some(a) = ev::map(event::read()?, app) {
                 app.update(a);
+                dirty = true;
             }
         }
-        if last.elapsed() >= tick {
-            last = Instant::now();
-            app.update(Action::Tick);
+        if last_tick.elapsed() >= tick {
+            last_tick = Instant::now();
+            if app.needs_animation_tick() {
+                app.update(Action::Tick);
+                dirty = true;
+            }
         }
     }
     Ok(())

@@ -12,7 +12,8 @@ expression: s
 "│                                                          ││Tags      refactor   work                                 │"
 "│                                                          ││                                                          │"
 "│                                                          ││Description                                               │"
-"│                                     ┌ 🍅 Focus Session ────────────────────────┐API spec done.                       │" Hidden by multi-width symbols: [(41, " ")]
+"│                                                          ││Pending until Review API spec done.                       │"
+"│                                     ┌ 🍅 Focus Session ────────────────────────┐                                     │" Hidden by multi-width symbols: [(41, " ")]
 "│                                     │ Task: Refactor pomodoro module           │                                     │"
 "│                                     │⠷   25:00 remaining                       │                                     │"
 "│                                     │                                          │                                     │"
@@ -23,7 +24,6 @@ expression: s
 "│                                     │                                          │                                     │"
 "│                                     │                                          │                                     │"
 "│                                     └──────────────────────────────────────────┘                                     │"
-"│                                                          ││                                                          │"
 "│                                                          ││                                                          │"
 "│                                                          ││                                                          │"
 "│                                                          ││                                                          │"

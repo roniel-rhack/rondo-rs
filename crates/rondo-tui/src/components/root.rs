@@ -1,6 +1,6 @@
 use crate::{action::Page, app::AppState, components};
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Flex, Layout, Rect},
     Frame,
 };
 
@@ -42,24 +42,20 @@ fn body(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
 }
 
 fn centered(w: u16, h: u16, area: Rect) -> Rect {
-    let w = w.min(area.width);
-    let h = h.min(area.height);
-    let x = area.x + (area.width.saturating_sub(w)) / 2;
-    let y = area.y + (area.height.saturating_sub(h)) / 2;
-    Rect {
-        x,
-        y,
-        width: w,
-        height: h,
-    }
+    let [vertical] = Layout::vertical([Constraint::Length(h.min(area.height))])
+        .flex(Flex::Center)
+        .areas(area);
+    let [centered] = Layout::horizontal([Constraint::Length(w.min(area.width))])
+        .flex(Flex::Center)
+        .areas(vertical);
+    centered
 }
 
 fn palette_rect(area: Rect) -> Rect {
-    let h = 12.min(area.height.saturating_sub(2));
-    Rect {
-        x: area.x + 2,
-        y: area.y + area.height.saturating_sub(h + 1),
-        width: area.width.saturating_sub(4),
-        height: h,
-    }
+    let h = 12u16.min(area.height.saturating_sub(4));
+    let [_, anchored] = Layout::vertical([Constraint::Min(0), Constraint::Length(h)])
+        .flex(Flex::End)
+        .margin(2)
+        .areas(area);
+    anchored
 }

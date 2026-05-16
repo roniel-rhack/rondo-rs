@@ -4,7 +4,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
     Frame,
 };
 
@@ -37,9 +37,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
                 .title(Span::styled(" Days ", t.accent_style())),
         )
         .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
-    let mut state = ListState::default();
-    state.select(Some(app.selected_journal));
-    f.render_stateful_widget(list, chunks[0], &mut state);
+    f.render_stateful_widget(list, chunks[0], &mut app.journal_list_state);
 
     let mut content_lines: Vec<Line> = Vec::new();
     if let Some(note) = app.journal_notes.get(app.selected_journal) {

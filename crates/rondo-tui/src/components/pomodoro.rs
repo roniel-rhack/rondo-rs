@@ -6,7 +6,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Gauge, Paragraph},
     Frame,
 };
-use throbber_widgets_tui::{Throbber, ThrobberState};
+use throbber_widgets_tui::Throbber;
 
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
@@ -58,11 +58,6 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let remaining = total.saturating_sub(elapsed);
     let ratio = (elapsed as f64 / total as f64).clamp(0.0, 1.0);
 
-    let mut throbber_state = ThrobberState::default();
-    let tick_frames = (elapsed % 1000) as usize;
-    for _ in 0..tick_frames % 10 {
-        throbber_state.calc_next();
-    }
     let throbber = Throbber::default()
         .label(format!(
             "  {:02}:{:02} remaining",
@@ -75,7 +70,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
                 .fg(t.urgent)
                 .add_modifier(Modifier::BOLD),
         );
-    f.render_stateful_widget(throbber, chunks[1], &mut throbber_state);
+    f.render_stateful_widget(throbber, chunks[1], &mut app.pomodoro_throbber);
 
     let gauge = Gauge::default()
         .gauge_style(Style::default().fg(t.urgent).bg(t.border_inactive))

@@ -4,7 +4,7 @@ use ratatui::{
     layout::Rect,
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, ListState},
+    widgets::{Block, Borders, List, ListItem},
     Frame,
 };
 use rondo_core::domain::task::Status;
@@ -84,7 +84,5 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let list = List::new(items)
         .block(block)
         .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
-    let mut state = ListState::default();
-    state.select(Some(app.selected_task));
-    f.render_stateful_widget(list, area, &mut state);
+    f.render_stateful_widget(list, area, &mut app.task_list_state);
 }

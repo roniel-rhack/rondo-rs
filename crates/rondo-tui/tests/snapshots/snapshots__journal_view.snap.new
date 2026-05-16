@@ -1,5 +1,6 @@
 ---
 source: crates/rondo-tui/tests/snapshots.rs
+assertion_line: 59
 expression: s
 ---
 " RonDO  │  Tasks   Journal  │ 4 tasks                                                                                   "

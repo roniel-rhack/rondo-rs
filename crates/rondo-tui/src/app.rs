@@ -1,6 +1,8 @@
 use crate::action::{Action, Page};
 use crate::theme::Theme;
 use color_eyre::eyre::Result;
+use ratatui::widgets::ListState;
+use throbber_widgets_tui::ThrobberState;
 use rondo_core::domain::{
     journal::{Entry, Note},
     task::Task,
@@ -14,20 +16,30 @@ pub struct AppState {
     pub page: Page,
     pub tasks: Vec<Task>,
     pub selected_task: usize,
+    pub task_list_state: ListState,
     pub focus_left: bool,
     pub split_ratio: u16,
     pub journal_notes: Vec<Note>,
     pub journal_entries: Vec<Entry>,
     pub selected_journal: usize,
+    pub journal_list_state: ListState,
     pub pomodoro_open: bool,
     pub pomodoro_started: Option<Instant>,
     pub pomodoro_total: Duration,
+    pub pomodoro_throbber: ThrobberState,
     pub command_palette_open: bool,
     pub command_buf: String,
     pub should_quit: bool,
     pub status_msg: Option<String>,
     pub plugins: PluginRegistry,
     pub store: Arc<rondo_core::store::sqlite::SqliteStore>,
+}
+
+impl AppState {
+    /// Returns true when an animation requires periodic redraw without user input.
+    pub fn needs_animation_tick(&self) -> bool {
+        self.pomodoro_open
+    }
 }
 
 impl AppState {
@@ -39,19 +51,30 @@ impl AppState {
         } else {
             vec![]
         };
+        let mut task_list_state = ListState::default();
+        if !tasks.is_empty() {
+            task_list_state.select(Some(0));
+        }
+        let mut journal_list_state = ListState::default();
+        if !journal_notes.is_empty() {
+            journal_list_state.select(Some(0));
+        }
         Ok(Self {
             theme: Theme::dark(),
             page: Page::Tasks,
             tasks,
             selected_task: 0,
+            task_list_state,
             focus_left: true,
             split_ratio: 50,
             journal_notes,
             journal_entries,
             selected_journal: 0,
+            journal_list_state,
             pomodoro_open: false,
             pomodoro_started: None,
             pomodoro_total: Duration::from_secs(25 * 60),
+            pomodoro_throbber: ThrobberState::default(),
             command_palette_open: false,
             command_buf: String::new(),
             should_quit: false,
@@ -64,7 +87,12 @@ impl AppState {
     pub fn update(&mut self, action: Action) {
         match action {
             Action::Quit => self.should_quit = true,
-            Action::Tick => self.dispatch_plugin_ticks(),
+            Action::Tick => {
+                if self.pomodoro_open {
+                    self.pomodoro_throbber.calc_next();
+                }
+                self.dispatch_plugin_ticks();
+            }
             Action::NextItem => self.move_selection(1),
             Action::PrevItem => self.move_selection(-1),
             Action::TogglePage(p) => self.page = p,
@@ -95,6 +123,16 @@ impl AppState {
             }
             Action::SearchInput(s) => self.command_buf = s,
             Action::SubmitCommand(cmd) => self.handle_command(cmd),
+            Action::EscapeContext => {
+                if self.command_palette_open {
+                    self.command_palette_open = false;
+                } else if self.pomodoro_open {
+                    self.pomodoro_open = false;
+                    self.pomodoro_started = None;
+                } else if self.status_msg.is_some() {
+                    self.status_msg = None;
+                }
+            }
             _ => {}
         }
     }
@@ -108,6 +146,7 @@ impl AppState {
                 let len = self.tasks.len() as i32;
                 let next = (self.selected_task as i32 + delta).rem_euclid(len);
                 self.selected_task = next as usize;
+                self.task_list_state.select(Some(self.selected_task));
             }
             Page::Journal => {
                 if self.journal_notes.is_empty() {
@@ -116,6 +155,7 @@ impl AppState {
                 let len = self.journal_notes.len() as i32;
                 let next = (self.selected_journal as i32 + delta).rem_euclid(len);
                 self.selected_journal = next as usize;
+                self.journal_list_state.select(Some(self.selected_journal));
                 if let Ok(e) = self
                     .store
                     .entries_for_note(self.journal_notes[self.selected_journal].id)

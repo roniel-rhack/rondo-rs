@@ -24,6 +24,7 @@ pub enum Action {
     CloseCommandPalette,
     SearchInput(String),
     SubmitCommand(String),
+    EscapeContext,
 
     Error(String),
 }

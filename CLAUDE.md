@@ -23,8 +23,8 @@ The implementation plan lives at `/Users/roniel/.claude/plans/construyamos-un-mv
 
 - Status icons: `○` Pending, `◐` InProgress, `✓` Done
 - Priority labels/colors: LOW (green), MED (yellow), HIGH (red), URG! (magenta)
-- Keybindings: `j/k` nav, `Tab` focus, `1/2` pages, `p` pomodoro, `:` command palette, `</>` resize, `q` quit, `Esc` close overlay
-- Color palette hex: cyan #00BCD4, white #FAFAFA, green #4CAF50, red #F44336, muted #9E9E9E
+- **Navigation parity only.** Full keybinding parity is tracked in IMPROVEMENTS.md Fase 4. Currently implemented: `j/k` nav, `Tab` focus, `1/2` pages, `p` pomodoro, `:` command palette, `</>` resize, `q` quit, `Esc` close-top-modal. Missing vs Go: `/` search, `?` help, `g/G` top/bottom, `h/l` focus pane, `a/e/d/s/t` CRUD, `F1-F4` sort/tag bar.
+- Color palette hex: cyan #00BCD4, white #FAFAFA, green #4CAF50, red #F44336, muted #9E9E9E (slated for rework in Fase 2)
 
 ## How to run
 

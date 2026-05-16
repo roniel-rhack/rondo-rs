@@ -51,7 +51,7 @@ fn key_to_action(k: KeyEvent) -> Option<Action> {
         KeyCode::Char(':') => Action::OpenCommandPalette,
         KeyCode::Char('<') => Action::ResizeSplit { delta: -2 },
         KeyCode::Char('>') => Action::ResizeSplit { delta: 2 },
-        KeyCode::Esc => Action::ClosePomodoro,
+        KeyCode::Esc => Action::EscapeContext,
         _ => return None,
     })
 }

@@ -5,8 +5,7 @@ use ratatui::{
 };
 use rondo_core::domain::task::Priority;
 
-/// Soft inline badge: color + bold, no REVERSED.
-/// `URG!` exclamation removed — color carries the urgency signal.
+/// Rounded-end pill `◖URG◗` colored by priority. Sci-fi capsule aesthetic.
 pub fn span(p: Priority, theme: &Theme) -> Span<'static> {
     let label = match p {
         Priority::Low => "low",
@@ -14,10 +13,9 @@ pub fn span(p: Priority, theme: &Theme) -> Span<'static> {
         Priority::High => "high",
         Priority::Urgent => "URG",
     };
+    let color = theme.priority_color(p);
     Span::styled(
-        label.to_string(),
-        Style::default()
-            .fg(theme.priority_color(p))
-            .add_modifier(Modifier::BOLD),
+        format!("◖{}◗", label),
+        Style::default().fg(color).add_modifier(Modifier::BOLD),
     )
 }

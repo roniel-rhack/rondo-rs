@@ -1,11 +1,13 @@
 use crate::app::AppState;
 use crate::focus::{DetailSection, Pane};
-use crate::widgets::{due_badge, markdown, priority_badge, progress_bar};
+use crate::widgets::{
+    bracket_panel::BracketPanel, due_badge, markdown, priority_badge, ring, sparkline,
+};
 use ratatui::{
     layout::Rect,
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Paragraph, Wrap},
+    widgets::{Paragraph, Widget, Wrap},
     Frame,
 };
 use rondo_core::domain::task::Status;
@@ -17,13 +19,12 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let task = match app.tasks.get(app.selected_task) {
         Some(x) => x,
         None => {
-            let block = t.panel("Detail", active);
+            let panel = BracketPanel::new("detail", t).active(active);
+            let inner = panel.inner(area);
+            panel.render(area, f.buffer_mut());
             let lines = vec![
                 Line::raw(""),
-                Line::from(Span::styled(
-                    "  No task selected",
-                    t.muted(),
-                )),
+                Line::from(Span::styled("  No task selected", t.muted())),
                 Line::raw(""),
                 Line::from(vec![
                     Span::raw("  "),
@@ -40,13 +41,20 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
                     Span::styled("help", t.muted()),
                 ]),
             ];
-            f.render_widget(Paragraph::new(lines).block(block), area);
+            f.render_widget(Paragraph::new(lines), inner);
             return;
         }
     };
 
-    let title = format!("Detail · #{}", task.id);
-    let block = t.panel(&title, active);
+    let title = format!("detail · #{}", task.id);
+    let badge = format!(
+        "{} · {}",
+        task.status.label().to_lowercase(),
+        task.priority.label().to_lowercase()
+    );
+    let panel = BracketPanel::new(&title, t).active(active).badge(&badge);
+    let inner = panel.inner(area);
+    panel.render(area, f.buffer_mut());
 
     let mut lines: Vec<Line> = Vec::new();
     lines.push(Line::from(Span::styled(
@@ -118,8 +126,16 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     if total > 0 {
         let section_active = app.focus.pane == Pane::Detail
             && app.focus.section == DetailSection::Subtasks;
-        lines.push(section_header("Subtasks", &format!("{}/{}", done, total), section_active, t));
-        lines.push(progress_bar::line(done, total, 30, t));
+        let mut header = section_header(
+            "Subtasks",
+            &format!("{}/{}", done, total),
+            section_active,
+            t,
+        );
+        // append ring glyph
+        header.spans.insert(1, Span::raw(" "));
+        header.spans.insert(2, ring::glyph(done, total, t));
+        lines.push(header);
         for (i, st) in task.subtasks.iter().enumerate() {
             let cursor_here = section_active && app.focus.section_item == i;
             let gutter = if cursor_here {
@@ -173,15 +189,24 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
     if !task.time_logs.is_empty() {
         let total_secs: i64 = task.time_logs.iter().map(|tl| tl.duration_secs).sum();
+        let spark_values: Vec<u64> = task
+            .time_logs
+            .iter()
+            .rev()
+            .take(7)
+            .map(|tl| tl.duration_secs.max(0) as u64)
+            .collect();
+        lines.push(section_header("Time", &format_duration(total_secs), false, t));
         lines.push(Line::from(vec![
-            Span::styled("Time logged ", Style::default().fg(t.fg_muted)),
+            Span::raw("  "),
+            sparkline::span(&spark_values, t),
+            Span::raw("  "),
             Span::styled(
-                format_duration(total_secs),
-                Style::default()
-                    .fg(t.success)
-                    .add_modifier(Modifier::BOLD),
+                format!("{} sessions", task.time_logs.len()),
+                t.muted(),
             ),
         ]));
+        lines.push(Line::raw(""));
     }
 
     if !task.notes.is_empty() {
@@ -195,10 +220,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         }
     }
 
-    f.render_widget(
-        Paragraph::new(lines).wrap(Wrap { trim: false }).block(block),
-        area,
-    );
+    f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
 }
 
 fn section_header(name: &str, count: &str, active: bool, t: &crate::theme::Theme) -> Line<'static> {

@@ -1,18 +1,20 @@
 use crate::app::AppState;
-use crate::widgets::{due_badge, priority_badge, priority_spine};
+use crate::widgets::{bracket_panel::BracketPanel, due_badge, priority_badge, priority_spine, ring};
 use ratatui::{
     layout::Rect,
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{List, ListItem},
+    widgets::{List, ListItem, Widget},
     Frame,
 };
 use rondo_core::domain::task::Status;
 
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
-    let title = format!("Tasks ({})", app.tasks.len());
-    let block = t.panel(&title, app.focus_left());
+    let title = format!("tasks · {}", app.tasks.len());
+    let panel = BracketPanel::new(&title, t).active(app.focus_left());
+    let inner = panel.inner(area);
+    panel.render(area, f.buffer_mut());
 
     if app.tasks.is_empty() {
         let lines = vec![
@@ -31,10 +33,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
                 Span::styled("commands", t.muted()),
             ]),
         ];
-        f.render_widget(
-            ratatui::widgets::Paragraph::new(lines).block(block),
-            area,
-        );
+        f.render_widget(ratatui::widgets::Paragraph::new(lines), inner);
         return;
     }
 
@@ -88,8 +87,10 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
             }
             let (done, total) = task.subtask_progress();
             if total > 0 {
+                spans.push(Span::raw("   "));
+                spans.push(ring::glyph(done, total, t));
                 spans.push(Span::styled(
-                    format!("   {}/{}", done, total),
+                    format!(" {}/{}", done, total),
                     t.muted(),
                 ));
             }
@@ -103,6 +104,6 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         })
         .collect();
 
-    let list = List::new(items).block(block).highlight_style(t.selection());
-    f.render_stateful_widget(list, area, &mut app.task_list_state);
+    let list = List::new(items).highlight_style(t.selection());
+    f.render_stateful_widget(list, inner, &mut app.task_list_state);
 }

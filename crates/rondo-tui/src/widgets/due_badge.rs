@@ -1,5 +1,5 @@
 use crate::theme::Theme;
-use chrono::{Local, NaiveDate};
+use chrono::NaiveDate;
 use ratatui::{
     style::{Modifier, Style},
     text::Span,
@@ -8,7 +8,7 @@ use ratatui::{
 /// Pill-shaped due badge: `◖overdue◗`, `◖today◗`, or near-future muted hint.
 pub fn span(due: Option<NaiveDate>, theme: &Theme) -> Option<Span<'static>> {
     let due = due?;
-    let today = Local::now().date_naive();
+    let today = crate::clock::today();
     let delta = (due - today).num_days();
     if delta < 0 {
         return Some(Span::styled(

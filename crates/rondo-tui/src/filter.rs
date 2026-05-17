@@ -1,4 +1,3 @@
-use chrono::Local;
 use rondo_core::domain::task::{Priority, Status, Task};
 
 /// Active subset of tasks. Only filters that actually apply to rondo's
@@ -63,7 +62,7 @@ impl Filter {
     }
 
     pub fn applies_to(self, task: &Task) -> bool {
-        let today = Local::now().date_naive();
+        let today = crate::clock::today();
         match self {
             Self::Inbox => task.status != Status::Done,
             Self::Today => task.status != Status::Done && task.due_date == Some(today),

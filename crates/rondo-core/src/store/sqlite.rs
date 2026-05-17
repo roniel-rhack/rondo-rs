@@ -366,8 +366,11 @@ impl SqliteStore {
     }
 
     /// Returns the today-dated note, creating it if it doesn't exist yet.
+    /// "Today" is interpreted in the user's LOCAL timezone — using UTC would
+    /// roll the date over at midnight UTC, producing a "tomorrow" note for
+    /// users west of UTC who write entries after their evening cutoff.
     pub fn create_or_get_today_note(&self) -> Result<Note> {
-        let today = Utc::now().date_naive();
+        let today = chrono::Local::now().date_naive();
         self.create_or_get_note_for(today)
     }
 
@@ -435,6 +438,26 @@ impl SqliteStore {
     pub fn delete_entry(&self, entry_id: i64) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(super::queries::DELETE_JOURNAL_ENTRY, params![entry_id])?;
+        Ok(())
+    }
+
+    /// Replace the body text of an existing journal entry. Also bumps the
+    /// parent note's `updated_at`. Inside a single transaction.
+    pub fn update_journal_entry(&self, entry_id: i64, body: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let tx = conn.unchecked_transaction()?;
+        let note_id: i64 = tx.query_row(
+            super::queries::NOTE_ID_FOR_ENTRY,
+            params![entry_id],
+            |r| r.get(0),
+        )?;
+        let now = Utc::now().to_rfc3339();
+        tx.execute(
+            super::queries::UPDATE_JOURNAL_ENTRY_BODY,
+            params![body, entry_id],
+        )?;
+        tx.execute(super::queries::TOUCH_JOURNAL_NOTE, params![&now, note_id])?;
+        tx.commit()?;
         Ok(())
     }
 

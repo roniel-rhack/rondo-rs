@@ -309,13 +309,40 @@ impl AppState {
                 if self.ui.page == Page::Journal {
                     self.modals.journal_editor_open = true;
                     self.modals.journal_editor_buf.clear();
+                    self.modals.journal_editor_entry_id = None;
                     self.ui.mode = Mode::Insert;
+                }
+            }
+            Action::JournalEditFocusedEntry => {
+                if self.ui.page == Page::Journal && !self.data.journal_entries.is_empty() {
+                    let idx = self
+                        .data
+                        .selected_journal_entry
+                        .min(self.data.journal_entries.len() - 1);
+                    let entry = &self.data.journal_entries[idx];
+                    self.modals.journal_editor_buf = entry.body.clone();
+                    self.modals.journal_editor_entry_id = Some(entry.id);
+                    self.modals.journal_editor_open = true;
+                    self.ui.mode = Mode::Insert;
+                }
+            }
+            Action::JournalNextEntry => {
+                let n = self.data.journal_entries.len();
+                if n > 0 {
+                    self.data.selected_journal_entry =
+                        (self.data.selected_journal_entry + 1).min(n - 1);
+                }
+            }
+            Action::JournalPrevEntry => {
+                if self.data.selected_journal_entry > 0 {
+                    self.data.selected_journal_entry -= 1;
                 }
             }
             Action::JournalSubmitEntry => self.submit_journal_entry(),
             Action::JournalCancelEntry => {
                 self.modals.journal_editor_open = false;
                 self.modals.journal_editor_buf.clear();
+                self.modals.journal_editor_entry_id = None;
                 self.ui.mode = Mode::Normal;
             }
             Action::JournalToggleHidden => {
@@ -346,6 +373,8 @@ impl AppState {
             Action::JournalDeleteEntry => {
                 self.delete_focused_journal_entry();
             }
+            Action::JournalNextDay => self.move_journal_day(1),
+            Action::JournalPrevDay => self.move_journal_day(-1),
             Action::SetSortOrder(order) => {
                 self.ui.sort_order = order;
                 self.modals.sort_overlay_open = false;
@@ -521,7 +550,15 @@ impl AppState {
                 }
             }
             Action::EscapeContext => {
-                if self.modals.plugins_overlay_open {
+                if self.modals.plugin_page.is_some() {
+                    // Notify plugin its page is hiding.
+                    if let Some(id) = self.modals.plugin_page.take() {
+                        let ctx = rondo_plugin_api::PluginContext::new(&id);
+                        if let Some(p) = self.plugins.get_mut(&id) {
+                            let _ = p.handle(rondo_plugin_api::PluginAction::Hide, &ctx);
+                        }
+                    }
+                } else if self.modals.plugins_overlay_open {
                     self.modals.plugins_overlay_open = false;
                 } else if self.modals.help_open {
                     self.modals.help_open = false;
@@ -739,23 +776,33 @@ impl AppState {
                 }
             }
             Page::Journal => {
-                if self.data.journal_notes.is_empty() {
-                    return;
-                }
-                let len = self.data.journal_notes.len() as i32;
-                let next = (self.data.selected_journal as i32 + delta).rem_euclid(len);
-                self.data.selected_journal = next as usize;
-                self.data
-                    .journal_list_state
-                    .select(Some(self.data.selected_journal));
-                if let Ok(e) = self
-                    .data
-                    .store
-                    .entries_for_note(self.data.journal_notes[self.data.selected_journal].id)
-                {
-                    self.data.journal_entries = e;
+                // j/k cycles entries within the focused day.
+                if !self.data.journal_entries.is_empty() {
+                    let len = self.data.journal_entries.len() as i32;
+                    let next = (self.data.selected_journal_entry as i32 + delta).rem_euclid(len);
+                    self.data.selected_journal_entry = next as usize;
                 }
             }
+        }
+    }
+
+    fn move_journal_day(&mut self, delta: i32) {
+        if self.data.journal_notes.is_empty() {
+            return;
+        }
+        let len = self.data.journal_notes.len() as i32;
+        let next = (self.data.selected_journal as i32 + delta).rem_euclid(len);
+        self.data.selected_journal = next as usize;
+        self.data
+            .journal_list_state
+            .select(Some(self.data.selected_journal));
+        self.data.selected_journal_entry = 0;
+        if let Ok(e) = self
+            .data
+            .store
+            .entries_for_note(self.data.journal_notes[self.data.selected_journal].id)
+        {
+            self.data.journal_entries = e;
         }
     }
 
@@ -916,38 +963,57 @@ impl AppState {
 
     fn submit_journal_entry(&mut self) {
         let body = std::mem::take(&mut self.modals.journal_editor_buf);
+        let editing_id = self.modals.journal_editor_entry_id.take();
         self.modals.journal_editor_open = false;
         self.ui.mode = Mode::Normal;
         if body.trim().is_empty() {
             return;
         }
-        match self.data.store.create_or_get_today_note() {
-            Ok(note) => match self.data.store.add_journal_entry(note.id, &body) {
+        match editing_id {
+            Some(id) => match self.data.store.update_journal_entry(id, &body) {
                 Ok(_) => {
-                    self.data.refresh_journal_notes();
-                    // Jump cursor to today's note (newest).
-                    if let Some(pos) = self.data.journal_notes.iter().position(|n| n.id == note.id)
-                    {
-                        self.data.selected_journal = pos;
-                        self.data.journal_list_state.select(Some(pos));
-                        self.data.reload_journal_entries();
-                    }
-                    self.toast("entry saved".to_string());
+                    self.data.reload_journal_entries();
+                    self.toast(format!("entry #{} updated", id));
                 }
+                Err(e) => self.toast(format!("update failed: {}", e)),
+            },
+            None => match self.data.store.create_or_get_today_note() {
+                Ok(note) => match self.data.store.add_journal_entry(note.id, &body) {
+                    Ok(_) => {
+                        self.data.refresh_journal_notes();
+                        if let Some(pos) =
+                            self.data.journal_notes.iter().position(|n| n.id == note.id)
+                        {
+                            self.data.selected_journal = pos;
+                            self.data.journal_list_state.select(Some(pos));
+                            self.data.reload_journal_entries();
+                        }
+                        self.toast("entry saved".to_string());
+                    }
+                    Err(e) => self.toast(format!("save failed: {}", e)),
+                },
                 Err(e) => self.toast(format!("save failed: {}", e)),
             },
-            Err(e) => self.toast(format!("save failed: {}", e)),
         }
     }
 
     fn delete_focused_journal_entry(&mut self) {
-        let entry_id = match self.data.journal_entries.last() {
-            Some(e) => e.id,
-            None => return,
-        };
+        if self.data.journal_entries.is_empty() {
+            return;
+        }
+        let idx = self
+            .data
+            .selected_journal_entry
+            .min(self.data.journal_entries.len() - 1);
+        let entry_id = self.data.journal_entries[idx].id;
         match self.data.store.delete_entry(entry_id) {
             Ok(_) => {
                 self.data.reload_journal_entries();
+                if self.data.selected_journal_entry >= self.data.journal_entries.len()
+                    && !self.data.journal_entries.is_empty()
+                {
+                    self.data.selected_journal_entry = self.data.journal_entries.len() - 1;
+                }
                 self.toast(format!("deleted entry #{}", entry_id));
             }
             Err(e) => self.toast(format!("delete failed: {}", e)),
@@ -969,10 +1035,28 @@ impl AppState {
             }
             "plugins" => self.modals.plugins_overlay_open = true,
             "help" => self.modals.help_open = true,
+            "calendar" => self.open_plugin_page("builtin.calendar"),
+            "focus" | "focus-page" => self.open_plugin_page("builtin.focus-page"),
+            "deps" | "dep-graph" => self.open_plugin_page("builtin.dep-graph"),
+            "analytics" => self.open_plugin_page("builtin.analytics"),
             "quit" => self.should_quit = true,
             "" => {}
             other => self.status_msg = Some(format!("unknown: {}", other)),
         }
+    }
+
+    fn open_plugin_page(&mut self, id: &str) {
+        let exists = self.plugins.iter_manifests().any(|m| m.id == id);
+        if !exists {
+            self.toast(format!("plugin not registered: {}", id));
+            return;
+        }
+        // Dispatch a Show so plugins with internal state flip to "active".
+        let ctx = rondo_plugin_api::PluginContext::new(id);
+        if let Some(plugin) = self.plugins.get_mut(id) {
+            let _ = plugin.handle(rondo_plugin_api::PluginAction::Show, &ctx);
+        }
+        self.modals.plugin_page = Some(id.to_string());
     }
 
     /// Insert a `focus_sessions` row for the just-opened pomodoro. No-op when

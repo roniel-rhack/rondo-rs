@@ -17,6 +17,9 @@ pub struct DataState {
     pub journal_entries: Vec<Entry>,
     pub selected_journal: usize,
     pub journal_list_state: ListState,
+    /// Index into `journal_entries` for the currently focused entry (used
+    /// for "edit this entry" and "delete this entry" actions).
+    pub selected_journal_entry: usize,
     pub active_filter: Filter,
     pub journal_show_hidden: bool,
 }
@@ -49,6 +52,7 @@ impl DataState {
             journal_entries,
             selected_journal: 0,
             journal_list_state,
+            selected_journal_entry: 0,
             active_filter: Filter::Inbox,
             journal_show_hidden: false,
         })
@@ -155,6 +159,11 @@ impl DataState {
             if let Ok(e) = self.store.entries_for_note(n.id) {
                 self.journal_entries = e;
             }
+        }
+        if self.journal_entries.is_empty() {
+            self.selected_journal_entry = 0;
+        } else if self.selected_journal_entry >= self.journal_entries.len() {
+            self.selected_journal_entry = self.journal_entries.len() - 1;
         }
     }
 

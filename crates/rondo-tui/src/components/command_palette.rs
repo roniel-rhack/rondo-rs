@@ -77,6 +77,22 @@ fn filter_suggestions(buf: &str) -> Vec<&'static Suggestion> {
             desc: "list installed plugins + capabilities",
         },
         Suggestion {
+            cmd: "calendar",
+            desc: "open calendar plugin (journal-driven mini-month)",
+        },
+        Suggestion {
+            cmd: "focus",
+            desc: "open focus heatmap plugin (5w×7d)",
+        },
+        Suggestion {
+            cmd: "deps",
+            desc: "open dependency graph plugin",
+        },
+        Suggestion {
+            cmd: "analytics",
+            desc: "open analytics dashboard plugin",
+        },
+        Suggestion {
             cmd: "help",
             desc: "open key-bindings reference",
         },

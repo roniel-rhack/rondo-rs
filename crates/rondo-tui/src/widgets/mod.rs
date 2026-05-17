@@ -6,3 +6,4 @@ pub mod priority_spine;
 pub mod progress_bar;
 pub mod ring;
 pub mod sparkline;
+pub mod viewspec;

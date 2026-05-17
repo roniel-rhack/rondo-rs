@@ -73,6 +73,11 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
     if app.modals.plugins_overlay_open {
         components::plugins_overlay::draw(app, f, centered(86, 40, area));
     }
+    if app.modals.plugin_page.is_some() {
+        let w = (area.width.saturating_sub(8)).min(120);
+        let h = area.height.saturating_sub(4);
+        components::plugin_page::draw(app, f, centered(w, h, area));
+    }
 
     // Run live effects after all widgets have painted; effects mutate cells in
     // place to produce fades/sweeps/dissolves.

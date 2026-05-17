@@ -120,6 +120,11 @@ pub const UNHIDE_JOURNAL_NOTE: &str = "UPDATE journal_notes SET hidden = 0 WHERE
 
 pub const DELETE_JOURNAL_ENTRY: &str = "DELETE FROM journal_entries WHERE id = ?1";
 
+pub const UPDATE_JOURNAL_ENTRY_BODY: &str =
+    "UPDATE journal_entries SET body = ?1 WHERE id = ?2";
+
+pub const NOTE_ID_FOR_ENTRY: &str = "SELECT note_id FROM journal_entries WHERE id = ?1";
+
 pub const LIST_ALL_JOURNAL_NOTES: &str = r#"
 SELECT id, date, hidden, created_at, updated_at
 FROM journal_notes ORDER BY date DESC LIMIT 365

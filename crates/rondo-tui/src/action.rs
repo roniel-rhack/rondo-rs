@@ -62,6 +62,11 @@ pub enum Action {
     JournalGotoTop,
     JournalGotoBottom,
     JournalDeleteEntry,
+    JournalEditFocusedEntry,
+    JournalNextEntry,
+    JournalPrevEntry,
+    JournalNextDay,
+    JournalPrevDay,
 
     OpenSortOverlay,
     CloseSortOverlay,

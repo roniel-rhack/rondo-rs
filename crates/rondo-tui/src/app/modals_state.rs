@@ -27,6 +27,9 @@ pub struct ModalsState {
     pub quick_add_buf: String,
     pub journal_editor_open: bool,
     pub journal_editor_buf: String,
+    /// If `Some(id)`, the journal editor is editing an existing entry and
+    /// submit will UPDATE rather than INSERT. `None` = new entry.
+    pub journal_editor_entry_id: Option<i64>,
     pub sort_overlay_open: bool,
     pub confirm_delete_open: bool,
     pub edit_title_open: bool,
@@ -37,6 +40,9 @@ pub struct ModalsState {
     pub dep_overlay_buf: String,
     pub dep_overlay_mode: DepOverlayMode,
     pub plugins_overlay_open: bool,
+    /// If `Some(id)`, render the named plugin's last `Show` response
+    /// full-screen as a page overlay. Set via `:<plugin>` commands.
+    pub plugin_page: Option<String>,
 }
 
 impl Default for ModalsState {
@@ -57,6 +63,7 @@ impl Default for ModalsState {
             quick_add_buf: String::new(),
             journal_editor_open: false,
             journal_editor_buf: String::new(),
+            journal_editor_entry_id: None,
             sort_overlay_open: false,
             confirm_delete_open: false,
             edit_title_open: false,
@@ -67,6 +74,7 @@ impl Default for ModalsState {
             dep_overlay_buf: String::new(),
             dep_overlay_mode: DepOverlayMode::Add,
             plugins_overlay_open: false,
+            plugin_page: None,
         }
     }
 }
@@ -87,6 +95,7 @@ impl ModalsState {
             || self.add_subtask_open
             || self.dep_overlay_open
             || self.plugins_overlay_open
+            || self.plugin_page.is_some()
     }
 
     /// Pure modal mutations that don't need cross-substate access.

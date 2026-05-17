@@ -35,20 +35,32 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         .data
         .journal_notes
         .iter()
-        .map(|n| {
+        .enumerate()
+        .map(|(i, n)| {
+            let is_cursor = i == app.data.selected_journal;
             let label = smart_date_label(n.date);
+            let cursor_mark = if is_cursor { "▌" } else { " " };
+            let label_style = if is_cursor {
+                Style::default()
+                    .fg(t.accent)
+                    .add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
+            } else {
+                Style::default().fg(t.fg)
+            };
             ListItem::new(Line::from(vec![
-                Span::styled(format!(" {:<10} ", label), Style::default().fg(t.accent)),
                 Span::styled(
-                    n.date.format("%Y-%m-%d").to_string(),
+                    cursor_mark,
+                    Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(format!(" {:<10}", label), label_style),
+                Span::styled(
+                    n.date.format(" %Y-%m-%d").to_string(),
                     Style::default().fg(t.fg_muted),
                 ),
             ]))
         })
         .collect();
-    let list = List::new(items)
-        .block(t.panel("Days", false))
-        .highlight_style(t.selection());
+    let list = List::new(items).block(t.panel("Days", true));
     f.render_stateful_widget(list, chunks[0], &mut app.data.journal_list_state);
 
     let mut content_lines: Vec<Line> = Vec::new();
@@ -72,6 +84,10 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
             )));
         }
         let body_width = chunks[1].width.saturating_sub(4) as usize;
+        let cursor_idx = app
+            .data
+            .selected_journal_entry
+            .min(app.data.journal_entries.len().saturating_sub(1));
         for (i, entry) in app.data.journal_entries.iter().enumerate() {
             if i > 0 {
                 content_lines.push(Line::raw(""));
@@ -81,17 +97,24 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
                 )));
                 content_lines.push(Line::raw(""));
             }
+            let is_focused = i == cursor_idx;
+            let gutter = if is_focused { "▌ ◷ " } else { "  ◷ " };
+            let time_style = if is_focused {
+                Style::default()
+                    .fg(t.accent)
+                    .add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
+            } else {
+                Style::default().fg(t.accent).add_modifier(Modifier::BOLD)
+            };
             content_lines.push(Line::from(vec![
-                Span::styled("  ◷ ", Style::default().fg(t.accent)),
+                Span::styled(gutter, Style::default().fg(t.accent)),
                 Span::styled(
                     entry
                         .created_at
                         .with_timezone(&Local)
                         .format("%H:%M")
                         .to_string(),
-                    Style::default()
-                        .fg(t.accent)
-                        .add_modifier(Modifier::BOLD),
+                    time_style,
                 ),
                 Span::styled(
                     format!("  · #{}", entry.id),
@@ -121,18 +144,26 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
 
 pub fn draw_editor_overlay(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
-    let h = 6.min(area.height.saturating_sub(2)).max(3);
+    // Take most of the available height so multi-line entries stay visible.
+    // Leave 2 rows of margin and 1 hint row inside.
+    let h = area.height.saturating_sub(4).max(8);
+    let w = area.width.saturating_sub(4);
     let editor_rect = Rect {
         x: area.x + 2,
-        y: area.y + area.height.saturating_sub(h + 1),
-        width: area.width.saturating_sub(4),
+        y: area.y + 2,
+        width: w,
         height: h,
     };
     f.render_widget(Clear, editor_rect);
+    let title = if app.modals.journal_editor_entry_id.is_some() {
+        " ✎ edit entry "
+    } else {
+        " + journal entry "
+    };
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(t.border_style(true))
-        .title(Span::styled(" + journal entry ", t.accent_style()));
+        .title(Span::styled(title, t.accent_style()));
     let inner = block.inner(editor_rect);
     f.render_widget(block, editor_rect);
 
@@ -151,16 +182,28 @@ pub fn draw_editor_overlay(app: &AppState, f: &mut Frame<'_>, area: Rect) {
             Style::default().fg(t.fg).add_modifier(Modifier::SLOW_BLINK),
         ));
     }
-    lines.push(Line::from(vec![
+    // Auto-scroll: reserve 1 row for the hint at bottom, take the last N
+    // lines so the cursor row stays visible no matter how much was typed.
+    let visible_rows = inner.height.saturating_sub(1) as usize;
+    let body_lines = if lines.len() > visible_rows {
+        lines.split_off(lines.len() - visible_rows)
+    } else {
+        lines
+    };
+    let mut all = body_lines;
+    all.push(Line::raw(""));
+    all.push(Line::from(vec![
         Span::styled("  ", t.muted()),
         Span::styled("Ctrl+S", t.kbd()),
         Span::styled(" save · ", t.muted()),
         Span::styled("Esc", t.kbd()),
         Span::styled(" cancel · ", t.muted()),
         Span::styled("Enter", t.kbd()),
-        Span::styled(" newline", t.muted()),
+        Span::styled(" newline · ", t.muted()),
+        Span::styled("# **md**", t.muted()),
+        Span::styled(" supported ", t.muted()),
     ]));
-    f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+    f.render_widget(Paragraph::new(all).wrap(Wrap { trim: false }), inner);
 }
 
 fn smart_date_label(date: NaiveDate) -> String {

@@ -109,6 +109,26 @@ fn add_tag_undo_via_remove() {
     assert_eq!(store.task_by_id(t.id).unwrap().tags, before_tags);
 }
 
+#[test]
+fn add_dependency_cycle_reports_endpoints() {
+    let (_f, store) = fixture();
+    let mut tasks = store.list_tasks().unwrap().into_iter();
+    let a = tasks.next().unwrap();
+    let b = tasks.next().unwrap();
+    // a is blocked by b; trying to make b blocked by a forms the cycle.
+    store.add_dependency(a.id, b.id).unwrap();
+    let err = store
+        .add_dependency(b.id, a.id)
+        .expect_err("should refuse cycle");
+    match err {
+        rondo_core::error::Error::CycleDetected(x, y) => {
+            assert_eq!(x, b.id);
+            assert_eq!(y, a.id);
+        }
+        other => panic!("expected CycleDetected, got {other:?}"),
+    }
+}
+
 // ----- A4: per-kind round-trips for the new payload-bearing UndoKinds ----
 
 #[test]

@@ -1572,7 +1572,16 @@ impl AppState {
 
     fn handle_command(&mut self, cmd: String) {
         self.modals.command_palette_open = false;
-        match cmd.trim() {
+        let trimmed = cmd.trim();
+        if let Some(rest) = trimmed.strip_prefix("theme ") {
+            self.switch_theme(rest.trim());
+            return;
+        }
+        if trimmed == "theme" {
+            self.toast("usage: :theme dark|light|high-contrast".to_string());
+            return;
+        }
+        match trimmed {
             "tasks" => self.ui.page = Page::Tasks,
             "journal" => self.ui.page = Page::Journal,
             "pomodoro" => {
@@ -1593,6 +1602,13 @@ impl AppState {
             "" => {}
             other => self.status_msg = Some(format!("unknown: {}", other)),
         }
+    }
+
+    fn switch_theme(&mut self, name: &str) {
+        let resolved = crate::theme::Theme::by_name(name);
+        let applied = resolved.name();
+        self.theme = resolved;
+        self.toast(format!("theme: {}", applied));
     }
 
     fn open_plugin_page(&mut self, id: &str) {

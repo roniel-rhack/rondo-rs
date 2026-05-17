@@ -93,6 +93,10 @@ fn filter_suggestions(buf: &str) -> Vec<&'static Suggestion> {
             desc: "open analytics dashboard plugin",
         },
         Suggestion {
+            cmd: "theme",
+            desc: "switch theme: theme dark|light|high-contrast",
+        },
+        Suggestion {
             cmd: "help",
             desc: "open key-bindings reference",
         },

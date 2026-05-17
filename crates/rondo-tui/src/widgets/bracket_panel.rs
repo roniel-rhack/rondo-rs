@@ -114,15 +114,13 @@ impl<'a> Widget for BracketPanel<'a> {
             if badge_len < area.width.saturating_sub(8) {
                 let start = x1.saturating_sub(badge_len);
                 let badge_style = Style::default().fg(t.fg_muted);
-                let mut bx = start;
-                for ch in badge_text.chars() {
+                for (bx, ch) in (start..).zip(badge_text.chars()) {
                     if bx >= x1 {
                         break;
                     }
                     buf[(bx, y0)]
                         .set_symbol(&ch.to_string())
                         .set_style(badge_style);
-                    bx += 1;
                 }
             }
         }

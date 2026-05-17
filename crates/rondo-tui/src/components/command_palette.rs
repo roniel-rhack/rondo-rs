@@ -100,6 +100,10 @@ static ALL: &[Suggestion] = &[
         desc: "group task list: group priority|status|due|none",
     },
     Suggestion {
+        cmd: "lang",
+        desc: "switch UI language",
+    },
+    Suggestion {
         cmd: "help",
         desc: "open key-bindings reference",
     },

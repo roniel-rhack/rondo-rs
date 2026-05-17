@@ -145,6 +145,14 @@ pub enum Action {
 
     Undo,
 
+    OpenLangPicker,
+    CloseLangPicker,
+    LangPickerMoveUp,
+    LangPickerMoveDown,
+    /// Apply the highlighted pack: persist `[ui].language`, swap the active
+    /// `Translations`, close the picker.
+    LangPickerApply,
+
     Error(String),
 }
 

@@ -15,6 +15,7 @@ pub fn map(ev: Event, app: &AppState) -> Option<Action> {
     // global bindings remain active while a pomodoro is running.
     if let Some(layer) = app.modals.top_modal() {
         match layer {
+            ModalLayer::LangPicker => return lang_picker_key(ev),
             ModalLayer::EditRecurrence => return edit_recurrence_key(ev),
             ModalLayer::EditDueDate => return edit_due_date_key(ev, app),
             ModalLayer::NoteEditor => return note_editor_key(ev),
@@ -134,6 +135,19 @@ fn journal_editor_key(ev: Event, _app: &AppState) -> Option<Action> {
         _ => {}
     }
     Some(Action::JournalEditorKey(k))
+}
+
+fn lang_picker_key(ev: Event) -> Option<Action> {
+    let Event::Key(k) = ev else {
+        return None;
+    };
+    Some(match k.code {
+        KeyCode::Esc | KeyCode::Char('q') => Action::CloseLangPicker,
+        KeyCode::Up | KeyCode::Char('k') => Action::LangPickerMoveUp,
+        KeyCode::Down | KeyCode::Char('j') => Action::LangPickerMoveDown,
+        KeyCode::Enter => Action::LangPickerApply,
+        _ => return None,
+    })
 }
 
 fn sort_overlay_key(ev: Event) -> Option<Action> {

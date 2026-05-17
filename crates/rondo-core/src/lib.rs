@@ -4,6 +4,7 @@ pub mod config;
 pub mod domain;
 pub mod error;
 pub mod export;
+pub mod i18n;
 pub mod recurrence;
 pub mod store;
 pub mod telemetry;

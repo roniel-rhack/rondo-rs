@@ -135,7 +135,8 @@ fn main() -> Result<()> {
     } else {
         Theme::by_name(theme_name)
     };
-    app.lang = cfg.lang.name;
+    app.lang = rondo_tui::strings::Lang::from_code(&cfg.ui.language);
+    load_active_language_pack(&cfg.ui.language);
     app.fx = FxManager::new_with_options(reduced);
     register_builtin_plugins(&mut app);
     load_external_plugins(&mut app);
@@ -170,6 +171,28 @@ fn load_external_plugins(app: &mut AppState) {
         }
         Ok(_) => {}
         Err(e) => tracing::warn!("failed to scan {}: {}", dir.display(), e),
+    }
+}
+
+/// Apply the user's configured language pack to the process-global
+/// `rondo_core::i18n` state. Unknown codes and parse failures leave the
+/// English baseline active and emit a `tracing::warn`.
+fn load_active_language_pack(code: &str) {
+    if code == "en" {
+        rondo_core::i18n::set_active(rondo_core::i18n::builtin_en());
+        return;
+    }
+    let path = rondo_core::i18n::pack_path(code);
+    match rondo_core::i18n::load_pack(&path) {
+        Ok(pack) => rondo_core::i18n::set_active(pack),
+        Err(e) => {
+            tracing::warn!(
+                "language pack `{}` failed to load ({}); falling back to en",
+                code,
+                e
+            );
+            rondo_core::i18n::set_active(rondo_core::i18n::builtin_en());
+        }
     }
 }
 

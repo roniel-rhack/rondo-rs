@@ -19,6 +19,7 @@ tracing-subscriber = { workspace = true }
 tracing-appender = "0.2"
 toml = "0.8"
 getrandom = "0.2"
+arc-swap = "1"
 
 [dev-dependencies]
 tempfile = "3.10"

@@ -4,21 +4,16 @@ use tachyonfx::{Effect, Shader};
 
 /// Force any ratatui Color into a concrete Color::Rgb (tachyonfx requires
 /// Into<Color> on concrete RGB; named variants like Reset would fail HSL math).
+///
+/// All app palette colors are already `Color::Rgb` (see `theme.rs`), so the
+/// fast path is a passthrough. Anything else falls back to a neutral gray
+/// instead of trying to translate named ANSI palette entries to RGB — those
+/// are terminal-dependent and the per-name mapping was dead code.
 pub fn rgb_color(c: Color) -> Color {
-    let [r, g, b] = match c {
-        Color::Rgb(r, g, b) => [r, g, b],
-        Color::Reset | Color::Black => [0, 0, 0],
-        Color::White => [255, 255, 255],
-        Color::Red => [200, 60, 60],
-        Color::Green => [60, 180, 90],
-        Color::Yellow => [220, 180, 60],
-        Color::Blue => [60, 100, 200],
-        Color::Magenta => [180, 60, 180],
-        Color::Cyan => [60, 200, 220],
-        Color::Gray | Color::DarkGray => [120, 120, 120],
-        _ => [180, 180, 180],
-    };
-    Color::Rgb(r, g, b)
+    match c {
+        Color::Rgb(..) => c,
+        _ => Color::Rgb(180, 180, 180),
+    }
 }
 
 /// Identifies a live effect so callers can replace or query specific ones.

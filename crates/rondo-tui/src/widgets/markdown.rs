@@ -35,8 +35,10 @@ pub fn render(md: &str, theme: &Theme) -> Text<'static> {
 
     let heading_prefix = |lvl: u8| -> &'static str {
         match lvl {
-            1 => "▍▍ ",
-            2 => "▎ ",
+            1 => "█ ",
+            2 => "▆ ",
+            3 => "▍ ",
+            4 => "▎ ",
             _ => "▏ ",
         }
     };
@@ -45,12 +47,18 @@ pub fn render(md: &str, theme: &Theme) -> Text<'static> {
         match lvl {
             1 => Style::default()
                 .fg(theme.accent)
-                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+                .bg(theme.surface)
+                .add_modifier(Modifier::BOLD),
             2 => Style::default()
                 .fg(theme.accent)
-                .add_modifier(Modifier::BOLD),
-            3 => Style::default().fg(theme.warn).add_modifier(Modifier::BOLD),
-            _ => Style::default().fg(theme.fg).add_modifier(Modifier::BOLD),
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+            3 => Style::default()
+                .fg(theme.warn)
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+            4 => Style::default().fg(theme.warn).add_modifier(Modifier::BOLD),
+            _ => Style::default()
+                .fg(theme.fg)
+                .add_modifier(Modifier::BOLD | Modifier::DIM),
         }
     };
 
@@ -73,6 +81,19 @@ pub fn render(md: &str, theme: &Theme) -> Text<'static> {
             }
             Event::End(TagEnd::Heading(_)) => {
                 flush_buf(&mut buf, &mut lines);
+                if let Some(lvl) = in_heading {
+                    if lvl == 1 {
+                        lines.push(Line::from(Span::styled(
+                            "━".repeat(40),
+                            Style::default().fg(theme.accent),
+                        )));
+                    } else if lvl == 2 {
+                        lines.push(Line::from(Span::styled(
+                            "─".repeat(28),
+                            Style::default().fg(theme.border_inactive),
+                        )));
+                    }
+                }
                 lines.push(Line::raw(""));
                 in_heading = None;
                 style = base;

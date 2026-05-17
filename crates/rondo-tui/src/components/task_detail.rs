@@ -441,6 +441,11 @@ fn section_header(
     width: usize,
     t: &Theme,
 ) {
+    let bar_style = if active {
+        Style::default().fg(t.accent).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(t.border_inactive)
+    };
     let label_style = if active {
         Style::default()
             .fg(t.accent)
@@ -449,17 +454,20 @@ fn section_header(
         Style::default().fg(t.accent).add_modifier(Modifier::BOLD)
     };
     let mut spans = vec![
-        Span::raw("  "),
-        Span::styled(label.to_uppercase(), label_style),
+        Span::styled("▌ ", bar_style),
+        Span::styled(format!("§ {}", label.to_uppercase()), label_style),
     ];
-    let mut used = 2 + label.chars().count();
+    let mut used = 2 + 2 + label.chars().count();
     if let Some(c) = count {
-        spans.push(Span::raw("  "));
-        spans.push(Span::styled(c.to_string(), Style::default().fg(t.fg_muted)));
-        used += 2 + c.chars().count();
+        spans.push(Span::styled("  ", Style::default()));
+        spans.push(Span::styled(
+            format!("({})", c),
+            Style::default().fg(t.fg_muted),
+        ));
+        used += 2 + c.chars().count() + 2;
     }
-    spans.push(Span::raw("  "));
-    used += 2;
+    spans.push(Span::raw(" "));
+    used += 1;
     let dash_count = width.saturating_sub(used + 2);
     spans.push(Span::styled(
         "─".repeat(dash_count),

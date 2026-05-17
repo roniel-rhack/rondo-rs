@@ -604,6 +604,77 @@ impl SqliteStore {
         Ok(())
     }
 
+    /// Re-insert a deleted task with its full sub-tree (subtasks, tags,
+    /// notes, time logs, dependency edges), preserving the original id
+    /// for every row. Used by `apply_undo` on `UndoKind::Delete`.
+    ///
+    /// All inserts run in a single transaction. Rows are inserted with
+    /// `INSERT OR REPLACE` so re-applying onto an existing id is safe
+    /// (idempotent restore).
+    pub fn restore_task(&self, task: &crate::domain::task::Task) -> Result<()> {
+        let metadata_json =
+            serde_json::to_string(&task.metadata).unwrap_or_else(|_| "{}".to_string());
+        let due = task.due_date.map(|d| d.format("%Y-%m-%d").to_string());
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        tx.execute(
+            super::queries::RESTORE_TASK,
+            params![
+                task.id,
+                task.title,
+                task.description,
+                task.status as i64,
+                task.priority as i64,
+                due,
+                task.created_at.to_rfc3339(),
+                task.recur_freq as i64,
+                task.recur_interval,
+                metadata_json,
+            ],
+        )?;
+        for tag in &task.tags {
+            tx.execute(super::queries::INSERT_TAG, params![task.id, tag])?;
+        }
+        for sub in &task.subtasks {
+            tx.execute(
+                super::queries::RESTORE_SUBTASK,
+                params![sub.id, sub.task_id, sub.title, sub.completed as i64, sub.position],
+            )?;
+        }
+        for note in &task.notes {
+            tx.execute(
+                super::queries::RESTORE_TASK_NOTE,
+                params![note.id, note.task_id, note.body, note.created_at.to_rfc3339()],
+            )?;
+        }
+        for log in &task.time_logs {
+            tx.execute(
+                super::queries::RESTORE_TIME_LOG,
+                params![
+                    log.id,
+                    log.task_id,
+                    log.duration_secs,
+                    log.note,
+                    log.logged_at.to_rfc3339(),
+                ],
+            )?;
+        }
+        for blocker in &task.blocked_by_ids {
+            tx.execute(
+                super::queries::INSERT_DEPENDENCY,
+                params![task.id, blocker],
+            )?;
+        }
+        for blocked in &task.blocks_ids {
+            tx.execute(
+                super::queries::INSERT_DEPENDENCY,
+                params![blocked, task.id],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
     /// Re-insert a journal day note plus all its entries, preserving ids.
     pub fn restore_journal_day(
         &self,

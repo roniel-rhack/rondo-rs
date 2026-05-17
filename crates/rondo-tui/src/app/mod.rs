@@ -473,16 +473,14 @@ impl AppState {
     /// Apply the inverse of a captured mutation. Called from the `Undo`
     /// action handler; never pushes onto the undo stack itself.
     ///
-    /// Known limitation: `Delete` undo re-creates the row via
-    /// `create_task`, which produces a **new** id. Subtasks, tags
-    /// beyond the initial set, time logs, and notes attached to the
-    /// original are NOT restored — only the core task plus initial
-    /// tags from `NewTask`. Dependency edges are also lost.
+    /// `Delete` undo restores the full sub-tree (subtasks, tags, time
+    /// logs, notes, dep edges) with the original ids via
+    /// `SqliteStore::restore_task`.
     fn apply_undo(
         &mut self,
         snap: rondo_core::domain::task::UndoSnapshot,
     ) -> rondo_core::Result<()> {
-        use rondo_core::domain::task::{NewTask, TaskPatch, UndoKind};
+        use rondo_core::domain::task::{TaskPatch, UndoKind};
         let kind = snap.kind.clone();
         match kind {
             UndoKind::Create => {
@@ -506,17 +504,11 @@ impl AppState {
             }
             UndoKind::Delete => {
                 if let Some(before) = snap.task_before {
-                    let new = NewTask {
-                        title: before.title.clone(),
-                        description: before.description.clone(),
-                        status: before.status,
-                        priority: before.priority,
-                        due_date: before.due_date,
-                        recur_freq: before.recur_freq,
-                        recur_interval: before.recur_interval,
-                        tags: before.tags.clone(),
-                    };
-                    self.data.store.create_task(new)?;
+                    // Use `restore_task` so the original id, subtasks,
+                    // tags, time-logs, notes, and dependency edges are
+                    // all reinstated — `create_task` would mint a new id
+                    // and drop everything but the bare task row.
+                    self.data.store.restore_task(&before)?;
                 }
             }
             UndoKind::SetStatus => {

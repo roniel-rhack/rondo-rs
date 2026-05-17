@@ -35,8 +35,8 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-rondo-plugin-api = { git = "https://github.com/roniel-rondo/rondo-rust", default-features = false }
-# or path = "/path/to/rondo-rust/crates/rondo-plugin-api"
+rondo-plugin-api = { git = "https://github.com/roniel-rhack/rondo-rs", default-features = false }
+# or path = "/path/to/rondo-rs/crates/rondo-plugin-api"
 extism-pdk = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

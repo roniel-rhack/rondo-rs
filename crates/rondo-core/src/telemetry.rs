@@ -6,7 +6,7 @@ use tracing_appender::non_blocking::WorkerGuard;
 pub fn init_logging(log_dir: PathBuf) -> std::io::Result<WorkerGuard> {
     std::fs::create_dir_all(&log_dir)?;
     let ts = chrono::Utc::now().format("%Y%m%d-%H%M%S");
-    let filename = format!("rondo-rust-{}.log", ts);
+    let filename = format!("rondo-rs-{}.log", ts);
     let appender = tracing_appender::rolling::never(&log_dir, &filename);
     let (writer, guard) = tracing_appender::non_blocking(appender);
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()

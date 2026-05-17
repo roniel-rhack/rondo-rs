@@ -47,8 +47,8 @@ binary's `~/.todo-app/`.
 Requires Rust 1.83 (toolchain pinned via `rust-toolchain.toml`).
 
 ```bash
-git clone https://github.com/roniel-rondo/rondo-rust
-cd rondo-rust
+git clone https://github.com/roniel-rhack/rondo-rs
+cd rondo-rs
 cargo build --release
 ./target/release/rondo-tui
 ```
@@ -207,7 +207,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-rondo-plugin-api = { git = "https://github.com/roniel-rondo/rondo-rust", default-features = false }
+rondo-plugin-api = { git = "https://github.com/roniel-rhack/rondo-rs", default-features = false }
 extism-pdk = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -304,7 +304,7 @@ Three sample plugins live in `examples/plugins/`:
 ├── config.toml                   # optional TOML config
 ├── rondo.lock                    # cooperative PID lock (RW mode)
 ├── logs/
-│   └── rondo-rust-YYYYMMDD-HHMMSS.log    # rotation 7 days
+│   └── rondo-rs-YYYYMMDD-HHMMSS.log      # rotation 7 days
 ├── backups/
 │   └── YYYYMMDDTHHMMSSZ-todo.db          # rotation 30 days
 └── plugins/

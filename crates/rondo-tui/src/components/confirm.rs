@@ -6,6 +6,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
+use rondo_core::i18n;
 
 pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
@@ -19,13 +20,13 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         .borders(Borders::ALL)
         .border_style(Style::default().fg(t.danger))
         .title(Span::styled(
-            " delete? ",
+            i18n::t("confirm_delete.title"),
             Style::default().fg(t.danger).add_modifier(Modifier::BOLD),
         ));
     let lines = vec![
         Line::raw(""),
         Line::from(vec![
-            Span::raw("  Delete "),
+            Span::raw(format!("  {} ", i18n::t("confirm_delete.prompt"))),
             Span::styled(
                 format!("\"{}\"", title),
                 Style::default().fg(t.danger).add_modifier(Modifier::BOLD),
@@ -39,12 +40,12 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
                 " y ",
                 Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
             ),
-            Span::raw(" confirm    "),
+            Span::raw(i18n::t("confirm_delete.yes")),
             Span::styled(
                 " n/Esc ",
                 Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
             ),
-            Span::raw(" cancel"),
+            Span::raw(i18n::t("confirm_delete.no")),
         ]),
     ];
     f.render_widget(Paragraph::new(lines).block(block), area);

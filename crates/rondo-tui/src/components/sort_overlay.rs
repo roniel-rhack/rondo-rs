@@ -7,6 +7,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
+use rondo_core::i18n;
 
 pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
@@ -15,7 +16,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         .borders(Borders::ALL)
         .border_style(Style::default().fg(t.accent))
         .title(Span::styled(
-            " sort by ",
+            i18n::t("sort_overlay.title"),
             Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
         ));
     let inner = block.inner(area);

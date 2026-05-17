@@ -8,45 +8,52 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
     Frame,
 };
+use rondo_core::i18n;
 
 pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
     f.render_widget(Clear, area);
     let task = app.data.selected_task();
     let task_title = task.map(|x| x.title.clone()).unwrap_or_default();
-    let mode_label = match app.modals.dep_overlay_mode {
-        DepOverlayMode::Add => "+ dependency",
-        DepOverlayMode::Remove => "- dependency",
+    let title_key = match app.modals.dep_overlay_mode {
+        DepOverlayMode::Add => "dep_overlay.title_add",
+        DepOverlayMode::Remove => "dep_overlay.title_remove",
     };
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(t.border_style(true))
-        .title(Span::styled(format!(" {} ", mode_label), t.accent_style()));
+        .title(Span::styled(i18n::t(title_key), t.accent_style()));
     let inner = block.inner(area);
     f.render_widget(block, area);
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1), // task context
-            Constraint::Length(1), // existing blockers
-            Constraint::Length(1), // input line
-            Constraint::Min(1),    // candidates
-            Constraint::Length(1), // hint
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Min(1),
+            Constraint::Length(1),
         ])
         .split(inner);
 
     let context = Line::from(vec![
-        Span::styled(" task: ", t.muted()),
+        Span::styled(i18n::t("dep_overlay.task_label"), t.muted()),
         Span::styled(task_title, Style::default().fg(t.fg_muted)),
     ]);
     f.render_widget(Paragraph::new(context), chunks[0]);
 
     let existing = task.map(|tk| tk.blocked_by_ids.clone()).unwrap_or_default();
     let existing_line = if existing.is_empty() {
-        Line::from(vec![Span::styled(" blocked by: (none) ", t.muted())])
+        Line::from(vec![Span::styled(
+            i18n::t("dep_overlay.blocked_by_none"),
+            t.muted(),
+        )])
     } else {
-        let mut spans = vec![Span::styled(" blocked by: ", t.muted())];
+        let mut spans = vec![Span::styled(
+            i18n::t("dep_overlay.blocked_by_prefix"),
+            t.muted(),
+        )];
         for (i, id) in existing.iter().enumerate() {
             if i > 0 {
                 spans.push(Span::styled(", ", t.muted()));
@@ -61,8 +68,8 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     f.render_widget(Paragraph::new(existing_line), chunks[1]);
 
     let prompt = match app.modals.dep_overlay_mode {
-        DepOverlayMode::Add => " filter: ",
-        DepOverlayMode::Remove => " enter blocker id to remove: ",
+        DepOverlayMode::Add => i18n::t("dep_overlay.filter_prompt"),
+        DepOverlayMode::Remove => i18n::t("dep_overlay.remove_prompt"),
     };
     let input = Line::from(vec![
         Span::styled(prompt, t.muted()),
@@ -77,7 +84,6 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     ]);
     f.render_widget(Paragraph::new(input), chunks[2]);
 
-    // Candidate list: only in Add mode. Remove mode keeps the numeric flow.
     if matches!(app.modals.dep_overlay_mode, DepOverlayMode::Add) {
         let self_id = app.data.selected_task_id().unwrap_or(-1);
         let mut exclude = existing.clone();
@@ -107,13 +113,13 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let hint = Line::from(vec![
         Span::styled("  ", t.muted()),
         Span::styled("Enter", Style::default().fg(t.accent)),
-        Span::styled(" submit  ", t.muted()),
+        Span::styled(i18n::t("dep_overlay.hint_submit"), t.muted()),
         Span::styled("↑↓", Style::default().fg(t.accent)),
-        Span::styled(" choose  ", t.muted()),
+        Span::styled(i18n::t("dep_overlay.hint_choose"), t.muted()),
         Span::styled("Tab", Style::default().fg(t.accent)),
-        Span::styled(" toggle add/remove  ", t.muted()),
+        Span::styled(i18n::t("dep_overlay.hint_toggle"), t.muted()),
         Span::styled("Esc", Style::default().fg(t.accent)),
-        Span::styled(" cancel", t.muted()),
+        Span::styled(i18n::t("dep_overlay.hint_cancel"), t.muted()),
     ]);
     f.render_widget(Paragraph::new(hint), chunks[4]);
 }

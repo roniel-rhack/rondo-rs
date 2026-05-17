@@ -1,5 +1,4 @@
 use crate::app::AppState;
-use crate::strings::{t as tr, StringKey};
 use chrono::{Local, TimeZone};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -9,6 +8,7 @@ use ratatui::{
     Frame,
 };
 use rondo_core::domain::task::Status;
+use rondo_core::i18n;
 
 /// Single-row brand strip: left = product mark, center = subtitle, right = telemetry.
 pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
@@ -40,10 +40,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
     let subtitle = Line::from(vec![
         Span::styled("// ", Style::default().fg(t.border_inactive)),
-        Span::styled(
-            tr(app.lang, StringKey::HeaderSubtitle),
-            Style::default().fg(t.fg_muted),
-        ),
+        Span::styled(i18n::t("header.subtitle"), Style::default().fg(t.fg_muted)),
         Span::styled(" //", Style::default().fg(t.border_inactive)),
     ]);
     f.render_widget(

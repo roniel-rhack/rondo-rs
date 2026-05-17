@@ -1,7 +1,5 @@
 use crate::app::ui_state::SortOrder;
 use crate::app::{AppState, FlashTarget};
-use crate::strings::Lang;
-use crate::strings::{t as tr, StringKey};
 use crate::theme::Theme;
 use crate::widgets::{
     bracket_panel::BracketPanel, due_badge, priority_badge, priority_spine, ring,
@@ -14,6 +12,7 @@ use ratatui::{
     Frame,
 };
 use rondo_core::domain::task::{Status, Task};
+use rondo_core::i18n;
 
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
@@ -24,7 +23,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     );
     let filter_label = app.data.active_filter.label().to_lowercase();
     let sort_label = app.ui.sort_order.label();
-    let tasks_word = tr(app.lang, StringKey::TasksCount);
+    let tasks_word = i18n::t("task_list.tasks");
     let group_suffix = app
         .ui
         .group_by
@@ -59,11 +58,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
             Line::raw(""),
             Line::raw(""),
             Line::from(Span::styled(
-                format!(
-                    "  {} '{}'",
-                    tr(app.lang, StringKey::TasksEmpty),
-                    filter_label
-                ),
+                format!("  {} '{}'", i18n::t("task_list.empty_for"), filter_label),
                 t.muted(),
             )),
             Line::raw(""),
@@ -71,11 +66,11 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
                 Span::raw("  "),
                 Span::styled("h", t.kbd()),
                 Span::raw(" "),
-                Span::styled(tr(app.lang, StringKey::HintChangeFilter), t.muted()),
+                Span::styled(i18n::t("task_list.hint_change_filter"), t.muted()),
                 Span::raw("    "),
                 Span::styled("?", t.kbd()),
                 Span::raw(" "),
-                Span::styled(tr(app.lang, StringKey::HintHelp), t.muted()),
+                Span::styled(i18n::t("task_list.hint_help"), t.muted()),
             ]),
         ];
         f.render_widget(Paragraph::new(lines), inner);
@@ -92,7 +87,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         ])
         .split(inner);
 
-    draw_column_header(f, layout[0], t, app.lang);
+    draw_column_header(f, layout[0], t);
 
     let search_query: Option<String> =
         if app.modals.search_open && !app.modals.search_buf.trim().is_empty() {
@@ -161,19 +156,18 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     draw_progress_bar(app, f, layout[2], t);
 }
 
-fn draw_column_header(f: &mut Frame<'_>, area: Rect, t: &Theme, lang: Lang) {
-    // Columns:  [ ] gutter | [pri] 8 | tarea flex | [tags] 18 | [vence] 10
+fn draw_column_header(f: &mut Frame<'_>, area: Rect, t: &Theme) {
     let header = Line::from(vec![
         Span::raw("    "),
         Span::styled(
-            format!("{:<8}", tr(lang, StringKey::ColumnStatus)),
+            format!("{:<8}", i18n::t("task_list.column_status")),
             t.muted(),
         ),
         Span::styled(
-            format!("{:<8}", tr(lang, StringKey::ColumnPriority)),
+            format!("{:<8}", i18n::t("task_list.column_priority")),
             t.muted(),
         ),
-        Span::styled(tr(lang, StringKey::ColumnTask).to_string(), t.muted()),
+        Span::styled(i18n::t("task_list.column_task"), t.muted()),
     ]);
     f.render_widget(Paragraph::new(header), area);
 }
@@ -359,7 +353,7 @@ fn build_row_lines(
     if task.is_blocked() {
         primary.push(Span::raw("   "));
         primary.push(Span::styled(
-            "⛒ blocked",
+            format!("⛒ {}", i18n::t("task_list.blocked")),
             Style::default().fg(t.danger).add_modifier(Modifier::BOLD),
         ));
     }
@@ -436,7 +430,7 @@ fn draw_progress_bar(app: &AppState, f: &mut Frame<'_>, area: Rect, t: &Theme) {
     let pct = (ratio * 100.0).round() as u32;
     let mut spans: Vec<Span<'static>> = vec![
         Span::styled(
-            format!("{}  ", tr(app.lang, StringKey::OverallProgress)),
+            format!("{}  ", i18n::t("task_list.overall_progress")),
             t.muted(),
         ),
         Span::styled("[", Style::default().fg(t.border_inactive)),

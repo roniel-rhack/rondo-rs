@@ -1,3 +1,4 @@
+use rondo_core::i18n;
 use rondo_plugin_api::{
     action::PluginAction,
     capabilities::Capability,
@@ -63,7 +64,7 @@ impl Plugin for PomodoroPlugin {
                 kind: ViewKind::Overlay,
                 blocks: vec![
                     Block::Heading {
-                        text: "Focus".into(),
+                        text: i18n::t("pomodoro_plugin.heading"),
                         level: 1,
                     },
                     Block::Gauge {
@@ -71,7 +72,11 @@ impl Plugin for PomodoroPlugin {
                         label: Some(format!("{:.0}%", ratio * 100.0)),
                     },
                     Block::Paragraph {
-                        text: format!("{}s remaining", (self.total_ms - self.elapsed_ms) / 1000),
+                        text: format!(
+                            "{}{}",
+                            (self.total_ms - self.elapsed_ms) / 1000,
+                            i18n::t("pomodoro_plugin.remaining_suffix")
+                        ),
                         style: Some(TextStyle {
                             fg: Some(ColorToken::Accent),
                             ..Default::default()

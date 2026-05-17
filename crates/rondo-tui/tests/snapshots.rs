@@ -40,13 +40,10 @@ fn snapshot(_name: &str, width: u16, height: u16, mutate: impl FnOnce(&mut AppSt
     unsafe {
         std::env::set_var("HOME", "/snapshot-fixture");
     }
-    // Pin the legacy `strings.rs` table to Spanish so the snapshots
-    // (captured before the new English default) stay stable, and pin the
-    // file-based i18n stack to the baked English baseline so any new
-    // `i18n::t()` call sites are locale-independent.
+    // Pin the file-based i18n stack to the baked English baseline so
+    // snapshots stay locale-stable regardless of host config.
     rondo_core::i18n::force_for_tests();
     let mut app = AppState::with_writable_and_clock(fixture_store(), false, fixed_clock()).unwrap();
-    app.lang = rondo_tui::strings::Lang::Es;
     mutate(&mut app);
     let backend = TestBackend::new(width, height);
     let mut term = Terminal::new(backend).unwrap();

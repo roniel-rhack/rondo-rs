@@ -9,6 +9,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
+use rondo_core::i18n;
 use tui_textarea::TextArea;
 
 pub struct Config<'a> {
@@ -66,11 +67,14 @@ pub fn draw(
     let mut hint_spans = vec![
         Span::styled(" ", muted),
         Span::styled("Ctrl+S", kbd),
-        Span::styled(" save · ", muted),
+        Span::styled(i18n::t("multiline_editor.hint_save"), muted),
         Span::styled("Esc", kbd),
-        Span::styled(" cancel · ", muted),
+        Span::styled(i18n::t("multiline_editor.hint_cancel"), muted),
         Span::styled("←↑↓→", kbd),
-        Span::styled(" mover", muted),
+        Span::styled(
+            format!(" {}", i18n::t("multiline_editor.hint_navigate")),
+            muted,
+        ),
     ];
     if let Some(extra) = cfg.hint_extra {
         hint_spans.push(Span::styled(" · ", muted));

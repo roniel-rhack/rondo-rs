@@ -29,10 +29,6 @@ pub struct AppState {
     /// alongside `plugins` by the command palette and `handle_command`.
     pub external: rondo_plugin_host::PluginHost,
     pub theme: Theme,
-    /// Active UI language for the legacy `strings.rs` table. New strings go
-    /// through `rondo_core::i18n::t()` and ignore this field. Populated from
-    /// `cfg.ui.language` at startup.
-    pub lang: crate::strings::Lang,
     pub should_quit: bool,
     pub status_msg: Option<String>,
     /// True when the underlying store was opened RW (so we can persist mutations).
@@ -78,7 +74,6 @@ impl AppState {
             plugins,
             external: rondo_plugin_host::PluginHost::new(),
             theme: Theme::dark(),
-            lang: crate::strings::Lang::default(),
             should_quit: false,
             status_msg: None,
             writable,
@@ -1328,9 +1323,9 @@ impl AppState {
     }
 
     /// Persist the picked pack code into `config.toml`, swap the active
-    /// `Translations`, sync the legacy `app.lang` field, and toast the result.
-    /// Surface failures via `toast` rather than panicking — losing the swap
-    /// must never lock the user out of the UI.
+    /// `Translations`, and toast the result. Surface failures via `toast`
+    /// rather than panicking — losing the swap must never lock the user out
+    /// of the UI.
     fn apply_lang_picker(&mut self) {
         let entry = match self
             .modals
@@ -1364,7 +1359,6 @@ impl AppState {
             }
         };
         rondo_core::i18n::set_active(new_pack);
-        self.lang = crate::strings::Lang::from_code(&entry.code);
 
         // Persist into config.toml so the choice survives restart.
         let mut cfg = rondo_core::config::Config::from_env_or_default();

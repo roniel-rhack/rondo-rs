@@ -6,6 +6,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
+use rondo_core::i18n;
 
 pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
@@ -13,7 +14,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(t.border_style(true))
-        .title(Span::styled(" + add task ", t.accent_style()));
+        .title(Span::styled(i18n::t("quick_add.title"), t.accent_style()));
     let inner = block.inner(area);
     f.render_widget(block, area);
 
@@ -25,12 +26,9 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
             Style::default().fg(t.fg).add_modifier(Modifier::SLOW_BLINK),
         ),
     ]);
-    let hint = Line::from(vec![
-        Span::styled("  syntax: ", t.muted()),
-        Span::styled("title", Style::default().fg(t.fg)),
-        Span::styled(" #tag", Style::default().fg(t.accent)),
-        Span::styled(" !p1..p4", Style::default().fg(t.warn)),
-        Span::styled(" due:tmrw", Style::default().fg(t.fg_muted)),
-    ]);
+    let hint = Line::from(vec![Span::styled(
+        format!("  {}", i18n::t("quick_add.hint")),
+        t.muted(),
+    )]);
     f.render_widget(Paragraph::new(vec![line, hint]), inner);
 }

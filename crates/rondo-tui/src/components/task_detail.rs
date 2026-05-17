@@ -13,6 +13,7 @@ use ratatui::{
     Frame,
 };
 use rondo_core::domain::task::Status;
+use rondo_core::i18n;
 
 pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
@@ -25,7 +26,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         }
     };
 
-    let title = format!("detail · #{}", task.id);
+    let title = format!("{} · #{}", i18n::t("task_detail.title_prefix"), task.id);
     let badge = format!(
         "{} · {}",
         task.status.label().to_lowercase(),
@@ -63,7 +64,12 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     lines.push(Line::raw(""));
 
     // ─── METADATA ───────────────────────────────────────────
-    push_meta(&mut lines, "creada", created_line(task, t), t);
+    push_meta(
+        &mut lines,
+        &i18n::t("task_detail.created"),
+        created_line(task, t),
+        t,
+    );
     if let Some(due) = task.due_date {
         let mut spans: Vec<Span<'static>> = Vec::new();
         if let Some(b) = due_badge::span(Some(due), app.clock.today(), t) {
@@ -74,7 +80,12 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
             due.format("%Y-%m-%d (%A)").to_string(),
             Style::default().fg(t.fg_muted),
         ));
-        push_meta(&mut lines, "vence", Line::from(spans), t);
+        push_meta(
+            &mut lines,
+            &i18n::t("task_detail.due"),
+            Line::from(spans),
+            t,
+        );
     }
     if matches!(
         task.recur_freq,
@@ -85,9 +96,9 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     ) {
         push_meta(
             &mut lines,
-            "recurre",
+            &i18n::t("task_detail.recurs"),
             Line::from(Span::styled(
-                format!("{:?} · cada {}", task.recur_freq, task.recur_interval),
+                format!("{:?} · every {}", task.recur_freq, task.recur_interval),
                 Style::default().fg(t.fg),
             )),
             t,
@@ -104,7 +115,12 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
                 Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
             ));
         }
-        push_meta(&mut lines, "tags", Line::from(tag_spans), t);
+        push_meta(
+            &mut lines,
+            &i18n::t("task_detail.tags"),
+            Line::from(tag_spans),
+            t,
+        );
     }
     if !task.metadata.is_empty() {
         for (k, v) in &task.metadata {
@@ -123,10 +139,15 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let desc_body = task.description.as_deref().unwrap_or("");
     let has_desc = !desc_body.trim().is_empty();
     lines.push(Line::raw(""));
+    let empty_lbl = i18n::t("task_detail.section_empty");
     section_header(
         &mut lines,
-        "descripción",
-        if has_desc { None } else { Some("vacía") },
+        &i18n::t("task_detail.section_description"),
+        if has_desc {
+            None
+        } else {
+            Some(empty_lbl.as_str())
+        },
         header_active,
         inner_width,
         t,
@@ -139,7 +160,8 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
             lines.push(Line::from(spans));
         }
     } else {
-        lines.push(empty::line("description", "E", "to add", t));
+        let hint = i18n::t("task_detail.empty_description_hint");
+        lines.push(empty::line("description", "E", &hint, t));
     }
 
     // ─── SUBTASKS ───────────────────────────────────────────
@@ -147,21 +169,22 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let section_active =
         app.ui.focus.pane == Pane::Detail && app.ui.focus.section == DetailSection::Subtasks;
     lines.push(Line::raw(""));
+    let subtasks_count_lbl = if total > 0 {
+        format!("{}/{}", done, total)
+    } else {
+        i18n::t("task_detail.section_empty")
+    };
     section_header(
         &mut lines,
-        "subtareas",
-        if total > 0 {
-            Some(format!("{}/{}", done, total))
-        } else {
-            Some("vacía".to_string())
-        }
-        .as_deref(),
+        &i18n::t("task_detail.section_subtasks"),
+        Some(&subtasks_count_lbl),
         section_active,
         inner_width,
         t,
     );
     if total == 0 {
-        lines.push(empty::line("subtasks", "A", "to add", t));
+        let hint = i18n::t("task_detail.empty_subtasks_hint");
+        lines.push(empty::line("subtasks", "A", &hint, t));
     }
     if total > 0 {
         // Mini progress bar
@@ -228,10 +251,15 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         app.ui.focus.pane == Pane::Detail && app.ui.focus.section == DetailSection::Dependencies;
     let has_deps = task.is_blocked() || !task.blocks_ids.is_empty();
     lines.push(Line::raw(""));
+    let deps_empty_lbl = i18n::t("task_detail.section_empty");
     section_header(
         &mut lines,
-        "dependencias",
-        if has_deps { None } else { Some("vacía") },
+        &i18n::t("task_detail.section_dependencies"),
+        if has_deps {
+            None
+        } else {
+            Some(deps_empty_lbl.as_str())
+        },
         deps_section_active,
         inner_width,
         t,
@@ -244,7 +272,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
                 [
                     Span::styled("  ⛒ ", Style::default().fg(t.danger)),
                     Span::styled(
-                        format!("blocked by #{}", id),
+                        format!("{} #{}", i18n::t("task_detail.blocked_by"), id),
                         Style::default().fg(t.danger).add_modifier(Modifier::BOLD),
                     ),
                 ]
@@ -260,7 +288,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
                 [
                     Span::styled("  ⏵ ", Style::default().fg(t.warn)),
                     Span::styled(
-                        format!("blocks #{}", id),
+                        format!("{} #{}", i18n::t("task_detail.blocks"), id),
                         Style::default().fg(t.warn).add_modifier(Modifier::BOLD),
                     ),
                 ]
@@ -269,19 +297,29 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         lines.push(Line::from(blocks));
     }
     if !has_deps {
-        lines.push(empty::line("dependencies", "B", "to add/remove", t));
+        let hint = i18n::t("task_detail.empty_deps_hint");
+        lines.push(empty::line("dependencies", "B", &hint, t));
     }
 
     // ─── TIME LOG ───────────────────────────────────────────
     lines.push(Line::raw(""));
     if task.time_logs.is_empty() {
-        section_header(&mut lines, "tiempo", Some("vacía"), false, inner_width, t);
-        lines.push(empty::line("time-log", "p", "to start a pomodoro", t));
+        let empty_lbl = i18n::t("task_detail.section_empty");
+        section_header(
+            &mut lines,
+            &i18n::t("task_detail.section_time"),
+            Some(&empty_lbl),
+            false,
+            inner_width,
+            t,
+        );
+        let hint = i18n::t("task_detail.empty_time_hint");
+        lines.push(empty::line("time-log", "p", &hint, t));
     } else {
         let total_secs: i64 = task.time_logs.iter().map(|tl| tl.duration_secs).sum();
         section_header(
             &mut lines,
-            "tiempo",
+            &i18n::t("task_detail.section_time"),
             Some(&format_duration(total_secs)),
             false,
             inner_width,
@@ -299,13 +337,18 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
             sparkline::span(&spark_values, t),
             Span::raw("   "),
             Span::styled(
-                format!("{} sessions", task.time_logs.len()),
+                format!(
+                    "{} {}",
+                    task.time_logs.len(),
+                    i18n::t("task_detail.sessions")
+                ),
                 Style::default().fg(t.fg_muted),
             ),
             Span::styled("  ·  ", Style::default().fg(t.border_inactive)),
             Span::styled(
                 format!(
-                    "media {}",
+                    "{} {}",
+                    i18n::t("task_detail.session_avg"),
                     format_duration(total_secs / task.time_logs.len() as i64)
                 ),
                 Style::default().fg(t.fg_muted),
@@ -318,20 +361,21 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         app.ui.focus.pane == Pane::Detail && app.ui.focus.section == DetailSection::Notes;
     lines.push(Line::raw(""));
     let notes_count_lbl = if task.notes.is_empty() {
-        "vacía".to_string()
+        i18n::t("task_detail.section_empty")
     } else {
         format!("{}", task.notes.len())
     };
     section_header(
         &mut lines,
-        "notas",
+        &i18n::t("task_detail.section_notes"),
         Some(notes_count_lbl.as_str()),
         notes_section_active,
         inner_width,
         t,
     );
     if task.notes.is_empty() {
-        lines.push(empty::line("notes", "a", "to add", t));
+        let hint = i18n::t("task_detail.empty_notes_hint");
+        lines.push(empty::line("notes", "a", &hint, t));
     }
     if !task.notes.is_empty() {
         let section_active = notes_section_active;
@@ -376,27 +420,31 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 }
 
 fn draw_empty(t: &Theme, active: bool, f: &mut Frame<'_>, area: Rect) {
-    let panel = BracketPanel::new("detail", t).active(active);
+    let title = i18n::t("task_detail.title_prefix");
+    let panel = BracketPanel::new(&title, t).active(active);
     let inner = panel.inner(area);
     panel.render(area, f.buffer_mut());
     let lines = vec![
         Line::raw(""),
         Line::raw(""),
-        Line::from(Span::styled("  No task selected", t.muted())),
+        Line::from(Span::styled(
+            format!("  {}", i18n::t("task_detail.no_selection")),
+            t.muted(),
+        )),
         Line::raw(""),
         Line::from(vec![
             Span::raw("  "),
             Span::styled("j/k", t.kbd()),
             Span::raw(" "),
-            Span::styled("navigate", t.muted()),
+            Span::styled(i18n::t("footer.hint.list_select"), t.muted()),
             Span::raw("    "),
             Span::styled("/", t.kbd()),
             Span::raw(" "),
-            Span::styled("search", t.muted()),
+            Span::styled(i18n::t("footer.hint.search_apply"), t.muted()),
             Span::raw("    "),
             Span::styled("?", t.kbd()),
             Span::raw(" "),
-            Span::styled("help", t.muted()),
+            Span::styled(i18n::t("footer.help_hint"), t.muted()),
         ]),
     ];
     f.render_widget(Paragraph::new(lines), inner);

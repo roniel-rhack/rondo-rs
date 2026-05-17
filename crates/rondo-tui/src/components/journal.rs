@@ -10,23 +10,26 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap},
     Frame,
 };
+use rondo_core::i18n;
 
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
     if app.data.journal_notes.is_empty() {
+        let add_hint = i18n::t("task_detail.empty_notes_hint");
+        let title = i18n::t("journal.panel_main");
         let lines = vec![
             Line::raw(""),
             Line::raw(""),
-            empty::line("journal", "i", "to add", t),
+            empty::line("journal", "i", &add_hint, t),
             Line::raw(""),
             Line::from(vec![
                 Span::raw("  "),
                 Span::styled("?", t.kbd()),
                 Span::raw(" "),
-                Span::styled("for help", t.muted()),
+                Span::styled(i18n::t("journal.help_hint"), t.muted()),
             ]),
         ];
-        f.render_widget(Paragraph::new(lines).block(t.panel("Journal", true)), area);
+        f.render_widget(Paragraph::new(lines).block(t.panel(&title, true)), area);
         return;
     }
     let chunks = Layout::default()
@@ -66,7 +69,8 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         .collect();
     let days_active = matches!(app.ui.journal_pane, crate::app::ui_state::JournalPane::Days);
     let entries_active = !days_active;
-    let list = List::new(items).block(t.panel("Days", days_active));
+    let days_title = i18n::t("journal.panel_days");
+    let list = List::new(items).block(t.panel(&days_title, days_active));
     f.render_stateful_widget(list, chunks[0], &mut app.data.journal_list_state);
 
     let mut content_lines: Vec<Line> = Vec::new();
@@ -84,7 +88,8 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         )));
         content_lines.push(Line::raw(""));
         if app.data.journal_entries.is_empty() {
-            content_lines.push(empty::line("journal", "i", "to add", t));
+            let hint = i18n::t("task_detail.empty_notes_hint");
+            content_lines.push(empty::line("journal", "i", &hint, t));
         }
         let body_width = chunks[1].width.saturating_sub(4) as usize;
         let cursor_idx = app
@@ -132,12 +137,14 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
             }
         }
     } else {
-        content_lines.push(empty::line("journal", "i", "to add", t));
+        let hint = i18n::t("task_detail.empty_notes_hint");
+        content_lines.push(empty::line("journal", "i", &hint, t));
     }
+    let main_title = i18n::t("journal.panel_main");
     f.render_widget(
         Paragraph::new(content_lines)
             .wrap(Wrap { trim: false })
-            .block(t.panel("Journal", entries_active)),
+            .block(t.panel(&main_title, entries_active)),
         chunks[1],
     );
 }
@@ -155,9 +162,9 @@ pub fn draw_editor_overlay(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     };
     f.render_widget(Clear, editor_rect);
     let title = if app.modals.journal_editor_entry_id.is_some() {
-        " ✎ edit entry "
+        i18n::t("journal.editor_title_edit")
     } else {
-        " + journal entry "
+        i18n::t("journal.editor_title_new")
     };
     let block = Block::default()
         .borders(Borders::ALL)
@@ -190,13 +197,12 @@ pub fn draw_editor_overlay(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let hint = Line::from(vec![
         Span::styled(" ", t.muted()),
         Span::styled("Ctrl+S", t.kbd()),
-        Span::styled(" save · ", t.muted()),
+        Span::styled(i18n::t("journal.editor_hint_save"), t.muted()),
         Span::styled("Esc", t.kbd()),
-        Span::styled(" cancel · ", t.muted()),
+        Span::styled(i18n::t("journal.editor_hint_cancel"), t.muted()),
         Span::styled("←↑↓→", t.kbd()),
-        Span::styled(" mover · ", t.muted()),
-        Span::styled("# **md** _it_", t.muted()),
-        Span::styled(" soportado", t.muted()),
+        Span::styled(i18n::t("journal.editor_hint_move"), t.muted()),
+        Span::styled(i18n::t("journal.editor_md_supported"), t.muted()),
     ]);
     f.render_widget(Paragraph::new(hint), layout[1]);
 }
@@ -205,8 +211,8 @@ fn smart_date_label(date: NaiveDate) -> String {
     let today = crate::clock::today();
     let delta = (today - date).num_days();
     match delta {
-        0 => "Today".to_string(),
-        1 => "Yesterday".to_string(),
+        0 => i18n::t("journal.date_today"),
+        1 => i18n::t("journal.date_yesterday"),
         d if (2..7).contains(&d) => format!("{}", date.format("%A")),
         _ => date.format("%b %-d").to_string(),
     }

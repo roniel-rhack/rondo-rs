@@ -10,6 +10,7 @@ use ratatui::{
     Frame,
 };
 use rondo_core::domain::task::Status;
+use rondo_core::i18n;
 use rondo_plugin_api::{
     action::PluginAction,
     capabilities::{Capability, QueryScope},
@@ -72,7 +73,8 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
 fn draw_donut(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
-    let panel = BracketPanel::new("vista general", t).active(false);
+    let title = i18n::t("analytics.section_overview");
+    let panel = BracketPanel::new(&title, t).active(false);
     let inner = panel.inner(area);
     panel.render(area, f.buffer_mut());
 
@@ -113,15 +115,15 @@ fn draw_donut(app: &AppState, f: &mut Frame<'_>, area: Rect) {
             ),
             Span::styled("  ", Style::default()),
             Span::styled(
-                "TOTAL",
+                i18n::t("analytics.label_total"),
                 Style::default().fg(t.fg_muted).add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::raw(""),
-        legend_row("◑", done, "Completadas", t.success, t),
-        legend_row("◐", in_prog, "En progreso", t.accent, t),
-        legend_row("○", pending, "Pendientes", t.warn, t),
-        legend_row("!", overdue, "Vencidas", t.danger, t),
+        legend_row("◑", done, &i18n::t("analytics.completed"), t.success, t),
+        legend_row("◐", in_prog, &i18n::t("analytics.in_progress"), t.accent, t),
+        legend_row("○", pending, &i18n::t("analytics.pending"), t.warn, t),
+        legend_row("!", overdue, &i18n::t("analytics.overdue"), t.danger, t),
     ];
     f.render_widget(Paragraph::new(lines), inner);
 }
@@ -151,7 +153,8 @@ fn legend_row(
 
 fn draw_bars_7d(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
-    let panel = BracketPanel::new("próximas 7 días", t).active(false);
+    let title = i18n::t("analytics.section_next7days");
+    let panel = BracketPanel::new(&title, t).active(false);
     let inner = panel.inner(area);
     panel.render(area, f.buffer_mut());
 
@@ -220,14 +223,16 @@ fn draw_bars_7d(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
 fn draw_distribution(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
-    let panel = BracketPanel::new("distribución por tag", t).active(false);
+    let title = i18n::t("analytics.section_tag_dist");
+    let panel = BracketPanel::new(&title, t).active(false);
     let inner = panel.inner(area);
     panel.render(area, f.buffer_mut());
 
     let mut tag_counts: HashMap<String, usize> = HashMap::new();
+    let untagged_label = i18n::t("analytics.untagged");
     for task in &app.data.tasks {
         if task.tags.is_empty() {
-            *tag_counts.entry("(sin tag)".into()).or_default() += 1;
+            *tag_counts.entry(untagged_label.clone()).or_default() += 1;
         }
         for tag in &task.tags {
             *tag_counts.entry(tag.clone()).or_default() += 1;
@@ -261,40 +266,41 @@ fn draw_distribution(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
 fn draw_sync(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
-    let panel = BracketPanel::new("sincronización", t).active(false);
+    let title = i18n::t("analytics.section_sync");
+    let panel = BracketPanel::new(&title, t).active(false);
     let inner = panel.inner(area);
     panel.render(area, f.buffer_mut());
 
     let now = crate::clock::now();
     let lines = vec![
         Line::from(vec![
-            Span::styled(" ESTADO     ", t.muted()),
+            Span::styled(i18n::t("analytics.status_header"), t.muted()),
             Span::styled(
-                "Conectado",
+                i18n::t("analytics.sync_status_connected"),
                 Style::default().fg(t.success).add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(vec![
-            Span::styled(" ÚLTIMA     ", t.muted()),
+            Span::styled(i18n::t("analytics.last_header"), t.muted()),
             Span::styled(
                 now.format("%H:%M:%S").to_string(),
                 Style::default().fg(t.fg),
             ),
         ]),
         Line::from(vec![
-            Span::styled(" PRÓXIMA    ", t.muted()),
+            Span::styled(i18n::t("analytics.next_header"), t.muted()),
             Span::styled(
                 (now + Duration::minutes(5)).format("%H:%M:%S").to_string(),
                 Style::default().fg(t.fg),
             ),
         ]),
         Line::from(vec![
-            Span::styled(" DISPOSIT.  ", t.muted()),
+            Span::styled(i18n::t("analytics.device_header"), t.muted()),
             Span::styled(
                 "1/1",
                 Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
             ),
-            Span::styled(" local", t.muted()),
+            Span::styled(format!(" {}", i18n::t("analytics.local")), t.muted()),
         ]),
         Line::raw(""),
         Line::from(vec![

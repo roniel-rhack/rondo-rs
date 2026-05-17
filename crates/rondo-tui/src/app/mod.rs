@@ -395,7 +395,7 @@ impl AppState {
             }
             Action::RequestDeleteTask => {
                 if !self.writable {
-                    self.toast("delete: read-only (start with --write)");
+                    self.toast(ro_msg("delete"));
                 } else if self.data.selected_task_id().is_some() {
                     self.modals.confirm_delete_open = true;
                 }
@@ -416,7 +416,7 @@ impl AppState {
             Action::CancelDelete => self.modals.confirm_delete_open = false,
             Action::RequestEditTitle => {
                 if !self.writable {
-                    self.toast("edit: read-only (start with --write)");
+                    self.toast(ro_msg("edit"));
                 } else if let Some(t) = self.data.selected_task() {
                     self.modals.edit_title_buf = t.title.clone();
                     self.modals.edit_title_open = true;
@@ -452,7 +452,7 @@ impl AppState {
             }
             Action::RequestAddSubtask => {
                 if !self.writable {
-                    self.toast("subtask: read-only (start with --write)");
+                    self.toast(ro_msg("subtask"));
                 } else if self.data.selected_task_id().is_some() {
                     self.modals.add_subtask_buf.clear();
                     self.modals.add_subtask_open = true;
@@ -484,7 +484,7 @@ impl AppState {
             }
             Action::RequestAddDependency => {
                 if !self.writable {
-                    self.toast("dep: read-only (start with --write)");
+                    self.toast(ro_msg("dep"));
                 } else if self.data.selected_task_id().is_some() {
                     self.modals.dep_overlay_buf.clear();
                     self.modals.dep_overlay_open = true;
@@ -540,7 +540,7 @@ impl AppState {
             }
             Action::RequestEditDescription => {
                 if !self.writable {
-                    self.toast("description: read-only (start with --write)");
+                    self.toast(ro_msg("description"));
                 } else if let Some(task) = self.data.selected_task() {
                     let body = task.description.clone().unwrap_or_default();
                     self.modals.description_textarea = tui_textarea::TextArea::new(
@@ -587,7 +587,7 @@ impl AppState {
 
             Action::RequestEditFocusedSubtask => {
                 if !self.writable {
-                    self.toast("subtask: read-only (start with --write)");
+                    self.toast(ro_msg("subtask"));
                 } else if let Some(task) = self.data.selected_task() {
                     if let Some(sub) = task.subtasks.get(self.ui.focus.section_item) {
                         self.modals.edit_subtask_buf = sub.title.clone();
@@ -1232,7 +1232,7 @@ impl AppState {
             return;
         }
         if !self.writable {
-            self.toast("quick-add: read-only (start with --write)");
+            self.toast(ro_msg("quick-add"));
             return;
         }
         let new_task = rondo_core::domain::task::NewTask {
@@ -1516,6 +1516,13 @@ fn action_dismisses_quick_actions(a: &Action) -> bool {
             | Action::ToggleHelp
             | Action::TogglePage(_)
     )
+}
+
+/// Build the toast string shown when an action is rejected because the store was
+/// opened read-only. The binary has no `--write` flag; the only way to mutate is
+/// to relaunch without `--read-only`.
+fn ro_msg(action: &str) -> String {
+    format!("{action}: read-only mode (restart without --read-only)")
 }
 
 /// Parse a `due:` token value into a `NaiveDate`.

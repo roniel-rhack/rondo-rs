@@ -2,11 +2,11 @@
 source: crates/rondo-tui/tests/snapshots.rs
 expression: s
 ---
-" ▌rondo v0.1.0       // SISTEMA DE GESTIÓN DE TAREAS AVANZADO //                  ⊙ ONLINE · HH:MM:SS · ◷ 1/1 · P— · ☑3 "
+" ▌rondo v0.1.0       // SISTEMA DE GESTIÓN DE TAREAS AVANZADO //                  ⊙ ONLINE · HH:MM:SS · ◷ 1/2 · P— · ☑3 "
 "┌─ navegación ───────────┐┏━ todas · 1 tareas · /deploy ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
 "│  [i] ◉ INBOX       3   │┃     ESTADO  PRI     TAREA                                                                  ┃"
-"│  [t] ◷ HOY             │┃ ▌ ▎ [x]   ◖med◗  Deploy v2.1   ◖today◗                                                     ┃"
-"│  [p] ⏵ PRÓXIMAS    3   │┃                                                                                            ┃"
+"│  [t] ◷ HOY         1   │┃ ▌ ▎ [x]   ◖med◗  Deploy v2.1   ◖overdue◗                                                   ┃"
+"│  [p] ⏵ PRÓXIMAS    2   │┃                                                                                            ┃"
 "│  [A] ◇ TODAS       4   │┃                                                                                            ┃"
 "└────────────────────────┘┃                                                                                            ┃"
 "┌─ filtros rápidos ──────┐┃                                                                                            ┃"
@@ -25,9 +25,9 @@ expression: s
 "│                        │┃                                                                                            ┃"
 "└────────────────────────┘┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
 "┌─ vista general ────┐┌─ próximas 7 días ──────────────┐┌─ distribución por tag ───────────┐┌─ sincronización ─────────┐"
-"│                    ││    1    1    1    1            ││   work      ▰▰▰▱▱▱▱▱▱▱▱▱   2 (33 ││  ESTADO     Conectado    │"
-"│   4  TOTAL         ││    ██   ██   ██   ██           ││   (sin tag) ▰▱▱▱▱▱▱▱▱▱▱▱   1 (16 ││  ÚLTIMA     HH:MM:SS     │"
-"│                    ││    ██   ██   ██   ██           ││   backend   ▰▱▱▱▱▱▱▱▱▱▱▱   1 (16 ││  PRÓXIMA    HH:MM:SS     │"
+"│                    ││    1    1    1                 ││   work      ▰▰▰▱▱▱▱▱▱▱▱▱   2 (33 ││  ESTADO     Conectado    │"
+"│   4  TOTAL         ││    ██   ██   ██                ││   (sin tag) ▰▱▱▱▱▱▱▱▱▱▱▱   1 (16 ││  ÚLTIMA     HH:MM:SS     │"
+"│                    ││    ██   ██   ██                ││   backend   ▰▱▱▱▱▱▱▱▱▱▱▱   1 (16 ││  PRÓXIMA    HH:MM:SS     │"
 "│ ┌ / search ────────────────────────────────────────────────────────────────────────────────────────────────────────┐ │"
 "│ │ / deploy▏   1 match                                                                                              │ │"
 "│ │                                                                                                                  │ │"

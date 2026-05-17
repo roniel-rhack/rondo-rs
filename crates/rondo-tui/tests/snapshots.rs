@@ -29,11 +29,15 @@ fn snapshot(_name: &str, width: u16, height: u16, mutate: impl FnOnce(&mut AppSt
     term.draw(|f| components::root::draw(&mut app, f)).unwrap();
     let raw = term.backend().to_string();
     // Redact wall-clock timestamps so snapshots are stable across runs.
-    // Order matters: longer pattern first (HH:MM:SS), then plain HH:MM.
+    // Order matters: longer pattern first (HH:MM:SS), then plain HH:MM, then
+    // single-digit-hour fragments (`6:02`) that leak through when an overlay
+    // clips the dashboard's sync widget.
     let re_hms = regex::Regex::new(r"\d{2}:\d{2}:\d{2}").unwrap();
     let stage1 = re_hms.replace_all(&raw, "HH:MM:SS").to_string();
     let re_hm = regex::Regex::new(r"\b\d{2}:\d{2}\b").unwrap();
-    re_hm.replace_all(&stage1, "HH:MM").to_string()
+    let stage2 = re_hm.replace_all(&stage1, "HH:MM").to_string();
+    let re_hm_frag = regex::Regex::new(r"\b\d:\d{2}\b").unwrap();
+    re_hm_frag.replace_all(&stage2, "H:MM").to_string()
 }
 
 #[test]
@@ -204,6 +208,91 @@ fn edit_title_overlay() {
         a.modals.edit_title_open = true;
         a.modals.edit_title_buf = "ship the demo".to_string();
         a.ui.mode = rondo_tui::focus::Mode::Insert;
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn calendar_plugin_page() {
+    let s = snapshot("calendar_plugin_page", 140, 36, |a| {
+        a.modals.plugin_page = Some("builtin.calendar".to_string());
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn dep_graph_plugin_page() {
+    let s = snapshot("dep_graph_plugin_page", 140, 36, |a| {
+        a.modals.plugin_page = Some("builtin.dep-graph".to_string());
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn focus_plugin_page() {
+    let s = snapshot("focus_plugin_page", 140, 36, |a| {
+        a.modals.plugin_page = Some("builtin.focus-page".to_string());
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn analytics_plugin_page() {
+    let s = snapshot("analytics_plugin_page", 140, 36, |a| {
+        a.modals.plugin_page = Some("builtin.analytics".to_string());
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn plugins_overlay() {
+    let s = snapshot("plugins_overlay", 140, 36, |a| {
+        a.modals.plugins_overlay_open = true;
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn sort_overlay_default() {
+    let s = snapshot("sort_overlay_default", 120, 32, |a| {
+        a.modals.sort_overlay_open = true;
+        a.ui.sort_order = rondo_tui::app::ui_state::SortOrder::Default;
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn sort_overlay_priority_desc() {
+    let s = snapshot("sort_overlay_priority_desc", 120, 32, |a| {
+        a.modals.sort_overlay_open = true;
+        a.ui.sort_order = rondo_tui::app::ui_state::SortOrder::PriorityDesc;
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn sort_overlay_due_asc() {
+    let s = snapshot("sort_overlay_due_asc", 120, 32, |a| {
+        a.modals.sort_overlay_open = true;
+        a.ui.sort_order = rondo_tui::app::ui_state::SortOrder::DueAsc;
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn sort_overlay_created_desc() {
+    let s = snapshot("sort_overlay_created_desc", 120, 32, |a| {
+        a.modals.sort_overlay_open = true;
+        a.ui.sort_order = rondo_tui::app::ui_state::SortOrder::CreatedAtDesc;
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn sort_overlay_title_asc() {
+    let s = snapshot("sort_overlay_title_asc", 120, 32, |a| {
+        a.modals.sort_overlay_open = true;
+        a.ui.sort_order = rondo_tui::app::ui_state::SortOrder::TitleAsc;
     });
     assert_snapshot!(s);
 }

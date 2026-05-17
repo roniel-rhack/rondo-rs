@@ -1,10 +1,11 @@
 use crate::app::modals_state::DepOverlayMode;
 use crate::app::AppState;
+use crate::components::task_picker;
 use ratatui::{
-    layout::Rect,
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
     Frame,
 };
 
@@ -24,12 +25,24 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let inner = block.inner(area);
     f.render_widget(block, area);
 
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // task context
+            Constraint::Length(1), // existing blockers
+            Constraint::Length(1), // input line
+            Constraint::Min(1),    // candidates
+            Constraint::Length(1), // hint
+        ])
+        .split(inner);
+
     let context = Line::from(vec![
         Span::styled(" task: ", t.muted()),
         Span::styled(task_title, Style::default().fg(t.fg_muted)),
     ]);
+    f.render_widget(Paragraph::new(context), chunks[0]);
 
-    let existing = task.map(|t| t.blocked_by_ids.clone()).unwrap_or_default();
+    let existing = task.map(|tk| tk.blocked_by_ids.clone()).unwrap_or_default();
     let existing_line = if existing.is_empty() {
         Line::from(vec![Span::styled(" blocked by: (none) ", t.muted())])
     } else {
@@ -45,12 +58,13 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         }
         Line::from(spans)
     };
+    f.render_widget(Paragraph::new(existing_line), chunks[1]);
 
     let prompt = match app.modals.dep_overlay_mode {
-        DepOverlayMode::Add => " enter blocker task id: ",
+        DepOverlayMode::Add => " filter: ",
         DepOverlayMode::Remove => " enter blocker id to remove: ",
     };
-    let line = Line::from(vec![
+    let input = Line::from(vec![
         Span::styled(prompt, t.muted()),
         Span::styled(
             app.modals.dep_overlay_buf.clone(),
@@ -61,17 +75,46 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
             Style::default().fg(t.fg).add_modifier(Modifier::SLOW_BLINK),
         ),
     ]);
+    f.render_widget(Paragraph::new(input), chunks[2]);
+
+    // Candidate list: only in Add mode. Remove mode keeps the numeric flow.
+    if matches!(app.modals.dep_overlay_mode, DepOverlayMode::Add) {
+        let self_id = app.data.selected_task_id().unwrap_or(-1);
+        let mut exclude = existing.clone();
+        exclude.push(self_id);
+        let candidates =
+            task_picker::rank(&app.data.tasks, &app.modals.dep_overlay_buf, &exclude);
+        let items: Vec<ListItem> = candidates
+            .iter()
+            .map(|c| {
+                ListItem::new(Line::from(vec![
+                    Span::styled(
+                        format!(" #{:<4} ", c.id),
+                        Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(c.title.clone(), Style::default().fg(t.fg)),
+                ]))
+            })
+            .collect();
+        let mut state = ListState::default();
+        if !candidates.is_empty() {
+            let cursor = app.modals.dep_overlay_cursor.min(candidates.len() - 1);
+            state.select(Some(cursor));
+        }
+        let list = List::new(items).highlight_style(t.accent_style());
+        f.render_stateful_widget(list, chunks[3], &mut state);
+    }
+
     let hint = Line::from(vec![
         Span::styled("  ", t.muted()),
         Span::styled("Enter", Style::default().fg(t.accent)),
         Span::styled(" submit  ", t.muted()),
+        Span::styled("↑↓", Style::default().fg(t.accent)),
+        Span::styled(" choose  ", t.muted()),
         Span::styled("Tab", Style::default().fg(t.accent)),
         Span::styled(" toggle add/remove  ", t.muted()),
         Span::styled("Esc", Style::default().fg(t.accent)),
         Span::styled(" cancel", t.muted()),
     ]);
-    f.render_widget(
-        Paragraph::new(vec![context, existing_line, line, hint]),
-        inner,
-    );
+    f.render_widget(Paragraph::new(hint), chunks[4]);
 }

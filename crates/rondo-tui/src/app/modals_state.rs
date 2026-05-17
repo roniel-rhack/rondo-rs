@@ -67,6 +67,9 @@ pub struct ModalsState {
     pub dep_overlay_open: bool,
     pub dep_overlay_buf: String,
     pub dep_overlay_mode: DepOverlayMode,
+    /// Highlighted row in the fuzzy task-picker results (E2). Reset whenever
+    /// the buffer changes or the overlay opens.
+    pub dep_overlay_cursor: usize,
     pub plugins_overlay_open: bool,
     /// If `Some(id)`, render the named plugin's last `Show` response
     /// full-screen as a page overlay. Set via `:<plugin>` commands.
@@ -118,6 +121,7 @@ impl Default for ModalsState {
             dep_overlay_open: false,
             dep_overlay_buf: String::new(),
             dep_overlay_mode: DepOverlayMode::Add,
+            dep_overlay_cursor: 0,
             plugins_overlay_open: false,
             plugin_page: None,
             description_editor_open: false,
@@ -264,11 +268,13 @@ impl ModalsState {
         self.dep_overlay_buf.clear();
         self.dep_overlay_open = true;
         self.dep_overlay_mode = mode;
+        self.dep_overlay_cursor = 0;
     }
 
     pub fn close_dep_overlay(&mut self) {
         self.dep_overlay_open = false;
         self.dep_overlay_buf.clear();
+        self.dep_overlay_cursor = 0;
     }
 
     pub fn open_edit_subtask(&mut self, id: i64, current: String) {
@@ -409,6 +415,7 @@ impl ModalsState {
             ModalLayer::DepOverlay => {
                 self.dep_overlay_open = false;
                 self.dep_overlay_buf.clear();
+                self.dep_overlay_cursor = 0;
             }
             ModalLayer::AddSubtask => {
                 self.add_subtask_open = false;
@@ -553,11 +560,13 @@ impl ModalsState {
             }
             Action::DepOverlayInput(s) => {
                 self.dep_overlay_buf = s;
+                self.dep_overlay_cursor = 0;
                 None
             }
             Action::CancelDepOverlay => {
                 self.dep_overlay_open = false;
                 self.dep_overlay_buf.clear();
+                self.dep_overlay_cursor = 0;
                 None
             }
             Action::ToggleDepOverlayMode => {

@@ -100,6 +100,10 @@ pub enum Action {
     SubmitRemoveDependency(String),
     ToggleDepOverlayMode,
     CancelDepOverlay,
+    DepPickerNext,
+    DepPickerPrev,
+    /// Submit the highlighted picker candidate (Enter in Add mode).
+    SubmitDepPickerHighlighted,
 
     PluginKeyPress(String),
     /// Bracketed-paste payload from the terminal. Routed by the app

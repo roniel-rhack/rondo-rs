@@ -326,19 +326,27 @@ fn dep_overlay_key(ev: Event, app: &AppState) -> Option<Action> {
     let Event::Key(k) = ev else {
         return None;
     };
-    let submit = || match app.modals.dep_overlay_mode {
-        DepOverlayMode::Add => Action::SubmitAddDependency(app.modals.dep_overlay_buf.clone()),
-        DepOverlayMode::Remove => {
-            Action::SubmitRemoveDependency(app.modals.dep_overlay_buf.clone())
-        }
-    };
+    let add_mode = matches!(app.modals.dep_overlay_mode, DepOverlayMode::Add);
     Some(match k.code {
         KeyCode::Esc => Action::CancelDepOverlay,
         KeyCode::Tab => Action::ToggleDepOverlayMode,
-        KeyCode::Enter => submit(),
+        KeyCode::Enter => {
+            if add_mode {
+                Action::SubmitDepPickerHighlighted
+            } else {
+                Action::SubmitRemoveDependency(app.modals.dep_overlay_buf.clone())
+            }
+        }
+        KeyCode::Down if add_mode => Action::DepPickerNext,
+        KeyCode::Up if add_mode => Action::DepPickerPrev,
         KeyCode::Backspace => Action::DepOverlayInput({
             let mut s = app.modals.dep_overlay_buf.clone();
             s.pop();
+            s
+        }),
+        KeyCode::Char(c) if add_mode && !c.is_control() => Action::DepOverlayInput({
+            let mut s = app.modals.dep_overlay_buf.clone();
+            s.push(c);
             s
         }),
         KeyCode::Char(c) if c.is_ascii_digit() => Action::DepOverlayInput({

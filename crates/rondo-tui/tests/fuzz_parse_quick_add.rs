@@ -71,7 +71,7 @@ proptest! {
         let expected_due: Option<String> = toks
             .iter()
             .filter_map(|t| t.strip_prefix("due:").map(|s| s.to_string()))
-            .last();
+            .next_back();
         prop_assert_eq!(parsed.due, expected_due);
     }
 }

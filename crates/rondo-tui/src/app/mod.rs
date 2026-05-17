@@ -212,11 +212,9 @@ impl AppState {
             }
             Action::NextItem => self.move_selection(1),
             Action::PrevItem => self.move_selection(-1),
-            Action::TogglePage(p) => {
-                if p != self.ui.page {
-                    self.ui.page = p;
-                    self.spawn_page_swap();
-                }
+            Action::TogglePage(p) if p != self.ui.page => {
+                self.ui.page = p;
+                self.spawn_page_swap();
             }
             Action::NextTab | Action::PrevTab => {
                 let next = match self.ui.page {
@@ -229,22 +227,21 @@ impl AppState {
                 }
             }
             Action::ToggleSelected => self.handle_space(),
-            Action::ApplySidebarSelection => {
-                if self.ui.focus.pane == Pane::Sidebar {
-                    self.apply_sidebar_selection();
-                }
+            Action::ApplySidebarSelection if self.ui.focus.pane == Pane::Sidebar => {
+                self.apply_sidebar_selection();
             }
             Action::ApplyFilter(f) => self.apply_filter(f),
-            Action::EnterVisual => {
-                if self.ui.focus.pane == Pane::List && self.ui.page == Page::Tasks {
-                    self.ui.mode = Mode::Visual;
-                    self.ui.selection.clear();
-                    if let Some(t) = self.data.tasks.get(self.data.selected_task) {
-                        self.ui.selection.insert(t.id);
-                    }
+            Action::EnterVisual
+                if self.ui.focus.pane == Pane::List && self.ui.page == Page::Tasks =>
+            {
+                self.ui.mode = Mode::Visual;
+                self.ui.selection.clear();
+                if let Some(t) = self.data.tasks.get(self.data.selected_task) {
+                    self.ui.selection.insert(t.id);
                 }
             }
             Action::BulkDone => {
+                #[allow(clippy::collapsible_match)]
                 if self.ui.mode == Mode::Visual {
                     let ids: Vec<i64> = self.ui.selection.iter().copied().collect();
                     if self.writable {
@@ -311,6 +308,7 @@ impl AppState {
                 }
             }
             Action::BulkPriority => {
+                #[allow(clippy::collapsible_match)]
                 if self.ui.mode == Mode::Visual {
                     let ids: Vec<i64> = self.ui.selection.iter().copied().collect();
                     for t in self.data.tasks.iter_mut() {
@@ -431,12 +429,11 @@ impl AppState {
                     }
                 }
             }
-            Action::ToggleFocusedSubtask => {
+            Action::ToggleFocusedSubtask
                 if self.ui.focus.pane == Pane::Detail
-                    && self.ui.focus.section == DetailSection::Subtasks
-                {
-                    self.toggle_focused_subtask();
-                }
+                    && self.ui.focus.section == DetailSection::Subtasks =>
+            {
+                self.toggle_focused_subtask();
             }
             Action::EscapeContext => {
                 use crate::app::modals_state::ModalLayer;

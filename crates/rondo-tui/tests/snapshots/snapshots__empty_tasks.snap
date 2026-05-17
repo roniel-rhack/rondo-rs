@@ -3,7 +3,7 @@ source: crates/rondo-tui/tests/snapshots.rs
 expression: s
 ---
 " ▌rondo v0.1.0       // SISTEMA DE GESTIÓN DE TAREAS AVANZADO //                      ⊙ RO · HH:MM:SS · ◷ 0/0 · P— · ☑0 "
-"┌─ navegación ───────────┐┏━ inbox · 0 tareas ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+"┌─ navegación ───────────┐┏━ inbox · 0 tareas · default (status, priority, due) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
 "│  [i] ◉ INBOX       3   │┃                                                                                            ┃"
 "│  [t] ◷ HOY         1   │┃                                                                                            ┃"
 "│  [p] ⏵ PRÓXIMAS    2   │┃   Sin tareas para 'inbox'                                                                  ┃"

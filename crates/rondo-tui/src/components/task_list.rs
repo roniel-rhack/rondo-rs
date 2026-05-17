@@ -21,15 +21,22 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         app.visible_task_indices(),
     );
     let filter_label = app.data.active_filter.label().to_lowercase();
+    let sort_label = app.ui.sort_order.label();
     let title = if app.modals.search_open && !app.modals.search_buf.trim().is_empty() {
         format!(
-            "{} · {} tareas · /{}",
+            "{} · {} tareas · {} · /{}",
             filter_label,
             visible.len(),
+            sort_label,
             app.modals.search_buf
         )
     } else {
-        format!("{} · {} tareas", filter_label, visible.len())
+        format!(
+            "{} · {} tareas · {}",
+            filter_label,
+            visible.len(),
+            sort_label
+        )
     };
     let panel = BracketPanel::new(&title, t).active(app.ui.focus.pane == crate::focus::Pane::List);
     let inner = panel.inner(area);

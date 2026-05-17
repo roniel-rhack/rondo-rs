@@ -37,7 +37,17 @@ fn snapshot(_name: &str, width: u16, height: u16, mutate: impl FnOnce(&mut AppSt
     let re_hm = regex::Regex::new(r"\b\d{2}:\d{2}\b").unwrap();
     let stage2 = re_hm.replace_all(&stage1, "HH:MM").to_string();
     let re_hm_frag = regex::Regex::new(r"\b\d:\d{2}\b").unwrap();
-    re_hm_frag.replace_all(&stage2, "H:MM").to_string()
+    let stage3 = re_hm_frag.replace_all(&stage2, "H:MM").to_string();
+    // Redact wall-clock dates that leak through detail-pane "CREADA" /
+    // "VENCE" rows (`YYYY-MM-DD`) so snapshots don't churn each midnight.
+    let re_date = regex::Regex::new(r"\d{4}-\d{2}-\d{2}").unwrap();
+    let stage4 = re_date.replace_all(&stage3, "YYYY-MM-DD").to_string();
+    // Localised weekday names trail some date strings (e.g. "(Monday)" /
+    // "(lunes)"). They also rotate with the clock — strip parentheticals
+    // that look like weekday-ish single English/Spanish words.
+    let re_weekday =
+        regex::Regex::new(r"\((Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|lunes|martes|miércoles|jueves|viernes|sábado|domingo)\)").unwrap();
+    re_weekday.replace_all(&stage4, "(WEEKDAY)").to_string()
 }
 
 #[test]

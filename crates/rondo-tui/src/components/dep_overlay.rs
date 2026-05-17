@@ -82,8 +82,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         let self_id = app.data.selected_task_id().unwrap_or(-1);
         let mut exclude = existing.clone();
         exclude.push(self_id);
-        let candidates =
-            task_picker::rank(&app.data.tasks, &app.modals.dep_overlay_buf, &exclude);
+        let candidates = task_picker::rank(&app.data.tasks, &app.modals.dep_overlay_buf, &exclude);
         let items: Vec<ListItem> = candidates
             .iter()
             .map(|c| {

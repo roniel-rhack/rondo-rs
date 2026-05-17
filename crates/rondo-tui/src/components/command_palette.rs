@@ -53,9 +53,9 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     f.render_widget(List::new(items), chunks[1]);
 }
 
-struct Suggestion {
-    cmd: &'static str,
-    desc: &'static str,
+pub(crate) struct Suggestion {
+    pub(crate) cmd: &'static str,
+    pub(crate) desc: &'static str,
 }
 
 static ALL: &[Suggestion] = &[
@@ -121,7 +121,7 @@ pub(crate) fn filter_suggestions(buf: &str) -> Vec<&'static Suggestion> {
             engine.score_only(q, &hay).map(|sc| (sc, s))
         })
         .collect();
-    scored.sort_by(|a, b| b.0.cmp(&a.0));
+    scored.sort_by_key(|x| std::cmp::Reverse(x.0));
     scored.into_iter().map(|(_, s)| s).collect()
 }
 

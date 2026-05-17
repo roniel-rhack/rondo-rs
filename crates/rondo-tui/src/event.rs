@@ -488,6 +488,18 @@ fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
         KeyCode::Char('a') if !on_journal => Action::OpenQuickAdd,
         KeyCode::Char('d') if on_journal && !in_visual => Action::JournalDeleteEntry,
         KeyCode::Char('d') if in_visual => Action::BulkDone,
+        KeyCode::Char('X') if in_visual && !on_journal => Action::BulkDelete,
+        KeyCode::Char('S') if in_visual => {
+            Action::BulkSetStatus(rondo_core::domain::task::Status::Pending)
+        }
+        KeyCode::Char('I') if in_visual => {
+            Action::BulkSetStatus(rondo_core::domain::task::Status::InProgress)
+        }
+        KeyCode::Char('C') if in_visual => Action::BulkSetDueDate(None),
+        KeyCode::Char('T') if in_visual => {
+            let today = chrono::Local::now().date_naive();
+            Action::BulkSetDueDate(Some(today))
+        }
         KeyCode::Char('d') if in_subtasks => Action::RequestDeleteFocusedSubtask,
         KeyCode::Char('d') if in_notes => Action::RequestDeleteFocusedNote,
         KeyCode::Char('d') if !in_visual && !in_sidebar => Action::RequestDeleteTask,

@@ -163,6 +163,7 @@ impl AppState {
             || handlers::note::handle(self, &action)
             || handlers::due_date::handle(self, &action)
             || handlers::recurrence::handle(self, &action)
+            || handlers::bulk::handle(self, &action)
         {
             if let Some(next) = follow_up.take() {
                 self.update(next);

@@ -102,7 +102,7 @@ fn render_items(
 ) -> Vec<ListItem<'static>> {
     let selected_pos = app.data.task_list_state.selected();
     let last_idx = visible.len().saturating_sub(1);
-    let mut engine = query.map(|_| crate::search::SearchEngine::new());
+    let mut engine_borrow = query.map(|_| app.data.search_engine.borrow_mut());
     visible
         .iter()
         .enumerate()
@@ -117,7 +117,7 @@ fn render_items(
                 &app.theme,
                 width,
                 query,
-                engine.as_mut(),
+                engine_borrow.as_deref_mut(),
             )
         })
         .collect()

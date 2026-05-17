@@ -27,6 +27,14 @@ pub struct DataState {
     /// Cached per-filter counts, refreshed alongside `tasks`. Sidebar and
     /// header use these instead of re-scanning `tasks` per render frame.
     pub filter_counts: HashMap<Filter, usize>,
+    /// Lazily-built `title + tags + description` strings aligned by index
+    /// with `tasks`. Refreshed alongside `tasks` so fuzzy search avoids
+    /// re-formatting per call.
+    pub task_haystacks: Vec<String>,
+    /// Reused fuzzy-search engine. Pulled out of `DataState` so we keep
+    /// nucleo's internal scratch buffers across frames instead of
+    /// allocating a fresh `Matcher` per render.
+    pub search_engine: std::cell::RefCell<crate::search::SearchEngine>,
 }
 
 impl DataState {
@@ -61,9 +69,25 @@ impl DataState {
             active_filter: Filter::Inbox,
             journal_show_hidden: false,
             filter_counts: HashMap::new(),
+            task_haystacks: Vec::new(),
+            search_engine: std::cell::RefCell::new(crate::search::SearchEngine::new()),
         };
         state.refresh_filter_counts();
+        state.rebuild_haystacks();
         Ok(state)
+    }
+
+    fn rebuild_haystacks(&mut self) {
+        self.task_haystacks.clear();
+        self.task_haystacks.reserve(self.tasks.len());
+        for t in &self.tasks {
+            self.task_haystacks.push(format!(
+                "{} {} {}",
+                t.title,
+                t.tags.join(" "),
+                t.description.as_deref().unwrap_or("")
+            ));
+        }
     }
 
     /// Recompute the per-filter cache. Cheap: a single linear pass over
@@ -108,6 +132,7 @@ impl DataState {
             self.task_list_state.select(Some(self.selected_task));
         }
         self.refresh_filter_counts();
+        self.rebuild_haystacks();
     }
 
     /// Reload journal notes from the store, honoring the `journal_show_hidden` flag.
@@ -154,18 +179,12 @@ impl DataState {
         if q.is_empty() {
             return base;
         }
-        let mut engine = crate::search::SearchEngine::new();
+        let mut engine = self.search_engine.borrow_mut();
         let mut scored: Vec<(u16, usize)> = base
             .into_iter()
             .filter_map(|i| {
-                let t = &self.tasks[i];
-                let hay = format!(
-                    "{} {} {}",
-                    t.title,
-                    t.tags.join(" "),
-                    t.description.as_deref().unwrap_or("")
-                );
-                engine.score_only(q, &hay).map(|s| (s, i))
+                let hay = self.task_haystacks.get(i)?;
+                engine.score_only(q, hay).map(|s| (s, i))
             })
             .collect();
         scored.sort_by(|a, b| b.0.cmp(&a.0));

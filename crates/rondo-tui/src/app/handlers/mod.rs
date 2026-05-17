@@ -10,3 +10,4 @@
 //! dependencies, …), keeping related state mutations together.
 
 pub mod journal;
+pub mod pomodoro;

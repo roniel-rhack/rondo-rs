@@ -151,9 +151,10 @@ impl AppState {
         }
 
         // Extracted domain handlers. Each `handle()` returns true if it
-        // consumed the action; the match below is then a no-op for that
-        // arm (the unmatched `_ => {}` branch).
-        if handlers::journal::handle(self, &action) {
+        // consumed the action; the main match below is skipped in that
+        // case (still running the follow-up tail).
+        if handlers::journal::handle(self, &action) || handlers::pomodoro::handle(self, &action)
+        {
             if let Some(next) = follow_up.take() {
                 self.update(next);
             }
@@ -308,29 +309,8 @@ impl AppState {
                 self.ui.mode = Mode::Insert;
             }
             Action::SubmitQuickAdd(raw) => self.submit_quick_add(raw),
-            Action::TogglePomodoro | Action::OpenPomodoro => {
-                let was_open = self.modals.pomodoro_open;
-                self.modals.pomodoro_open = !was_open || matches!(action, Action::OpenPomodoro);
-                if self.modals.pomodoro_open && self.modals.pomodoro_started.is_none() {
-                    self.modals.pomodoro_started = Some(Instant::now());
-                    self.persist_pomodoro_start();
-                }
-                if !self.modals.pomodoro_open {
-                    self.finalize_pomodoro_close();
-                }
-                if self.modals.pomodoro_open && !was_open && self.ui.last_pomodoro_rect.width > 0 {
-                    let eff = crate::fx::presets::pomodoro_open(self.theme.accent);
-                    self.fx.spawn(
-                        crate::fx::EffectId::PomodoroOpen,
-                        eff,
-                        self.ui.last_pomodoro_rect,
-                    );
-                }
-            }
-            Action::ClosePomodoro => {
-                self.modals.pomodoro_open = false;
-                self.finalize_pomodoro_close();
-            }
+            // TogglePomodoro/OpenPomodoro/ClosePomodoro handled in
+            // `handlers::pomodoro` (dispatched above).
             Action::SubmitCommand(cmd) => self.handle_command(cmd),
             // Journal* actions handled in `handlers::journal` (dispatched above).
             Action::SetSortOrder(order) => {
@@ -1521,7 +1501,7 @@ impl AppState {
 
     /// Insert a `focus_sessions` row for the just-opened pomodoro. No-op when
     /// the store is read-only; logs a debug line instead.
-    fn persist_pomodoro_start(&mut self) {
+    pub(crate) fn persist_pomodoro_start(&mut self) {
         if !self.writable {
             tracing::debug!("pomodoro: read-only store, skipping focus_sessions insert");
             return;
@@ -1543,7 +1523,7 @@ impl AppState {
 
     /// On modal close, mark the session completed iff the timer reached 100%.
     /// Always clears in-memory pomodoro state (started_at, session_id).
-    fn finalize_pomodoro_close(&mut self) {
+    pub(crate) fn finalize_pomodoro_close(&mut self) {
         let reached_total = match self.modals.pomodoro_started {
             Some(started) => started.elapsed() >= self.modals.pomodoro_total,
             None => false,

@@ -1,10 +1,12 @@
 use crate::action::{Action, Page};
-use crate::filter::Filter;
+use crate::filter::{Filter, SIDEBAR_ITEMS};
+use chrono::Local;
 use ratatui::widgets::ListState;
 use rondo_core::domain::{
     journal::{Entry, Note},
     task::Task,
 };
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Domain data + read-only store + selection indexes.
@@ -22,6 +24,9 @@ pub struct DataState {
     pub selected_journal_entry: usize,
     pub active_filter: Filter,
     pub journal_show_hidden: bool,
+    /// Cached per-filter counts, refreshed alongside `tasks`. Sidebar and
+    /// header use these instead of re-scanning `tasks` per render frame.
+    pub filter_counts: HashMap<Filter, usize>,
 }
 
 impl DataState {
@@ -43,7 +48,7 @@ impl DataState {
         if !journal_notes.is_empty() {
             journal_list_state.select(Some(0));
         }
-        Ok(Self {
+        let mut state = Self {
             store,
             tasks,
             selected_task: 0,
@@ -55,7 +60,28 @@ impl DataState {
             selected_journal_entry: 0,
             active_filter: Filter::Inbox,
             journal_show_hidden: false,
-        })
+            filter_counts: HashMap::new(),
+        };
+        state.refresh_filter_counts();
+        Ok(state)
+    }
+
+    /// Recompute the per-filter cache. Cheap: a single linear pass over
+    /// `tasks` checking each `Filter` variant, sharing a `today` value.
+    pub fn refresh_filter_counts(&mut self) {
+        let today = Local::now().date_naive();
+        let mut counts: HashMap<Filter, usize> = HashMap::with_capacity(SIDEBAR_ITEMS.len());
+        for &f in SIDEBAR_ITEMS {
+            counts.insert(f, 0);
+        }
+        for task in &self.tasks {
+            for &f in SIDEBAR_ITEMS {
+                if f.applies_to_with_today(task, today) {
+                    *counts.entry(f).or_insert(0) += 1;
+                }
+            }
+        }
+        self.filter_counts = counts;
     }
 
     /// Currently selected task (if any), as a reference.
@@ -81,6 +107,7 @@ impl DataState {
             self.selected_task = self.tasks.len() - 1;
             self.task_list_state.select(Some(self.selected_task));
         }
+        self.refresh_filter_counts();
     }
 
     /// Reload journal notes from the store, honoring the `journal_show_hidden` flag.

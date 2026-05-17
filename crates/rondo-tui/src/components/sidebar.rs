@@ -3,7 +3,6 @@ use crate::filter::{Filter, NAV_BLOCK_LEN, SIDEBAR_ITEMS};
 use crate::focus::Pane;
 use crate::theme::Theme;
 use crate::widgets::bracket_panel::BracketPanel;
-use chrono::Local;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
@@ -11,7 +10,6 @@ use ratatui::{
     widgets::{Paragraph, Widget},
     Frame,
 };
-use rondo_core::domain::task::Status;
 
 pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let chunks = Layout::default()
@@ -35,10 +33,9 @@ fn draw_nav(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let inner = panel.inner(area);
     panel.render(area, f.buffer_mut());
 
-    let counts = compute_counts(app);
     let mut lines: Vec<Line> = Vec::new();
     for (i, filter) in SIDEBAR_ITEMS.iter().take(NAV_BLOCK_LEN).enumerate() {
-        let count = counts_for(*filter, &counts);
+        let count = count_for(app, *filter);
         let is_cursor = app.ui.focus.pane == Pane::Sidebar && app.ui.focus.sidebar_item == i;
         let is_active = app.data.active_filter == *filter;
         lines.push(row(*filter, count, is_cursor, is_active, t, inner.width));
@@ -53,10 +50,9 @@ fn draw_filters(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let inner = panel.inner(area);
     panel.render(area, f.buffer_mut());
 
-    let counts = compute_counts(app);
     let mut lines: Vec<Line> = Vec::new();
     for (i, filter) in SIDEBAR_ITEMS.iter().skip(NAV_BLOCK_LEN).enumerate() {
-        let count = counts_for(*filter, &counts);
+        let count = count_for(app, *filter);
         let sidebar_idx = NAV_BLOCK_LEN + i;
         let is_cursor =
             app.ui.focus.pane == Pane::Sidebar && app.ui.focus.sidebar_item == sidebar_idx;
@@ -156,27 +152,10 @@ fn row(
     ])
 }
 
-struct Counts {
-    by_filter: std::collections::HashMap<Filter, usize>,
-}
-
-fn counts_for(f: Filter, c: &Counts) -> usize {
-    *c.by_filter.get(&f).unwrap_or(&0)
-}
-
-fn compute_counts(app: &AppState) -> Counts {
-    let mut by_filter = std::collections::HashMap::new();
-    for filter in SIDEBAR_ITEMS.iter().copied() {
-        let n = app
-            .data
-            .tasks
-            .iter()
-            .filter(|t| filter.applies_to(t))
-            .count();
-        by_filter.insert(filter, n);
-    }
-    // Status field is referenced only to ensure the trait is in scope.
-    let _ = Status::Pending;
-    let _ = Local::now();
-    Counts { by_filter }
+fn count_for(app: &AppState, filter: Filter) -> usize {
+    app.data
+        .filter_counts
+        .get(&filter)
+        .copied()
+        .unwrap_or(0)
 }

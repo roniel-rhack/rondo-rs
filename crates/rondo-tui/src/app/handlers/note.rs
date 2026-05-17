@@ -8,10 +8,7 @@ pub fn request_add(app: &mut AppState) {
     if !app.writable {
         app.toast("note: read-only");
     } else if let Some(id) = app.data.selected_task_id() {
-        app.modals.note_textarea = tui_textarea::TextArea::default();
-        app.modals.note_editing_id = None;
-        app.modals.note_task_id = Some(id);
-        app.modals.note_editor_open = true;
+        app.modals.open_note_editor(id, None);
         app.ui.mode = Mode::Insert;
     }
 }
@@ -27,12 +24,10 @@ pub fn request_edit_focused(app: &mut AppState) {
     let Some(note) = task.notes.get(app.ui.focus.section_item) else {
         return;
     };
-    app.modals.note_textarea = tui_textarea::TextArea::new(
-        note.body.split('\n').map(|s| s.to_string()).collect(),
-    );
-    app.modals.note_editing_id = Some(note.id);
-    app.modals.note_task_id = Some(task.id);
-    app.modals.note_editor_open = true;
+    let task_id = task.id;
+    let note_id = note.id;
+    let body = note.body.clone();
+    app.modals.open_note_editor(task_id, Some((note_id, &body)));
     app.ui.mode = Mode::Insert;
 }
 
@@ -84,10 +79,7 @@ pub fn submit(app: &mut AppState) {
     let body = app.modals.note_textarea.lines().join("\n");
     let editing = app.modals.note_editing_id;
     let task_id = app.modals.note_task_id;
-    app.modals.note_editor_open = false;
-    app.modals.note_textarea = tui_textarea::TextArea::default();
-    app.modals.note_editing_id = None;
-    app.modals.note_task_id = None;
+    app.modals.close_note_editor();
     app.ui.mode = Mode::Normal;
     if body.trim().is_empty() {
         return;
@@ -136,10 +128,7 @@ pub fn submit(app: &mut AppState) {
 }
 
 pub fn cancel(app: &mut AppState) {
-    app.modals.note_editor_open = false;
-    app.modals.note_textarea = tui_textarea::TextArea::default();
-    app.modals.note_editing_id = None;
-    app.modals.note_task_id = None;
+    app.modals.close_note_editor();
     app.ui.mode = Mode::Normal;
 }
 

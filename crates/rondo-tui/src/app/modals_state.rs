@@ -190,6 +190,159 @@ impl ModalsState {
         None
     }
 
+    pub fn open_help(&mut self) {
+        self.help_open = true;
+    }
+
+    pub fn close_help(&mut self) {
+        self.help_open = false;
+    }
+
+    pub fn open_command_palette(&mut self) {
+        self.command_palette_open = true;
+        self.command_buf.clear();
+    }
+
+    pub fn close_command_palette(&mut self) {
+        self.command_palette_open = false;
+        self.command_buf.clear();
+    }
+
+    pub fn open_search(&mut self) {
+        self.search_open = true;
+        self.search_buf.clear();
+    }
+
+    pub fn close_search(&mut self) {
+        self.search_open = false;
+        self.search_buf.clear();
+    }
+
+    pub fn open_quick_add(&mut self) {
+        self.quick_add_open = true;
+        self.quick_add_buf.clear();
+    }
+
+    pub fn close_quick_add(&mut self) {
+        self.quick_add_open = false;
+        self.quick_add_buf.clear();
+    }
+
+    pub fn open_edit_title(&mut self, current: String) {
+        self.edit_title_buf = current;
+        self.edit_title_open = true;
+    }
+
+    pub fn close_edit_title(&mut self) {
+        self.edit_title_open = false;
+        self.edit_title_buf.clear();
+    }
+
+    pub fn open_add_subtask(&mut self) {
+        self.add_subtask_buf.clear();
+        self.add_subtask_open = true;
+    }
+
+    pub fn close_add_subtask(&mut self) {
+        self.add_subtask_open = false;
+        self.add_subtask_buf.clear();
+    }
+
+    pub fn open_dep_overlay(&mut self, mode: DepOverlayMode) {
+        self.dep_overlay_buf.clear();
+        self.dep_overlay_open = true;
+        self.dep_overlay_mode = mode;
+    }
+
+    pub fn close_dep_overlay(&mut self) {
+        self.dep_overlay_open = false;
+        self.dep_overlay_buf.clear();
+    }
+
+    pub fn open_edit_subtask(&mut self, id: i64, current: String) {
+        self.edit_subtask_buf = current;
+        self.edit_subtask_id = Some(id);
+        self.edit_subtask_open = true;
+    }
+
+    pub fn close_edit_subtask(&mut self) {
+        self.edit_subtask_open = false;
+        self.edit_subtask_buf.clear();
+        self.edit_subtask_id = None;
+    }
+
+    pub fn open_note_editor(&mut self, task_id: i64, editing: Option<(i64, &str)>) {
+        let lines: Vec<String> = match editing {
+            Some((_id, body)) => body.split('\n').map(|s| s.to_string()).collect(),
+            None => Vec::new(),
+        };
+        self.note_textarea = if lines.is_empty() {
+            tui_textarea::TextArea::default()
+        } else {
+            tui_textarea::TextArea::new(lines)
+        };
+        self.note_editing_id = editing.map(|(id, _)| id);
+        self.note_task_id = Some(task_id);
+        self.note_editor_open = true;
+    }
+
+    pub fn close_note_editor(&mut self) {
+        self.note_editor_open = false;
+        self.note_textarea = tui_textarea::TextArea::default();
+        self.note_editing_id = None;
+        self.note_task_id = None;
+    }
+
+    pub fn open_description_editor(&mut self, task_id: i64, body: &str) {
+        self.description_textarea = tui_textarea::TextArea::new(
+            body.split('\n').map(|s| s.to_string()).collect(),
+        );
+        self.description_task_id = Some(task_id);
+        self.description_editor_open = true;
+    }
+
+    pub fn close_description_editor(&mut self) {
+        self.description_editor_open = false;
+        self.description_textarea = tui_textarea::TextArea::default();
+        self.description_task_id = None;
+    }
+
+    pub fn open_journal_editor(&mut self, editing: Option<(i64, &str)>) {
+        let lines: Vec<String> = match editing {
+            Some((_id, body)) => body.split('\n').map(|s| s.to_string()).collect(),
+            None => Vec::new(),
+        };
+        self.journal_textarea = if lines.is_empty() {
+            tui_textarea::TextArea::default()
+        } else {
+            tui_textarea::TextArea::new(lines)
+        };
+        self.journal_editor_entry_id = editing.map(|(id, _)| id);
+        self.journal_editor_open = true;
+    }
+
+    pub fn close_journal_editor(&mut self) {
+        self.journal_editor_open = false;
+        self.journal_textarea = tui_textarea::TextArea::default();
+        self.journal_editor_entry_id = None;
+    }
+
+    pub fn open_sort_overlay(&mut self) {
+        self.sort_overlay_open = true;
+    }
+
+    pub fn close_sort_overlay(&mut self) {
+        self.sort_overlay_open = false;
+    }
+
+    pub fn open_confirm_delete(&mut self) {
+        self.confirm_delete_open = true;
+    }
+
+    pub fn close_confirm_delete(&mut self) {
+        self.confirm_delete_open = false;
+    }
+
     /// Close the topmost modal, returning the layer that was closed.
     /// Returns `None` if no modal is open.
     ///

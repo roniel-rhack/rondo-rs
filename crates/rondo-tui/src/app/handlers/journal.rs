@@ -6,9 +6,7 @@ use crate::focus::Mode;
 
 pub fn start_entry(app: &mut AppState) {
     if app.ui.page == Page::Journal {
-        app.modals.journal_editor_open = true;
-        app.modals.journal_textarea = tui_textarea::TextArea::default();
-        app.modals.journal_editor_entry_id = None;
+        app.modals.open_journal_editor(None);
         app.ui.mode = Mode::Insert;
     }
 }
@@ -20,11 +18,9 @@ pub fn edit_focused_entry(app: &mut AppState) {
             .selected_journal_entry
             .min(app.data.journal_entries.len() - 1);
         let entry = &app.data.journal_entries[idx];
-        app.modals.journal_textarea = tui_textarea::TextArea::new(
-            entry.body.split('\n').map(|s| s.to_string()).collect(),
-        );
-        app.modals.journal_editor_entry_id = Some(entry.id);
-        app.modals.journal_editor_open = true;
+        let id = entry.id;
+        let body = entry.body.clone();
+        app.modals.open_journal_editor(Some((id, &body)));
         app.ui.mode = Mode::Insert;
     }
 }
@@ -48,9 +44,7 @@ pub fn prev_entry(app: &mut AppState) {
 }
 
 pub fn cancel_entry(app: &mut AppState) {
-    app.modals.journal_editor_open = false;
-    app.modals.journal_textarea = tui_textarea::TextArea::default();
-    app.modals.journal_editor_entry_id = None;
+    app.modals.close_journal_editor();
     app.ui.mode = Mode::Normal;
 }
 

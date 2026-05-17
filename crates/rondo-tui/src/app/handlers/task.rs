@@ -8,12 +8,12 @@ pub fn request_delete(app: &mut AppState) {
     if !app.writable {
         app.toast(ro_msg("delete"));
     } else if app.data.selected_task_id().is_some() {
-        app.modals.confirm_delete_open = true;
+        app.modals.open_confirm_delete();
     }
 }
 
 pub fn confirm_delete(app: &mut AppState) {
-    app.modals.confirm_delete_open = false;
+    app.modals.close_confirm_delete();
     if let Some(id) = app.data.selected_task_id() {
         match app.data.store.delete_task(id) {
             Ok(snap) => {
@@ -30,8 +30,7 @@ pub fn request_edit_title(app: &mut AppState) {
     if !app.writable {
         app.toast(ro_msg("edit"));
     } else if let Some(t) = app.data.selected_task() {
-        app.modals.edit_title_buf = t.title.clone();
-        app.modals.edit_title_open = true;
+        app.modals.open_edit_title(t.title.clone());
         app.ui.mode = Mode::Insert;
     }
 }
@@ -54,14 +53,12 @@ pub fn submit_edit_title(app: &mut AppState, new_title: String) {
             }
         }
     }
-    app.modals.edit_title_open = false;
-    app.modals.edit_title_buf.clear();
+    app.modals.close_edit_title();
     app.ui.mode = Mode::Normal;
 }
 
 pub fn cancel_edit_title(app: &mut AppState) {
-    app.modals.edit_title_open = false;
-    app.modals.edit_title_buf.clear();
+    app.modals.close_edit_title();
     app.ui.mode = Mode::Normal;
 }
 
@@ -70,11 +67,8 @@ pub fn request_edit_description(app: &mut AppState) {
         app.toast(ro_msg("description"));
     } else if let Some(task) = app.data.selected_task() {
         let body = task.description.clone().unwrap_or_default();
-        app.modals.description_textarea = tui_textarea::TextArea::new(
-            body.split('\n').map(|s| s.to_string()).collect(),
-        );
-        app.modals.description_task_id = Some(task.id);
-        app.modals.description_editor_open = true;
+        let task_id = task.id;
+        app.modals.open_description_editor(task_id, &body);
         app.ui.mode = Mode::Insert;
     }
 }
@@ -88,9 +82,7 @@ pub fn description_editor_key(app: &mut AppState, k: crossterm::event::KeyEvent)
 pub fn submit_edit_description(app: &mut AppState) {
     let body = app.modals.description_textarea.lines().join("\n");
     let task_id = app.modals.description_task_id;
-    app.modals.description_editor_open = false;
-    app.modals.description_textarea = tui_textarea::TextArea::default();
-    app.modals.description_task_id = None;
+    app.modals.close_description_editor();
     app.ui.mode = Mode::Normal;
     if let Some(id) = task_id {
         let patch = rondo_core::domain::task::TaskPatch {
@@ -109,9 +101,7 @@ pub fn submit_edit_description(app: &mut AppState) {
 }
 
 pub fn cancel_edit_description(app: &mut AppState) {
-    app.modals.description_editor_open = false;
-    app.modals.description_textarea = tui_textarea::TextArea::default();
-    app.modals.description_task_id = None;
+    app.modals.close_description_editor();
     app.ui.mode = Mode::Normal;
 }
 
@@ -126,7 +116,7 @@ pub fn handle(app: &mut AppState, action: &Action) -> bool {
             true
         }
         Action::CancelDelete => {
-            app.modals.confirm_delete_open = false;
+            app.modals.close_confirm_delete();
             true
         }
         Action::RequestEditTitle => {

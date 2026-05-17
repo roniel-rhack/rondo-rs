@@ -309,8 +309,7 @@ impl AppState {
                 }
             }
             Action::OpenQuickAdd => {
-                self.modals.quick_add_open = true;
-                self.modals.quick_add_buf.clear();
+                self.modals.open_quick_add();
                 self.ui.mode = Mode::Insert;
             }
             Action::SubmitQuickAdd(raw) => self.submit_quick_add(raw),
@@ -320,7 +319,7 @@ impl AppState {
             // Journal* actions handled in `handlers::journal` (dispatched above).
             Action::SetSortOrder(order) => {
                 self.ui.sort_order = order;
-                self.modals.sort_overlay_open = false;
+                self.modals.close_sort_overlay();
                 self.toast(format!("sort: {}", order.label()));
             }
             // Task delete + edit title handled in `handlers::task`.
@@ -913,10 +912,9 @@ impl AppState {
     }
 
     fn submit_quick_add(&mut self, raw: String) {
-        self.modals.quick_add_open = false;
+        self.modals.close_quick_add();
         self.ui.mode = Mode::Normal;
         let parsed = parse_quick_add(&raw);
-        self.modals.quick_add_buf.clear();
         if parsed.title.is_empty() {
             return;
         }
@@ -957,8 +955,7 @@ impl AppState {
     pub(crate) fn submit_journal_entry(&mut self) {
         let body = self.modals.journal_textarea.lines().join("\n");
         let editing_id = self.modals.journal_editor_entry_id.take();
-        self.modals.journal_editor_open = false;
-        self.modals.journal_textarea = tui_textarea::TextArea::default();
+        self.modals.close_journal_editor();
         self.ui.mode = Mode::Normal;
         if body.trim().is_empty() {
             return;

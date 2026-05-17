@@ -8,8 +8,7 @@ pub fn request_add(app: &mut AppState) {
     if !app.writable {
         app.toast(ro_msg("subtask"));
     } else if app.data.selected_task_id().is_some() {
-        app.modals.add_subtask_buf.clear();
-        app.modals.add_subtask_open = true;
+        app.modals.open_add_subtask();
         app.ui.mode = Mode::Insert;
     }
 }
@@ -28,14 +27,12 @@ pub fn submit_add(app: &mut AppState, title: String) {
             }
         }
     }
-    app.modals.add_subtask_open = false;
-    app.modals.add_subtask_buf.clear();
+    app.modals.close_add_subtask();
     app.ui.mode = Mode::Normal;
 }
 
 pub fn cancel_add(app: &mut AppState) {
-    app.modals.add_subtask_open = false;
-    app.modals.add_subtask_buf.clear();
+    app.modals.close_add_subtask();
     app.ui.mode = Mode::Normal;
 }
 
@@ -44,9 +41,9 @@ pub fn request_edit_focused(app: &mut AppState) {
         app.toast(ro_msg("subtask"));
     } else if let Some(task) = app.data.selected_task() {
         if let Some(sub) = task.subtasks.get(app.ui.focus.section_item) {
-            app.modals.edit_subtask_buf = sub.title.clone();
-            app.modals.edit_subtask_id = Some(sub.id);
-            app.modals.edit_subtask_open = true;
+            let id = sub.id;
+            let title = sub.title.clone();
+            app.modals.open_edit_subtask(id, title);
             app.ui.mode = Mode::Insert;
         }
     }
@@ -55,9 +52,7 @@ pub fn request_edit_focused(app: &mut AppState) {
 pub fn submit_edit(app: &mut AppState, new_title: String) {
     let trimmed = new_title.trim().to_string();
     let sub_id = app.modals.edit_subtask_id;
-    app.modals.edit_subtask_open = false;
-    app.modals.edit_subtask_buf.clear();
-    app.modals.edit_subtask_id = None;
+    app.modals.close_edit_subtask();
     app.ui.mode = Mode::Normal;
     if !trimmed.is_empty() {
         if let Some(id) = sub_id {
@@ -73,9 +68,7 @@ pub fn submit_edit(app: &mut AppState, new_title: String) {
 }
 
 pub fn cancel_edit(app: &mut AppState) {
-    app.modals.edit_subtask_open = false;
-    app.modals.edit_subtask_buf.clear();
-    app.modals.edit_subtask_id = None;
+    app.modals.close_edit_subtask();
     app.ui.mode = Mode::Normal;
 }
 

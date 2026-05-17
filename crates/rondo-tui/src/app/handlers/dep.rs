@@ -8,9 +8,7 @@ pub fn request_add(app: &mut AppState) {
     if !app.writable {
         app.toast(ro_msg("dep"));
     } else if app.data.selected_task_id().is_some() {
-        app.modals.dep_overlay_buf.clear();
-        app.modals.dep_overlay_open = true;
-        app.modals.dep_overlay_mode = DepOverlayMode::Add;
+        app.modals.open_dep_overlay(DepOverlayMode::Add);
         app.ui.mode = Mode::Insert;
     }
 }
@@ -40,8 +38,7 @@ pub fn submit_add(app: &mut AppState, buf: String) {
         (Ok(_), _) => app.toast("dep: invalid id"),
         (Err(_), _) => app.toast("dep: enter a numeric task id"),
     }
-    app.modals.dep_overlay_open = false;
-    app.modals.dep_overlay_buf.clear();
+    app.modals.close_dep_overlay();
     app.ui.mode = Mode::Normal;
 }
 
@@ -64,14 +61,12 @@ pub fn submit_remove(app: &mut AppState, buf: String) {
         },
         _ => app.toast("dep: enter a numeric task id"),
     }
-    app.modals.dep_overlay_open = false;
-    app.modals.dep_overlay_buf.clear();
+    app.modals.close_dep_overlay();
     app.ui.mode = Mode::Normal;
 }
 
 pub fn cancel(app: &mut AppState) {
-    app.modals.dep_overlay_open = false;
-    app.modals.dep_overlay_buf.clear();
+    app.modals.close_dep_overlay();
     app.ui.mode = Mode::Normal;
 }
 

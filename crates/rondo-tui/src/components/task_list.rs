@@ -219,7 +219,7 @@ fn build_row(
         lines.push(Line::from(vec![
             Span::raw(indent),
             Span::styled("↳ ", Style::default().fg(t.fg_muted)),
-            Span::styled(truncate(&st.title, 60), t.muted()),
+            Span::styled(truncate(&st.title, 60).into_owned(), t.muted()),
         ]));
     }
 
@@ -360,12 +360,12 @@ fn sorted_indices(tasks: &[Task], order: SortOrder, base: Vec<usize>) -> Vec<usi
     out
 }
 
-fn truncate(s: &str, max: usize) -> String {
+fn truncate(s: &str, max: usize) -> std::borrow::Cow<'_, str> {
     if s.chars().count() <= max {
-        s.to_string()
+        std::borrow::Cow::Borrowed(s)
     } else {
         let mut out: String = s.chars().take(max - 1).collect();
         out.push('…');
-        out
+        std::borrow::Cow::Owned(out)
     }
 }

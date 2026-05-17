@@ -159,11 +159,9 @@ impl AppState {
             }
             Action::NextItem => self.move_selection(1),
             Action::PrevItem => self.move_selection(-1),
-            Action::TogglePage(p) => {
-                if p != self.ui.page {
-                    self.ui.page = p;
-                    self.spawn_page_swap();
-                }
+            Action::TogglePage(p) if p != self.ui.page => {
+                self.ui.page = p;
+                self.spawn_page_swap();
             }
             Action::NextTab | Action::PrevTab => {
                 let next = match self.ui.page {
@@ -176,113 +174,107 @@ impl AppState {
                 }
             }
             Action::ToggleSelected => self.handle_space(),
-            Action::ApplySidebarSelection => {
-                if self.ui.focus.pane == Pane::Sidebar {
-                    self.apply_sidebar_selection();
-                }
+            Action::ApplySidebarSelection if self.ui.focus.pane == Pane::Sidebar => {
+                self.apply_sidebar_selection();
             }
             Action::ApplyFilter(f) => self.apply_filter(f),
-            Action::EnterVisual => {
-                if self.ui.focus.pane == Pane::List && self.ui.page == Page::Tasks {
-                    self.ui.mode = Mode::Visual;
-                    self.ui.selection.clear();
-                    if let Some(t) = self.data.tasks.get(self.data.selected_task) {
-                        self.ui.selection.insert(t.id);
-                    }
+            Action::EnterVisual
+                if self.ui.focus.pane == Pane::List && self.ui.page == Page::Tasks =>
+            {
+                self.ui.mode = Mode::Visual;
+                self.ui.selection.clear();
+                if let Some(t) = self.data.tasks.get(self.data.selected_task) {
+                    self.ui.selection.insert(t.id);
                 }
             }
-            Action::BulkDone => {
-                if self.ui.mode == Mode::Visual {
-                    let ids: Vec<i64> = self.ui.selection.iter().copied().collect();
-                    if self.writable {
-                        let mut ok = 0usize;
-                        let mut err: Option<String> = None;
-                        for id in &ids {
-                            match self
-                                .data
-                                .store
-                                .set_status(*id, rondo_core::domain::task::Status::Done)
-                            {
-                                Ok(snap) => {
-                                    self.undo.push(snap);
-                                    ok += 1;
-                                }
-                                Err(e) => err = Some(format!("{}", e)),
+            Action::BulkDone if self.ui.mode == Mode::Visual => {
+                let ids: Vec<i64> = self.ui.selection.iter().copied().collect();
+                if self.writable {
+                    let mut ok = 0usize;
+                    let mut err: Option<String> = None;
+                    for id in &ids {
+                        match self
+                            .data
+                            .store
+                            .set_status(*id, rondo_core::domain::task::Status::Done)
+                        {
+                            Ok(snap) => {
+                                self.undo.push(snap);
+                                ok += 1;
                             }
+                            Err(e) => err = Some(format!("{}", e)),
                         }
-                        self.data.refresh_tasks();
-                        if let Some(first) = ids.first() {
-                            self.ui.flash = Some((FlashTarget::Task(*first), Instant::now()));
-                        }
-                        if self.ui.last_task_list_rect.width > 0 {
-                            let eff = crate::fx::presets::task_done_sweep(self.theme.fg_muted);
-                            self.fx.spawn(
-                                crate::fx::EffectId::TaskDone(ids.first().copied().unwrap_or(0)),
-                                eff,
-                                self.ui.last_task_list_rect,
-                            );
-                        }
-                        match err {
-                            Some(e) => self.toast(format!("bulk done: {} ok, error: {}", ok, e)),
-                            None => self.toast(format!("marked {} tasks done", ok)),
-                        }
-                    } else {
-                        for t in self.data.tasks.iter_mut() {
-                            if ids.contains(&t.id) {
-                                t.status = match t.status {
-                                    rondo_core::domain::task::Status::Done => {
-                                        rondo_core::domain::task::Status::Pending
-                                    }
-                                    _ => rondo_core::domain::task::Status::Done,
-                                };
-                            }
-                        }
-                        if let Some(first) = ids.first() {
-                            self.ui.flash = Some((FlashTarget::Task(*first), Instant::now()));
-                        }
-                        if self.ui.last_task_list_rect.width > 0 {
-                            let eff = crate::fx::presets::task_done_sweep(self.theme.fg_muted);
-                            self.fx.spawn(
-                                crate::fx::EffectId::TaskDone(ids.first().copied().unwrap_or(0)),
-                                eff,
-                                self.ui.last_task_list_rect,
-                            );
-                        }
-                        self.toast(format!(
-                            "toggled {} tasks (read-only, in-memory)",
-                            self.ui.selection.len()
-                        ));
                     }
-                    self.ui.selection.clear();
-                    self.ui.mode = Mode::Normal;
-                }
-            }
-            Action::BulkPriority => {
-                if self.ui.mode == Mode::Visual {
-                    let ids: Vec<i64> = self.ui.selection.iter().copied().collect();
+                    self.data.refresh_tasks();
+                    if let Some(first) = ids.first() {
+                        self.ui.flash = Some((FlashTarget::Task(*first), Instant::now()));
+                    }
+                    if self.ui.last_task_list_rect.width > 0 {
+                        let eff = crate::fx::presets::task_done_sweep(self.theme.fg_muted);
+                        self.fx.spawn(
+                            crate::fx::EffectId::TaskDone(ids.first().copied().unwrap_or(0)),
+                            eff,
+                            self.ui.last_task_list_rect,
+                        );
+                    }
+                    match err {
+                        Some(e) => self.toast(format!("bulk done: {} ok, error: {}", ok, e)),
+                        None => self.toast(format!("marked {} tasks done", ok)),
+                    }
+                } else {
                     for t in self.data.tasks.iter_mut() {
                         if ids.contains(&t.id) {
-                            t.priority = match t.priority {
-                                rondo_core::domain::task::Priority::Low => {
-                                    rondo_core::domain::task::Priority::Med
+                            t.status = match t.status {
+                                rondo_core::domain::task::Status::Done => {
+                                    rondo_core::domain::task::Status::Pending
                                 }
-                                rondo_core::domain::task::Priority::Med => {
-                                    rondo_core::domain::task::Priority::High
-                                }
-                                rondo_core::domain::task::Priority::High => {
-                                    rondo_core::domain::task::Priority::Urgent
-                                }
-                                rondo_core::domain::task::Priority::Urgent => {
-                                    rondo_core::domain::task::Priority::Low
-                                }
+                                _ => rondo_core::domain::task::Status::Done,
                             };
                         }
                     }
-                    self.status_msg = Some(format!(
-                        "bumped priority on {} tasks",
+                    if let Some(first) = ids.first() {
+                        self.ui.flash = Some((FlashTarget::Task(*first), Instant::now()));
+                    }
+                    if self.ui.last_task_list_rect.width > 0 {
+                        let eff = crate::fx::presets::task_done_sweep(self.theme.fg_muted);
+                        self.fx.spawn(
+                            crate::fx::EffectId::TaskDone(ids.first().copied().unwrap_or(0)),
+                            eff,
+                            self.ui.last_task_list_rect,
+                        );
+                    }
+                    self.toast(format!(
+                        "toggled {} tasks (read-only, in-memory)",
                         self.ui.selection.len()
                     ));
                 }
+                self.ui.selection.clear();
+                self.ui.mode = Mode::Normal;
+            }
+            Action::BulkPriority if self.ui.mode == Mode::Visual => {
+                let ids: Vec<i64> = self.ui.selection.iter().copied().collect();
+                for t in self.data.tasks.iter_mut() {
+                    if ids.contains(&t.id) {
+                        t.priority = match t.priority {
+                            rondo_core::domain::task::Priority::Low => {
+                                rondo_core::domain::task::Priority::Med
+                            }
+                            rondo_core::domain::task::Priority::Med => {
+                                rondo_core::domain::task::Priority::High
+                            }
+                            rondo_core::domain::task::Priority::High => {
+                                rondo_core::domain::task::Priority::Urgent
+                            }
+                            rondo_core::domain::task::Priority::Urgent => {
+                                rondo_core::domain::task::Priority::Low
+                            }
+                        };
+                    }
+                }
+                self.status_msg = Some(format!(
+                    "bumped priority on {} tasks",
+                    self.ui.selection.len()
+                ));
             }
             Action::OpenQuickAdd => {
                 self.modals.quick_add_open = true;
@@ -314,30 +306,28 @@ impl AppState {
                 self.finalize_pomodoro_close();
             }
             Action::SubmitCommand(cmd) => self.handle_command(cmd),
-            Action::JournalStartEntry => {
-                if self.ui.page == Page::Journal {
-                    self.modals.journal_editor_open = true;
-                    self.modals.journal_editor_buf.clear();
-                    self.modals.journal_textarea = tui_textarea::TextArea::default();
-                    self.modals.journal_editor_entry_id = None;
-                    self.ui.mode = Mode::Insert;
-                }
+            Action::JournalStartEntry if self.ui.page == Page::Journal => {
+                self.modals.journal_editor_open = true;
+                self.modals.journal_editor_buf.clear();
+                self.modals.journal_textarea = tui_textarea::TextArea::default();
+                self.modals.journal_editor_entry_id = None;
+                self.ui.mode = Mode::Insert;
             }
-            Action::JournalEditFocusedEntry => {
-                if self.ui.page == Page::Journal && !self.data.journal_entries.is_empty() {
-                    let idx = self
-                        .data
-                        .selected_journal_entry
-                        .min(self.data.journal_entries.len() - 1);
-                    let entry = &self.data.journal_entries[idx];
-                    self.modals.journal_editor_buf = entry.body.clone();
-                    self.modals.journal_textarea = tui_textarea::TextArea::new(
-                        entry.body.split('\n').map(|s| s.to_string()).collect(),
-                    );
-                    self.modals.journal_editor_entry_id = Some(entry.id);
-                    self.modals.journal_editor_open = true;
-                    self.ui.mode = Mode::Insert;
-                }
+            Action::JournalEditFocusedEntry
+                if self.ui.page == Page::Journal && !self.data.journal_entries.is_empty() =>
+            {
+                let idx = self
+                    .data
+                    .selected_journal_entry
+                    .min(self.data.journal_entries.len() - 1);
+                let entry = &self.data.journal_entries[idx];
+                self.modals.journal_editor_buf = entry.body.clone();
+                self.modals.journal_textarea = tui_textarea::TextArea::new(
+                    entry.body.split('\n').map(|s| s.to_string()).collect(),
+                );
+                self.modals.journal_editor_entry_id = Some(entry.id);
+                self.modals.journal_editor_open = true;
+                self.ui.mode = Mode::Insert;
             }
             Action::JournalEditorKey(k) => {
                 let input = tui_textarea::Input::from(crossterm::event::Event::Key(k));
@@ -351,10 +341,8 @@ impl AppState {
                         (self.data.selected_journal_entry + 1).min(n - 1);
                 }
             }
-            Action::JournalPrevEntry => {
-                if self.data.selected_journal_entry > 0 {
-                    self.data.selected_journal_entry -= 1;
-                }
+            Action::JournalPrevEntry if self.data.selected_journal_entry > 0 => {
+                self.data.selected_journal_entry -= 1;
             }
             Action::JournalSubmitEntry => self.submit_journal_entry(),
             Action::JournalCancelEntry => {
@@ -377,20 +365,20 @@ impl AppState {
                 };
                 self.toast(format!("journal: {}", label));
             }
-            Action::JournalGotoTop => {
-                if self.ui.page == Page::Journal && !self.data.journal_notes.is_empty() {
-                    self.data.selected_journal = 0;
-                    self.data.journal_list_state.select(Some(0));
-                    self.data.reload_journal_entries();
-                }
+            Action::JournalGotoTop
+                if self.ui.page == Page::Journal && !self.data.journal_notes.is_empty() =>
+            {
+                self.data.selected_journal = 0;
+                self.data.journal_list_state.select(Some(0));
+                self.data.reload_journal_entries();
             }
-            Action::JournalGotoBottom => {
-                if self.ui.page == Page::Journal && !self.data.journal_notes.is_empty() {
-                    let last = self.data.journal_notes.len() - 1;
-                    self.data.selected_journal = last;
-                    self.data.journal_list_state.select(Some(last));
-                    self.data.reload_journal_entries();
-                }
+            Action::JournalGotoBottom
+                if self.ui.page == Page::Journal && !self.data.journal_notes.is_empty() =>
+            {
+                let last = self.data.journal_notes.len() - 1;
+                self.data.selected_journal = last;
+                self.data.journal_list_state.select(Some(last));
+                self.data.reload_journal_entries();
             }
             Action::JournalDeleteEntry => {
                 self.delete_focused_journal_entry();
@@ -816,12 +804,11 @@ impl AppState {
                     }
                 }
             }
-            Action::ToggleFocusedSubtask => {
+            Action::ToggleFocusedSubtask
                 if self.ui.focus.pane == Pane::Detail
-                    && self.ui.focus.section == DetailSection::Subtasks
-                {
-                    self.toggle_focused_subtask();
-                }
+                    && self.ui.focus.section == DetailSection::Subtasks =>
+            {
+                self.toggle_focused_subtask();
             }
             Action::EscapeContext => {
                 if self.modals.description_editor_open {

@@ -242,7 +242,7 @@ fn draw_distribution(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
     let mut lines: Vec<Line> = Vec::new();
     for (i, (tag, count)) in entries.iter().enumerate() {
-        let pct = if total == 0 { 0 } else { count * 100 / total };
+        let pct = (count * 100).checked_div(total).unwrap_or(0);
         let filled = (bar_max * pct / 100).max(1);
         let empty = bar_max.saturating_sub(filled);
         let color = palette[i % palette.len()];

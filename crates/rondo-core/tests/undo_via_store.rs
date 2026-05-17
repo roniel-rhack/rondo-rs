@@ -139,10 +139,10 @@ fn add_dep_undo_via_remove() {
     let b = tasks.next().unwrap();
     store.add_dependency(a.id, b.id).unwrap();
     let after = store.task_by_id(a.id).unwrap();
-    assert!(after.blocked_by_ids.iter().any(|d| *d == b.id));
+    assert!(after.blocked_by_ids.contains(&b.id));
     store.remove_dependency(a.id, b.id).unwrap();
     let after2 = store.task_by_id(a.id).unwrap();
-    assert!(!after2.blocked_by_ids.iter().any(|d| *d == b.id));
+    assert!(!after2.blocked_by_ids.contains(&b.id));
 }
 
 #[test]
@@ -158,8 +158,7 @@ fn remove_dep_undo_via_add() {
         .task_by_id(a.id)
         .unwrap()
         .blocked_by_ids
-        .iter()
-        .any(|d| *d == b.id));
+        .contains(&b.id));
 }
 
 #[test]

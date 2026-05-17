@@ -86,14 +86,16 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
     if app.modals.description_editor_open {
         let w = (area.width.saturating_sub(8)).min(110);
         let h = area.height.saturating_sub(4);
+        let title = rondo_core::i18n::t("multiline_editor.title_description");
+        let extra = rondo_core::i18n::t("multiline_editor.md_supported");
         components::multiline_editor::draw(
             app,
             f,
             centered(w, h, area),
             components::multiline_editor::TextAreaAccess::Description,
             components::multiline_editor::Config {
-                title: " ✎ edit description ",
-                hint_extra: Some("# **md** _it_  soportado"),
+                title: &title,
+                hint_extra: Some(&extra),
             },
         );
     }
@@ -101,18 +103,19 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
         let w = (area.width.saturating_sub(8)).min(110);
         let h = area.height.saturating_sub(4);
         let title = if app.modals.note_editing_id.is_some() {
-            " ✎ edit note "
+            rondo_core::i18n::t("multiline_editor.title_note_edit")
         } else {
-            " + note "
+            rondo_core::i18n::t("multiline_editor.title_note_new")
         };
+        let extra = rondo_core::i18n::t("multiline_editor.md_supported");
         components::multiline_editor::draw(
             app,
             f,
             centered(w, h, area),
             components::multiline_editor::TextAreaAccess::Note,
             components::multiline_editor::Config {
-                title,
-                hint_extra: Some("# **md** _it_  soportado"),
+                title: &title,
+                hint_extra: Some(&extra),
             },
         );
     }

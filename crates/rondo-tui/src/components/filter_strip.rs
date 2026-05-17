@@ -6,6 +6,7 @@ use ratatui::{
     widgets::Paragraph,
     Frame,
 };
+use rondo_core::i18n;
 
 /// Thin filter / count strip that lives between the header panel and the body.
 /// Left: active filter chips (`◖#work◗  ◖due≤7d◗`) — empty for now (Fase 5).
@@ -19,7 +20,10 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
     let mut chips: Vec<Span<'static>> = vec![Span::raw(" ")];
     if !app.modals.search_buf.is_empty() {
-        chips.push(Span::styled(" filter: ", Style::default().fg(t.fg_muted)));
+        chips.push(Span::styled(
+            i18n::t("filter_strip.label"),
+            Style::default().fg(t.fg_muted),
+        ));
         chips.push(chip(&format!("/{}", app.modals.search_buf), t.accent, t));
     }
     f.render_widget(Paragraph::new(Line::from(chips)), chunks[0]);
@@ -39,11 +43,14 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let done = app.data.tasks.len() - active;
     let counts = Line::from(vec![
         Span::styled(
-            format!("{} active", active),
+            format!("{}{}", active, i18n::t("filter_strip.active")),
             Style::default().fg(t.fg).add_modifier(Modifier::BOLD),
         ),
         Span::styled(" · ", Style::default().fg(t.border_inactive)),
-        Span::styled(format!("{} done ", done), Style::default().fg(t.fg_muted)),
+        Span::styled(
+            format!("{}{}", done, i18n::t("filter_strip.done")),
+            Style::default().fg(t.fg_muted),
+        ),
     ]);
     f.render_widget(
         Paragraph::new(counts).alignment(Alignment::Right),

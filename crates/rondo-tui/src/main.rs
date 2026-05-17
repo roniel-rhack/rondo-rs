@@ -135,7 +135,6 @@ fn main() -> Result<()> {
     } else {
         Theme::by_name(theme_name)
     };
-    app.lang = rondo_tui::strings::Lang::from_code(&cfg.ui.language);
     load_active_language_pack(&cfg.ui.language);
     app.fx = FxManager::new_with_options(reduced);
     register_builtin_plugins(&mut app);

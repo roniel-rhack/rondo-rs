@@ -50,6 +50,11 @@ cargo run -p rondo-tui -- --reduced-motion --no-color
 - Snapshot tests via `insta` + `TestBackend` — wall-clock timestamps redacted globally.
 - Plugin DSL types must survive `serde_json` round-trip.
 - All state under `~/.rondo-rs/` (DB, backups, logs, lock, plugins, sync, config).
+- All user-visible strings go through `rondo_core::i18n::t(key)` / `tf(key, args)`.
+  English baseline lives in `crates/rondo-core/src/i18n/en.toml` (single source
+  of truth, baked in via `include_str!`). External packs live as
+  `~/.rondo-rs/lang/<code>.toml` and switch in-place via the `:lang` palette
+  command. Snapshots pin `force_for_tests()` so insta runs are locale-stable.
 
 ## Branching (gitflow)
 

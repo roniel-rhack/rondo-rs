@@ -1,6 +1,5 @@
 use crate::app::AppState;
 use crate::focus::{DetailSection, Mode, Pane};
-use crate::strings::{t as tr, StringKey};
 use ratatui::{
     layout::Rect,
     style::{Modifier, Style},
@@ -8,6 +7,7 @@ use ratatui::{
     widgets::Paragraph,
     Frame,
 };
+use rondo_core::i18n;
 
 pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
@@ -34,7 +34,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
     for (key, action) in hints(app) {
         spans.push(Span::styled("[", t.muted()));
-        spans.push(Span::styled(key, t.kbd()));
+        spans.push(Span::styled(key.to_string(), t.kbd()));
         spans.push(Span::styled(" → ", t.muted()));
         spans.push(Span::styled(action, Style::default().fg(t.fg)));
         spans.push(Span::styled("] ", t.muted()));
@@ -46,14 +46,11 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         spans.push(Span::styled(msg.clone(), Style::default().fg(t.warn)));
         spans.push(Span::raw("  "));
     }
-    // E15: always-on `? help` hint. Rendered regardless of modal/page context
-    // so users discover the help overlay from any state. Suppressed only when
-    // the help overlay itself is already open.
     if !app.modals.help_open {
         spans.push(Span::styled("· ", t.muted()));
         spans.push(Span::styled("?", t.kbd()));
         spans.push(Span::styled(
-            format!(" {} ", tr(app.lang, StringKey::FooterHelpHint)),
+            format!(" {} ", i18n::t("footer.help_hint")),
             t.muted(),
         ));
     }
@@ -77,106 +74,118 @@ fn mode_color(mode: Mode, t: &crate::theme::Theme) -> ratatui::style::Color {
     }
 }
 
+/// Build a hint row, looking each label up in the active language pack.
+/// Keys are looked up lazily so a hot-reload (`:lang`) takes effect on the
+/// next frame.
+fn hint(key: &'static str, action_key: &'static str) -> (&'static str, String) {
+    (key, i18n::t(action_key))
+}
+
 /// Context-aware hint dispatcher. Caps at 5 hints; `?` appended separately.
-fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
+fn hints(app: &AppState) -> Vec<(&'static str, String)> {
     if app.modals.help_open {
-        return vec![("Esc", "close")];
+        return vec![hint("Esc", "footer.hint.help_close")];
     }
     if app.modals.command_palette_open {
-        return vec![("Enter", "run"), ("Tab", "complete"), ("Esc", "cancel")];
+        return vec![
+            hint("Enter", "footer.hint.palette_run"),
+            hint("Tab", "footer.hint.palette_complete"),
+            hint("Esc", "footer.hint.palette_cancel"),
+        ];
     }
     if app.modals.search_open {
-        return vec![("Enter", "apply"), ("Esc", "cancel")];
+        return vec![
+            hint("Enter", "footer.hint.search_apply"),
+            hint("Esc", "footer.hint.search_cancel"),
+        ];
     }
     if app.modals.pomodoro_open {
         return vec![
-            ("p", "toggle"),
-            ("Esc", "close"),
-            (":", "cmd"),
-            ("q", "quit"),
+            hint("p", "footer.hint.pomodoro_toggle"),
+            hint("Esc", "footer.hint.pomodoro_close"),
+            hint(":", "footer.hint.pomodoro_cmd"),
+            hint("q", "footer.hint.pomodoro_quit"),
         ];
     }
 
     if app.ui.mode == Mode::Visual {
         return vec![
-            ("j/k", "extend"),
-            ("d", "bulk done"),
-            ("P", "bulk prio"),
-            ("Esc", "cancel"),
-            (":", "cmd"),
+            hint("j/k", "footer.hint.visual_extend"),
+            hint("d", "footer.hint.visual_bulk_done"),
+            hint("P", "footer.hint.visual_bulk_prio"),
+            hint("Esc", "footer.hint.visual_cancel"),
+            hint(":", "footer.hint.visual_cmd"),
         ];
     }
     if app.modals.journal_editor_open {
         return vec![
-            ("Ctrl+S", "save (markdown)"),
-            ("Enter", "newline"),
-            ("Esc", "cancel"),
+            hint("Ctrl+S", "footer.hint.journal_editor_save"),
+            hint("Enter", "footer.hint.journal_editor_newline"),
+            hint("Esc", "footer.hint.journal_editor_cancel"),
         ];
     }
     if app.ui.page == crate::action::Page::Journal {
         let in_days = matches!(app.ui.journal_pane, crate::app::ui_state::JournalPane::Days);
         if in_days {
             return vec![
-                ("h/l", "días ↔ entries"),
-                ("j/k", "cambiar día"),
-                ("a/i", "nueva entrada"),
-                ("X", "delete day"),
-                ("H", "toggle hidden"),
+                hint("h/l", "footer.hint.journal_days_switch"),
+                hint("j/k", "footer.hint.journal_days_change"),
+                hint("a/i", "footer.hint.journal_days_new_entry"),
+                hint("X", "footer.hint.journal_days_delete_day"),
+                hint("H", "footer.hint.journal_days_toggle_hidden"),
             ];
         }
         return vec![
-            ("h/l", "días ↔ entries"),
-            ("j/k", "cambiar entry"),
-            ("e", "editar entry"),
-            ("d", "delete entry"),
-            ("a/i/A", "nueva entrada"),
+            hint("h/l", "footer.hint.journal_days_switch"),
+            hint("j/k", "footer.hint.journal_entries_change"),
+            hint("e", "footer.hint.journal_entries_edit"),
+            hint("d", "footer.hint.journal_entries_delete"),
+            hint("a/i/A", "footer.hint.journal_entries_new"),
         ];
     }
-    // Cap each branch at 5 hints. The `:` palette appears in every
-    // non-modal context so users can always escape to the command palette.
     match app.ui.focus.pane {
         Pane::Sidebar => vec![
-            ("j/k", "move"),
-            ("Enter", "aplicar filtro"),
-            ("l", "list"),
-            ("Esc", "cancel"),
-            (":", "cmd"),
+            hint("j/k", "footer.hint.sidebar_move"),
+            hint("Enter", "footer.hint.sidebar_apply_filter"),
+            hint("l", "footer.hint.sidebar_list"),
+            hint("Esc", "footer.hint.sidebar_cancel"),
+            hint(":", "footer.hint.sidebar_cmd"),
         ],
         Pane::List => vec![
-            ("a", "add"),
-            ("space", "status"),
-            ("v", "select"),
-            ("B", "+ dep"),
-            (":", "cmd"),
+            hint("a", "footer.hint.list_add"),
+            hint("space", "footer.hint.list_status"),
+            hint("v", "footer.hint.list_select"),
+            hint("B", "footer.hint.list_add_dep"),
+            hint(":", "footer.hint.list_cmd"),
         ],
         Pane::Detail => match app.ui.focus.section {
             DetailSection::Header => vec![
-                ("e", "edit title"),
-                ("E", "edit description"),
-                ("space", "cycle status"),
-                ("Tab", "next sect"),
-                (":", "cmd"),
+                hint("e", "footer.hint.detail_header_edit_title"),
+                hint("E", "footer.hint.detail_header_edit_description"),
+                hint("space", "footer.hint.detail_header_cycle_status"),
+                hint("Tab", "footer.hint.detail_header_next_section"),
+                hint(":", "footer.hint.common_cmd"),
             ],
             DetailSection::Subtasks => vec![
-                ("A", "+ subtarea"),
-                ("e", "rename"),
-                ("d", "delete"),
-                ("space", "check"),
-                (":", "cmd"),
+                hint("A", "footer.hint.detail_subtasks_add"),
+                hint("e", "footer.hint.detail_subtasks_rename"),
+                hint("d", "footer.hint.detail_subtasks_delete"),
+                hint("space", "footer.hint.detail_subtasks_check"),
+                hint(":", "footer.hint.common_cmd"),
             ],
             DetailSection::Dependencies => vec![
-                ("B", "+/- dep"),
-                ("Tab", "next sect"),
-                ("1/2/3/4", "section jump"),
-                ("h", "list"),
-                (":", "cmd"),
+                hint("B", "footer.hint.detail_deps_add_remove"),
+                hint("Tab", "footer.hint.detail_deps_next_section"),
+                hint("1/2/3/4", "footer.hint.detail_deps_section_jump"),
+                hint("h", "footer.hint.detail_deps_list"),
+                hint(":", "footer.hint.common_cmd"),
             ],
             DetailSection::Notes => vec![
-                ("a", "+ note"),
-                ("e", "edit note"),
-                ("d", "delete note"),
-                ("Tab", "next sect"),
-                (":", "cmd"),
+                hint("a", "footer.hint.detail_notes_add"),
+                hint("e", "footer.hint.detail_notes_edit"),
+                hint("d", "footer.hint.detail_notes_delete"),
+                hint("Tab", "footer.hint.detail_notes_next_section"),
+                hint(":", "footer.hint.common_cmd"),
             ],
         },
     }

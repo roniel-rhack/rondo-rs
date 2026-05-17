@@ -1,4 +1,5 @@
 use chrono::{Datelike, Duration, Local, NaiveDate};
+use rondo_core::i18n;
 use rondo_plugin_api::{
     action::PluginAction,
     capabilities::{Capability, QueryScope},
@@ -91,7 +92,7 @@ impl Plugin for CalendarPlugin {
             if let Ok(entries) = self.store.entries_for_note(note.id) {
                 if entries.is_empty() {
                     blocks.push(Block::Paragraph {
-                        text: "  (sin entradas)".to_string(),
+                        text: format!("  {}", i18n::t("calendar.no_entries_today")),
                         style: Some(TextStyle {
                             fg: Some(ColorToken::Muted),
                             ..Default::default()
@@ -125,7 +126,13 @@ impl Plugin for CalendarPlugin {
                     }
                     if entries.len() > 5 {
                         blocks.push(Block::Paragraph {
-                            text: format!("  … +{} entradas más", entries.len() - 5),
+                            text: format!(
+                                "  … {}",
+                                i18n::tf(
+                                    "calendar.more_entries",
+                                    &[("count", &(entries.len() - 5).to_string())],
+                                )
+                            ),
                             style: Some(TextStyle {
                                 fg: Some(ColorToken::Muted),
                                 ..Default::default()
@@ -136,7 +143,7 @@ impl Plugin for CalendarPlugin {
             }
         } else {
             blocks.push(Block::Paragraph {
-                text: "  (sin notas en este día)".to_string(),
+                text: format!("  {}", i18n::t("calendar.no_notes_today")),
                 style: Some(TextStyle {
                     fg: Some(ColorToken::Muted),
                     ..Default::default()
@@ -144,7 +151,7 @@ impl Plugin for CalendarPlugin {
             });
         }
         blocks.push(Block::Paragraph {
-            text: "h/l día · j/k semana · J/K mes · t hoy".to_string(),
+            text: i18n::t("calendar.help_hints"),
             style: Some(TextStyle {
                 fg: Some(ColorToken::Muted),
                 ..Default::default()
@@ -207,7 +214,7 @@ fn render_month(cursor: NaiveDate, dates: &HashSet<NaiveDate>) -> Vec<Block> {
             level: 1,
         },
         Block::Paragraph {
-            text: "Mo Tu We Th Fr Sa Su".into(),
+            text: i18n::t("calendar.weekday_header"),
             style: None,
         },
     ];

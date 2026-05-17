@@ -6,6 +6,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
+use rondo_core::i18n;
 
 const BINDINGS: &[(&str, &str)] = &[
     ("Navigation", ""),
@@ -18,14 +19,14 @@ const BINDINGS: &[(&str, &str)] = &[
     ("", ""),
     ("Filter (any focus)", ""),
     ("f i", "Inbox"),
-    ("f t", "HOY"),
-    ("f p", "Próximas"),
-    ("f u", "Urgentes"),
-    ("f H", "Alta prio"),
-    ("f o", "Vencidas"),
-    ("f c", "Completadas"),
-    ("f n", "Sin etiqueta"),
-    ("f A", "Todas"),
+    ("f t", "Today"),
+    ("f p", "Upcoming"),
+    ("f u", "Urgent"),
+    ("f H", "High priority"),
+    ("f o", "Overdue"),
+    ("f c", "Done"),
+    ("f n", "Untagged"),
+    ("f A", "All"),
     ("", ""),
     ("Layout", ""),
     ("Tab  /  Shift+Tab", "next / prev section"),
@@ -84,7 +85,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(t.border_style(true))
-        .title(Span::styled(" Keybindings ", t.accent_style()));
+        .title(Span::styled(i18n::t("help.title"), t.accent_style()));
     let inner = block.inner(area);
     f.render_widget(block, area);
 

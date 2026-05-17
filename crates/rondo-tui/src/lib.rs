@@ -11,7 +11,6 @@ pub mod fx;
 pub mod plugins;
 pub mod search;
 pub mod sort;
-pub mod strings;
 pub mod theme;
 pub mod tui;
 pub mod widgets;

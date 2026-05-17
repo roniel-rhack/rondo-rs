@@ -6,31 +6,32 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
+use rondo_core::i18n;
 
 const GRID: &[&[(&str, &str)]] = &[
     &[
-        ("a", "nueva tarea"),
-        ("e", "editar título"),
-        ("d", "eliminar"),
-        ("space", "toggle estado"),
+        ("a", "quick_actions.new_task"),
+        ("e", "quick_actions.edit_title"),
+        ("d", "quick_actions.delete"),
+        ("space", "quick_actions.toggle_status"),
     ],
     &[
-        ("A", "+ subtarea"),
-        ("B", "+ dependencia"),
-        ("v", "seleccionar múltiple"),
-        ("p", "pomodoro"),
+        ("A", "quick_actions.add_subtask"),
+        ("B", "quick_actions.add_dependency"),
+        ("v", "quick_actions.multi_select"),
+        ("p", "quick_actions.pomodoro"),
     ],
     &[
-        ("/", "buscar"),
-        (":", "comando"),
-        ("s", "ordenar"),
-        ("f<l>", "filtro rápido"),
+        ("/", "quick_actions.search"),
+        (":", "quick_actions.command"),
+        ("s", "quick_actions.sort"),
+        ("f<l>", "quick_actions.filter"),
     ],
     &[
-        ("Ctrl+Z", "deshacer"),
-        ("?", "ayuda"),
-        ("1/2", "tasks/journal"),
-        ("Esc", "cerrar overlay"),
+        ("Ctrl+Z", "quick_actions.undo"),
+        ("?", "quick_actions.help"),
+        ("1/2", "quick_actions.page_switch"),
+        ("Esc", "quick_actions.close_overlay"),
     ],
 ];
 
@@ -40,7 +41,10 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(t.border_style(true))
-        .title(Span::styled(" ⚙ acciones rápidas ", t.accent_style()));
+        .title(Span::styled(
+            i18n::t("quick_actions.title"),
+            t.accent_style(),
+        ));
     let inner = block.inner(area);
     f.render_widget(block, area);
 
@@ -58,7 +62,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
             .direction(Direction::Horizontal)
             .constraints(cols)
             .split(row_areas[row_idx]);
-        for (col_idx, (key, label)) in row.iter().enumerate() {
+        for (col_idx, (key, label_key)) in row.iter().enumerate() {
             let line = Line::from(vec![
                 Span::raw(" "),
                 Span::styled(
@@ -66,7 +70,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
                     Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
                 ),
                 Span::raw(" "),
-                Span::styled(label.to_string(), Style::default().fg(t.fg)),
+                Span::styled(i18n::t(label_key), Style::default().fg(t.fg)),
             ]);
             f.render_widget(Paragraph::new(line), col_areas[col_idx]);
         }

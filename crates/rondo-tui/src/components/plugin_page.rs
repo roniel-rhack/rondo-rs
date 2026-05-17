@@ -13,6 +13,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
+use rondo_core::i18n;
 
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let t_accent = app.theme.accent;
@@ -47,7 +48,10 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
                 " Esc ",
                 Style::default().fg(t_accent).add_modifier(Modifier::BOLD),
             ),
-            Span::styled("cerrar", Style::default().fg(t_fg)),
+            Span::styled(
+                i18n::t("plugin_page.close_label"),
+                Style::default().fg(t_fg),
+            ),
         ]);
         f.render_widget(Paragraph::new(hint), chunks[1]);
         return;
@@ -64,7 +68,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let mut lines: Vec<Line<'static>> = match view {
         Some(v) => viewspec::render(&v, &app.theme),
         None => vec![Line::from(Span::styled(
-            "(no view returned)".to_string(),
+            i18n::t("plugin_page.no_view"),
             Style::default().fg(t_fg_muted),
         ))],
     };
@@ -74,12 +78,15 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
             " Esc ",
             Style::default().fg(t_accent).add_modifier(Modifier::BOLD),
         ),
-        Span::styled("cerrar  ", Style::default().fg(t_fg)),
+        Span::styled(
+            i18n::t("plugin_page.close_button"),
+            Style::default().fg(t_fg),
+        ),
         Span::styled(
             "h/j/k/l",
             Style::default().fg(t_accent).add_modifier(Modifier::BOLD),
         ),
-        Span::styled(" navegar", Style::default().fg(t_fg)),
+        Span::styled(i18n::t("plugin_page.nav_hint"), Style::default().fg(t_fg)),
     ]));
     f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
 }

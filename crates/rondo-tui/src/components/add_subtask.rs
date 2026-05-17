@@ -6,6 +6,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
+use rondo_core::i18n;
 
 pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
@@ -18,12 +19,12 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(t.border_style(true))
-        .title(Span::styled(" + subtask ", t.accent_style()));
+        .title(Span::styled(i18n::t("add_subtask.title"), t.accent_style()));
     let inner = block.inner(area);
     f.render_widget(block, area);
 
     let context = Line::from(vec![
-        Span::styled(" parent: ", t.muted()),
+        Span::styled(i18n::t("add_subtask.parent"), t.muted()),
         Span::styled(parent_title, Style::default().fg(t.fg_muted)),
     ]);
     let line = Line::from(vec![
@@ -40,9 +41,9 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let hint = Line::from(vec![
         Span::styled("  ", t.muted()),
         Span::styled("Enter", Style::default().fg(t.accent)),
-        Span::styled(" add  ", t.muted()),
+        Span::styled(i18n::t("add_subtask.hint_add"), t.muted()),
         Span::styled("Esc", Style::default().fg(t.accent)),
-        Span::styled(" cancel", t.muted()),
+        Span::styled(i18n::t("add_subtask.hint_cancel"), t.muted()),
     ]);
     f.render_widget(Paragraph::new(vec![context, line, hint]), inner);
 }

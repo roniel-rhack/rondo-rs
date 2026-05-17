@@ -6,6 +6,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
+use rondo_core::i18n;
 
 pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
@@ -13,11 +14,17 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(t.border_style(true))
-        .title(Span::styled(" / search ", t.accent_style()));
+        .title(Span::styled(i18n::t("search.title"), t.accent_style()));
     let inner = block.inner(area);
     f.render_widget(block, area);
 
     let match_count = matching_tasks(app);
+    let key = if match_count == 1 {
+        "search.match_singular"
+    } else {
+        "search.match_plural"
+    };
+    let count_label = i18n::tf(key, &[("n", &match_count.to_string())]);
     let line = Line::from(vec![
         Span::styled(" / ", t.accent_style()),
         Span::styled(app.modals.search_buf.clone(), t.fg_style()),
@@ -26,14 +33,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
             Style::default().fg(t.fg).add_modifier(Modifier::SLOW_BLINK),
         ),
         Span::raw("   "),
-        Span::styled(
-            format!(
-                "{} match{}",
-                match_count,
-                if match_count == 1 { "" } else { "es" }
-            ),
-            t.muted(),
-        ),
+        Span::styled(count_label, t.muted()),
     ]);
     f.render_widget(Paragraph::new(line), inner);
 }

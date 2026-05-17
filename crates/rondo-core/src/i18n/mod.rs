@@ -233,7 +233,7 @@ mod tests {
         assert_eq!(active_code(), "xx");
         assert_eq!(t("modal.lang_picker.title"), "XX");
         // missing key still falls back to the English baseline
-        assert_eq!(t("modal.lang_picker.hint_close"), "Esc close");
+        assert_eq!(t("modal.lang_picker.hint_close"), "close");
         force_for_tests();
     }
 }

@@ -18,19 +18,24 @@ pub enum Filter {
 }
 
 impl Filter {
-    /// UPPERCASE label shown in sidebar.
-    pub fn label(self) -> &'static str {
+    /// UPPERCASE label shown in sidebar, resolved against the active
+    /// language pack.
+    pub fn label(self) -> String {
+        rondo_core::i18n::t(self.label_key())
+    }
+
+    fn label_key(self) -> &'static str {
         match self {
-            Self::Inbox => "INBOX",
-            Self::Today => "HOY",
-            Self::Upcoming => "PRÓXIMAS",
-            Self::NoTag => "SIN ETIQUETA",
-            Self::Urgent => "URGENTES",
-            Self::HighPriority => "ALTA PRIO",
-            Self::Overdue => "VENCIDAS",
-            Self::InProgress => "EN PROGRESO",
-            Self::Completed => "COMPLETADAS",
-            Self::All => "TODAS",
+            Self::Inbox => "filter.inbox",
+            Self::Today => "filter.today",
+            Self::Upcoming => "filter.upcoming",
+            Self::NoTag => "filter.no_tag",
+            Self::Urgent => "filter.urgent",
+            Self::HighPriority => "filter.high_priority",
+            Self::Overdue => "filter.overdue",
+            Self::InProgress => "filter.in_progress",
+            Self::Completed => "filter.completed",
+            Self::All => "filter.all",
         }
     }
 

@@ -6,6 +6,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Gauge, Paragraph},
     Frame,
 };
+use rondo_core::i18n;
 use tui_big_text::{BigText, PixelSize};
 
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
@@ -21,7 +22,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         .border_type(ratatui::widgets::BorderType::Rounded)
         .border_style(Style::default().fg(t.danger))
         .title(Span::styled(
-            " ◉ Focus Session ",
+            i18n::t("pomodoro.title"),
             Style::default().fg(t.danger).add_modifier(Modifier::BOLD),
         ));
     let inner = block.inner(area);
@@ -54,12 +55,13 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     );
 
     // Row 1: task title
+    let fallback_no_task = i18n::t("pomodoro.no_task");
     let task_label = app
         .data
         .tasks
         .get(app.data.selected_task)
-        .map(|t| t.title.as_str())
-        .unwrap_or("(no task selected)");
+        .map(|t| t.title.clone())
+        .unwrap_or(fallback_no_task);
     f.render_widget(
         Paragraph::new(Line::from(vec![Span::styled(task_label, t.muted())]))
             .alignment(Alignment::Center),
@@ -99,5 +101,5 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
 /// `ModalsState` this should be derived from `app.modals` instead.
 fn phase_label(_app: &AppState) -> String {
     let cycles = rondo_core::config::PomodoroConfig::default().cycles_per_long;
-    format!("Focus 1/{}", cycles)
+    i18n::tf("pomodoro.phase_focus", &[("cycles", &cycles.to_string())])
 }

@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use rondo_core::i18n;
 use rondo_plugin_api::{
     action::PluginAction,
     capabilities::{Capability, QueryScope},
@@ -41,7 +42,7 @@ impl DepGraphPlugin {
 
     fn render_graph(&self, root: i64) -> Vec<Block> {
         let mut out = vec![Block::Heading {
-            text: "Dependencies".into(),
+            text: i18n::t("dep_graph.title"),
             level: 1,
         }];
         let mut visited = HashSet::new();
@@ -53,7 +54,7 @@ impl DepGraphPlugin {
         let indent = "  ".repeat(depth);
         if !visited.insert(id) {
             out.push(Block::Paragraph {
-                text: format!("{indent}↳ [#{id}] (cycle)"),
+                text: format!("{indent}↳ [#{id}] {}", i18n::t("dep_graph.cycle")),
                 style: None,
             });
             return;
@@ -62,7 +63,7 @@ impl DepGraphPlugin {
             Ok(t) => t,
             Err(_) => {
                 out.push(Block::Paragraph {
-                    text: format!("{indent}↳ [#{id}] (missing)"),
+                    text: format!("{indent}↳ [#{id}] {}", i18n::t("dep_graph.missing")),
                     style: None,
                 });
                 return;
@@ -112,11 +113,11 @@ impl Plugin for DepGraphPlugin {
             Some(id) => self.render_graph(id),
             None => vec![
                 Block::Heading {
-                    text: "Dependencies".into(),
+                    text: i18n::t("dep_graph.title"),
                     level: 1,
                 },
                 Block::Paragraph {
-                    text: "(no task)".into(),
+                    text: i18n::t("dep_graph.no_task"),
                     style: None,
                 },
             ],

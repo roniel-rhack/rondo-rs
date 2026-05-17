@@ -6,6 +6,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
+use rondo_core::i18n;
 
 pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
@@ -13,13 +14,16 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(t.border_style(true))
-        .title(Span::styled(" 🧩 plugins ", t.accent_style()));
+        .title(Span::styled(
+            i18n::t("plugins_overlay.title"),
+            t.accent_style(),
+        ));
     let inner = block.inner(area);
     f.render_widget(block, area);
 
     let mut lines: Vec<Line> = Vec::new();
     lines.push(Line::from(Span::styled(
-        " built-in (in-process)",
+        i18n::t("plugins_overlay.section_builtin"),
         Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
     )));
     lines.push(Line::raw(""));
@@ -39,14 +43,17 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         ]));
         lines.push(Line::from(vec![
             Span::raw("    "),
-            Span::styled("caps: ", Style::default().fg(t.fg_muted)),
+            Span::styled(
+                i18n::t("plugins_overlay.caps_label"),
+                Style::default().fg(t.fg_muted),
+            ),
             Span::styled(caps, Style::default().fg(t.fg)),
         ]));
         lines.push(Line::raw(""));
     }
     lines.push(Line::raw(""));
     lines.push(Line::from(Span::styled(
-        " external (WASM)",
+        i18n::t("plugins_overlay.section_external"),
         Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
     )));
     lines.push(Line::raw(""));
@@ -67,7 +74,11 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
             .collect::<Vec<_>>()
             .join(", ");
         let id_color = if enabled { t.warn } else { t.fg_muted };
-        let status = if enabled { "enabled" } else { "DISABLED" };
+        let status_str = if enabled {
+            i18n::t("plugins_overlay.status_enabled")
+        } else {
+            i18n::t("plugins_overlay.status_disabled")
+        };
         lines.push(Line::from(vec![
             Span::raw("  "),
             Span::styled(
@@ -78,17 +89,26 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
                 format!("  v{}", manifest.version),
                 Style::default().fg(t.fg_muted),
             ),
-            Span::styled(format!("  ({})", status), Style::default().fg(t.fg_muted)),
+            Span::styled(
+                format!("  ({})", status_str),
+                Style::default().fg(t.fg_muted),
+            ),
         ]));
         lines.push(Line::from(vec![
             Span::raw("    "),
-            Span::styled("caps: ", Style::default().fg(t.fg_muted)),
+            Span::styled(
+                i18n::t("plugins_overlay.caps_label"),
+                Style::default().fg(t.fg_muted),
+            ),
             Span::styled(caps, Style::default().fg(t.fg)),
         ]));
         if let Some(cmd) = manifest.command_name() {
             lines.push(Line::from(vec![
                 Span::raw("    "),
-                Span::styled("cmd:  ", Style::default().fg(t.fg_muted)),
+                Span::styled(
+                    i18n::t("plugins_overlay.cmd_label"),
+                    Style::default().fg(t.fg_muted),
+                ),
                 Span::styled(format!(":{}", cmd), Style::default().fg(t.accent)),
             ]));
         }
@@ -96,23 +116,26 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     }
     if external_count == 0 {
         lines.push(Line::from(Span::styled(
-            format!("  (none installed in {})", plugins_dir.display()),
+            i18n::tf(
+                "plugins_overlay.none_installed",
+                &[("dir", &plugins_dir.display().to_string())],
+            ),
             Style::default().fg(t.fg_muted),
         )));
     }
     lines.push(Line::raw(""));
     lines.push(Line::from(vec![
         Span::raw(" "),
-        Span::styled("CLI:", t.kbd()),
+        Span::styled(i18n::t("plugins_overlay.cli_label"), t.kbd()),
         Span::styled(
-            " rondo-tui plugins list / info <id> / install <path> / remove <id>",
+            i18n::t("plugins_overlay.cli_help"),
             Style::default().fg(t.fg_muted),
         ),
     ]));
     lines.push(Line::from(vec![
         Span::raw(" "),
         Span::styled("Esc", t.kbd()),
-        Span::styled(" cerrar", t.muted()),
+        Span::styled(i18n::t("plugins_overlay.close_hint"), t.muted()),
     ]));
 
     f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);

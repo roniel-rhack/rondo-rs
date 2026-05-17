@@ -97,6 +97,9 @@ pub enum Action {
     CancelDepOverlay,
 
     PluginKeyPress(String),
+    /// Bracketed-paste payload from the terminal. Routed by the app
+    /// dispatcher to whichever input surface is currently open.
+    Paste(String),
 
     RequestEditDescription,
     DescriptionEditorKey(crossterm::event::KeyEvent),

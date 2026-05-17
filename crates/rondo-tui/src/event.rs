@@ -3,6 +3,12 @@ use crate::app::AppState;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 pub fn map(ev: Event, app: &AppState) -> Option<Action> {
+    // Bracketed paste short-circuit: route the payload to whichever input
+    // surface is open. The app dispatcher knows which textarea or buffer
+    // is active.
+    if let Event::Paste(s) = ev {
+        return Some(Action::Paste(s));
+    }
     if app.modals.help_open {
         return help_key(ev);
     }
@@ -74,6 +80,7 @@ pub fn map(ev: Event, app: &AppState) -> Option<Action> {
             width: w,
             height: h,
         }),
+        Event::Paste(s) => Some(Action::Paste(s)),
         _ => None,
     }
 }

@@ -743,6 +743,45 @@ impl AppState {
                 self.ui.mode = Mode::Normal;
             }
 
+            Action::Paste(text) => {
+                // Multiline textareas accept paste as-is.
+                if self.modals.description_editor_open {
+                    self.modals.description_textarea.insert_str(&text);
+                } else if self.modals.note_editor_open {
+                    self.modals.note_textarea.insert_str(&text);
+                } else if self.modals.journal_editor_open {
+                    self.modals.journal_textarea.insert_str(&text);
+                    self.modals.journal_editor_buf =
+                        self.modals.journal_textarea.lines().join("\n");
+                } else {
+                    // Single-line surfaces: keep the first line only and
+                    // strip trailing newlines so the modal doesn't break.
+                    let first_line = text
+                        .split('\n')
+                        .next()
+                        .unwrap_or("")
+                        .trim_end_matches('\r')
+                        .to_string();
+                    if self.modals.quick_add_open {
+                        self.modals.quick_add_buf.push_str(&first_line);
+                    } else if self.modals.edit_title_open {
+                        self.modals.edit_title_buf.push_str(&first_line);
+                    } else if self.modals.edit_subtask_open {
+                        self.modals.edit_subtask_buf.push_str(&first_line);
+                    } else if self.modals.command_palette_open {
+                        self.modals.command_buf.push_str(&first_line);
+                    } else if self.modals.search_open {
+                        self.modals.search_buf.push_str(&first_line);
+                    } else if self.modals.dep_overlay_open {
+                        // dep overlay accepts digits only
+                        for c in first_line.chars().filter(|c| c.is_ascii_digit()) {
+                            self.modals.dep_overlay_buf.push(c);
+                        }
+                    } else if self.modals.add_subtask_open {
+                        self.modals.add_subtask_buf.push_str(&first_line);
+                    }
+                }
+            }
             Action::PluginKeyPress(key) => {
                 if let Some(id) = self.modals.plugin_page.clone() {
                     let ctx = rondo_plugin_api::PluginContext::new(&id);

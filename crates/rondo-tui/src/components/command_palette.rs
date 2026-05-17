@@ -53,61 +53,103 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     f.render_widget(List::new(items), chunks[1]);
 }
 
-struct Suggestion {
-    cmd: &'static str,
-    desc: &'static str,
+pub(crate) struct Suggestion {
+    pub(crate) cmd: &'static str,
+    pub(crate) desc: &'static str,
 }
 
-fn filter_suggestions(buf: &str) -> Vec<&'static Suggestion> {
-    static ALL: &[Suggestion] = &[
-        Suggestion {
-            cmd: "tasks",
-            desc: "switch to Tasks page",
-        },
-        Suggestion {
-            cmd: "journal",
-            desc: "switch to Journal page",
-        },
-        Suggestion {
-            cmd: "pomodoro",
-            desc: "start focus session overlay",
-        },
-        Suggestion {
-            cmd: "plugins",
-            desc: "list installed plugins + capabilities",
-        },
-        Suggestion {
-            cmd: "calendar",
-            desc: "open calendar plugin (journal-driven mini-month)",
-        },
-        Suggestion {
-            cmd: "focus",
-            desc: "open focus heatmap plugin (5w×7d)",
-        },
-        Suggestion {
-            cmd: "deps",
-            desc: "open dependency graph plugin",
-        },
-        Suggestion {
-            cmd: "analytics",
-            desc: "open analytics dashboard plugin",
-        },
-        Suggestion {
-            cmd: "theme",
-            desc: "switch theme: theme dark|light|high-contrast",
-        },
-        Suggestion {
-            cmd: "help",
-            desc: "open key-bindings reference",
-        },
-        Suggestion {
-            cmd: "quit",
-            desc: "exit rondo-tui",
-        },
-    ];
+static ALL: &[Suggestion] = &[
+    Suggestion {
+        cmd: "tasks",
+        desc: "switch to Tasks page",
+    },
+    Suggestion {
+        cmd: "journal",
+        desc: "switch to Journal page",
+    },
+    Suggestion {
+        cmd: "pomodoro",
+        desc: "start focus session overlay",
+    },
+    Suggestion {
+        cmd: "plugins",
+        desc: "list installed plugins + capabilities",
+    },
+    Suggestion {
+        cmd: "calendar",
+        desc: "open calendar plugin (journal-driven mini-month)",
+    },
+    Suggestion {
+        cmd: "focus",
+        desc: "open focus heatmap plugin (5w×7d)",
+    },
+    Suggestion {
+        cmd: "deps",
+        desc: "open dependency graph plugin",
+    },
+    Suggestion {
+        cmd: "analytics",
+        desc: "open analytics dashboard plugin",
+    },
+    Suggestion {
+        cmd: "theme",
+        desc: "switch theme: theme dark|light|high-contrast",
+    },
+    Suggestion {
+        cmd: "help",
+        desc: "open key-bindings reference",
+    },
+    Suggestion {
+        cmd: "quit",
+        desc: "exit rondo-tui",
+    },
+];
+
+/// Rank suggestions by fuzzy match against the user buffer (E5). Empty
+/// buffer returns the full list in insertion order; otherwise we keep
+/// only matches and sort by descending `nucleo` score.
+pub(crate) fn filter_suggestions(buf: &str) -> Vec<&'static Suggestion> {
     let q = buf.trim();
     if q.is_empty() {
         return ALL.iter().collect();
     }
-    ALL.iter().filter(|s| s.cmd.starts_with(q)).collect()
+    let mut engine = crate::search::SearchEngine::new();
+    let mut scored: Vec<(u16, &'static Suggestion)> = ALL
+        .iter()
+        .filter_map(|s| {
+            let hay = format!("{} {}", s.cmd, s.desc);
+            engine.score_only(q, &hay).map(|sc| (sc, s))
+        })
+        .collect();
+    scored.sort_by_key(|x| std::cmp::Reverse(x.0));
+    scored.into_iter().map(|(_, s)| s).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_returns_all() {
+        assert_eq!(filter_suggestions("").len(), ALL.len());
+    }
+
+    #[test]
+    fn fuzzy_filters_matches() {
+        let out = filter_suggestions("plug");
+        assert!(out.iter().any(|s| s.cmd == "plugins"));
+    }
+
+    #[test]
+    fn description_terms_match_too() {
+        // "page" only appears in descriptions, not cmd names.
+        let out = filter_suggestions("page");
+        assert!(out.iter().any(|s| s.cmd == "tasks"));
+    }
+
+    #[test]
+    fn nonsense_returns_empty() {
+        let out = filter_suggestions("xyzqzzzzz");
+        assert!(out.is_empty());
+    }
 }

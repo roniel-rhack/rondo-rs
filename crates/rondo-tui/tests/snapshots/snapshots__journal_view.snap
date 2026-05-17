@@ -4,8 +4,8 @@ expression: s
 ---
 " ▌rondo v0.1.0       // SISTEMA DE GESTIÓN DE TAREAS AVANZADO //                      ⊙ RO · HH:MM:SS · ◷ 1/2 · P— · ☑3 "
 "┌─ navegación ───────────┐╭ Days ──────────────────────╮┌ Journal ─────────────────────────────────────────────────────┐"
-"│  [i] ◉ INBOX       3   ││▌ Today      2026-05-17     ││SUNDAY, MAY 17, 2026                                          │"
-"│  [t] ◷ HOY         1   ││  Yesterday  2026-05-16     ││━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                      │"
+"│  [i] ◉ INBOX       3   ││▌ Today      YYYY-MM-DD     ││SUNDAY, MAY 17, 2026                                          │"
+"│  [t] ◷ HOY         1   ││  Yesterday  YYYY-MM-DD     ││━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                      │"
 "│  [p] ⏵ PRÓXIMAS    2   ││                            ││                                                              │"
 "│  [A] ◇ TODAS       4   ││                            ││▌ ◷ HH:MM  · #1                                               │"
 "└────────────────────────┘│                            ││                                                              │"

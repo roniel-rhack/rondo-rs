@@ -2,6 +2,7 @@
 
 use crate::action::Action;
 use crate::app::{modals_state::DepOverlayMode, ro_msg, AppState};
+use crate::components::task_picker;
 use crate::focus::Mode;
 
 pub fn request_add(app: &mut AppState) {
@@ -70,6 +71,46 @@ pub fn cancel(app: &mut AppState) {
     app.ui.mode = Mode::Normal;
 }
 
+/// Move the dep-picker cursor by `delta` (clamped to the candidate set).
+pub fn picker_move(app: &mut AppState, delta: i32) {
+    let self_id = app.data.selected_task_id().unwrap_or(-1);
+    let existing = app
+        .data
+        .selected_task()
+        .map(|t| t.blocked_by_ids.clone())
+        .unwrap_or_default();
+    let mut exclude = existing;
+    exclude.push(self_id);
+    let candidates = task_picker::rank(&app.data.tasks, &app.modals.dep_overlay_buf, &exclude);
+    if candidates.is_empty() {
+        app.modals.dep_overlay_cursor = 0;
+        return;
+    }
+    let len = candidates.len() as i32;
+    let next = (app.modals.dep_overlay_cursor as i32 + delta).rem_euclid(len);
+    app.modals.dep_overlay_cursor = next as usize;
+}
+
+/// Resolve the highlighted candidate and dispatch SubmitAddDependency.
+pub fn submit_highlighted(app: &mut AppState) {
+    let self_id = app.data.selected_task_id().unwrap_or(-1);
+    let existing = app
+        .data
+        .selected_task()
+        .map(|t| t.blocked_by_ids.clone())
+        .unwrap_or_default();
+    let mut exclude = existing;
+    exclude.push(self_id);
+    let candidates = task_picker::rank(&app.data.tasks, &app.modals.dep_overlay_buf, &exclude);
+    if candidates.is_empty() {
+        app.toast("dep: no matching task");
+        return;
+    }
+    let cursor = app.modals.dep_overlay_cursor.min(candidates.len() - 1);
+    let picked = candidates[cursor].id;
+    submit_add(app, picked.to_string());
+}
+
 pub fn handle(app: &mut AppState, action: &Action) -> bool {
     match action.clone() {
         Action::RequestAddDependency => {
@@ -91,6 +132,18 @@ pub fn handle(app: &mut AppState, action: &Action) -> bool {
         Action::ToggleDepOverlayMode => {
             // Handled inside ModalsState::update; consume here so the main
             // match no longer needs an arm for it.
+            true
+        }
+        Action::DepPickerNext => {
+            picker_move(app, 1);
+            true
+        }
+        Action::DepPickerPrev => {
+            picker_move(app, -1);
+            true
+        }
+        Action::SubmitDepPickerHighlighted => {
+            submit_highlighted(app);
             true
         }
         _ => false,

@@ -161,6 +161,9 @@ impl AppState {
             || handlers::subtask::handle(self, &action)
             || handlers::dep::handle(self, &action)
             || handlers::note::handle(self, &action)
+            || handlers::due_date::handle(self, &action)
+            || handlers::recurrence::handle(self, &action)
+            || handlers::bulk::handle(self, &action)
         {
             if let Some(next) = follow_up.take() {
                 self.update(next);
@@ -913,6 +916,13 @@ impl AppState {
             self.toast(ro_msg("quick-add"));
             return;
         }
+        let recur_freq = parsed
+            .recur
+            .unwrap_or(rondo_core::domain::task::RecurFreq::None);
+        let recur_interval = match recur_freq {
+            rondo_core::domain::task::RecurFreq::None => 0,
+            _ => 1,
+        };
         let new_task = rondo_core::domain::task::NewTask {
             title: parsed.title.clone(),
             description: None,
@@ -921,8 +931,8 @@ impl AppState {
                 .priority
                 .unwrap_or(rondo_core::domain::task::Priority::Low),
             due_date: parsed.due.as_deref().and_then(parse_due),
-            recur_freq: rondo_core::domain::task::RecurFreq::None,
-            recur_interval: 0,
+            recur_freq,
+            recur_interval,
             tags: parsed.tags.clone(),
         };
         match self.data.store.create_task(new_task) {
@@ -1208,6 +1218,8 @@ pub struct QuickAddInput {
     pub tags: Vec<String>,
     pub priority: Option<rondo_core::domain::task::Priority>,
     pub due: Option<String>,
+    /// `recur:` quick-add token (`daily`/`weekly`/`monthly`/`yearly`). E3.
+    pub recur: Option<rondo_core::domain::task::RecurFreq>,
 }
 
 /// True for actions emitted from the quick-actions grid that should also
@@ -1275,6 +1287,14 @@ pub fn parse_quick_add(raw: &str) -> QuickAddInput {
             };
         } else if let Some(due) = token.strip_prefix("due:") {
             out.due = Some(due.to_string());
+        } else if let Some(recur) = token.strip_prefix("recur:") {
+            out.recur = match recur.to_lowercase().as_str() {
+                "daily" | "d" => Some(rondo_core::domain::task::RecurFreq::Daily),
+                "weekly" | "w" => Some(rondo_core::domain::task::RecurFreq::Weekly),
+                "monthly" | "m" => Some(rondo_core::domain::task::RecurFreq::Monthly),
+                "yearly" | "y" => Some(rondo_core::domain::task::RecurFreq::Yearly),
+                _ => None,
+            };
         } else {
             title_parts.push(token);
         }
@@ -1304,6 +1324,23 @@ mod tests {
         assert!(p.tags.is_empty());
         assert!(p.priority.is_none());
         assert!(p.due.is_none());
+    }
+
+    #[test]
+    fn quick_add_parses_recur_token() {
+        use rondo_core::domain::task::RecurFreq;
+        let p = parse_quick_add("Pay rent recur:monthly");
+        assert_eq!(p.title, "Pay rent");
+        assert_eq!(p.recur, Some(RecurFreq::Monthly));
+
+        let p = parse_quick_add("standup recur:d");
+        assert_eq!(p.recur, Some(RecurFreq::Daily));
+
+        let p = parse_quick_add("no recurrence here");
+        assert_eq!(p.recur, None);
+
+        let p = parse_quick_add("bogus recur:bogus");
+        assert_eq!(p.recur, None);
     }
 
     #[test]

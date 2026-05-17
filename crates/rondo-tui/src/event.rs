@@ -15,6 +15,8 @@ pub fn map(ev: Event, app: &AppState) -> Option<Action> {
     // global bindings remain active while a pomodoro is running.
     if let Some(layer) = app.modals.top_modal() {
         match layer {
+            ModalLayer::EditRecurrence => return edit_recurrence_key(ev),
+            ModalLayer::EditDueDate => return edit_due_date_key(ev, app),
             ModalLayer::NoteEditor => return note_editor_key(ev),
             ModalLayer::EditSubtask => return edit_subtask_key(ev, app),
             ModalLayer::DescriptionEditor => return description_editor_key(ev),
@@ -325,19 +327,27 @@ fn dep_overlay_key(ev: Event, app: &AppState) -> Option<Action> {
     let Event::Key(k) = ev else {
         return None;
     };
-    let submit = || match app.modals.dep_overlay_mode {
-        DepOverlayMode::Add => Action::SubmitAddDependency(app.modals.dep_overlay_buf.clone()),
-        DepOverlayMode::Remove => {
-            Action::SubmitRemoveDependency(app.modals.dep_overlay_buf.clone())
-        }
-    };
+    let add_mode = matches!(app.modals.dep_overlay_mode, DepOverlayMode::Add);
     Some(match k.code {
         KeyCode::Esc => Action::CancelDepOverlay,
         KeyCode::Tab => Action::ToggleDepOverlayMode,
-        KeyCode::Enter => submit(),
+        KeyCode::Enter => {
+            if add_mode {
+                Action::SubmitDepPickerHighlighted
+            } else {
+                Action::SubmitRemoveDependency(app.modals.dep_overlay_buf.clone())
+            }
+        }
+        KeyCode::Down if add_mode => Action::DepPickerNext,
+        KeyCode::Up if add_mode => Action::DepPickerPrev,
         KeyCode::Backspace => Action::DepOverlayInput({
             let mut s = app.modals.dep_overlay_buf.clone();
             s.pop();
+            s
+        }),
+        KeyCode::Char(c) if add_mode && !c.is_control() => Action::DepOverlayInput({
+            let mut s = app.modals.dep_overlay_buf.clone();
+            s.push(c);
             s
         }),
         KeyCode::Char(c) if c.is_ascii_digit() => Action::DepOverlayInput({
@@ -345,6 +355,63 @@ fn dep_overlay_key(ev: Event, app: &AppState) -> Option<Action> {
             s.push(c);
             s
         }),
+        _ => return None,
+    })
+}
+
+fn edit_recurrence_key(ev: Event) -> Option<Action> {
+    use rondo_core::domain::task::RecurFreq;
+    let Event::Key(k) = ev else {
+        return None;
+    };
+    Some(match k.code {
+        KeyCode::Esc => Action::CancelEditRecurrence,
+        KeyCode::Char('d') => Action::SubmitRecurrence(RecurFreq::Daily, 1),
+        KeyCode::Char('w') => Action::SubmitRecurrence(RecurFreq::Weekly, 1),
+        KeyCode::Char('m') => Action::SubmitRecurrence(RecurFreq::Monthly, 1),
+        KeyCode::Char('y') => Action::SubmitRecurrence(RecurFreq::Yearly, 1),
+        KeyCode::Char('x') => Action::SubmitRecurrence(RecurFreq::None, 0),
+        _ => return None,
+    })
+}
+
+fn edit_due_date_key(ev: Event, app: &AppState) -> Option<Action> {
+    use chrono::{Duration, Local, NaiveDate};
+    let Event::Key(k) = ev else {
+        return None;
+    };
+    let today = Local::now().date_naive();
+    if app.modals.edit_due_date_custom_mode {
+        return Some(match k.code {
+            KeyCode::Esc => Action::CancelEditDueDate,
+            KeyCode::Enter => {
+                let raw = app.modals.edit_due_date_buf.trim().to_string();
+                match NaiveDate::parse_from_str(&raw, "%Y-%m-%d") {
+                    Ok(d) => Action::SubmitDueDate(Some(d)),
+                    Err(_) => Action::Error(format!("due: invalid date '{}'", raw)),
+                }
+            }
+            KeyCode::Backspace => Action::EditDueDateInput({
+                let mut s = app.modals.edit_due_date_buf.clone();
+                s.pop();
+                s
+            }),
+            KeyCode::Char(c) if c.is_ascii_digit() || c == '-' => Action::EditDueDateInput({
+                let mut s = app.modals.edit_due_date_buf.clone();
+                s.push(c);
+                s
+            }),
+            _ => return None,
+        });
+    }
+    Some(match k.code {
+        KeyCode::Esc => Action::CancelEditDueDate,
+        KeyCode::Char('t') => Action::SubmitDueDate(Some(today)),
+        KeyCode::Char('m') => Action::SubmitDueDate(today.checked_add_signed(Duration::days(1))),
+        KeyCode::Char('w') => Action::SubmitDueDate(today.checked_add_signed(Duration::days(7))),
+        KeyCode::Char('M') => Action::SubmitDueDate(today.checked_add_signed(Duration::days(30))),
+        KeyCode::Char('x') => Action::SubmitDueDate(None),
+        KeyCode::Char('c') => Action::EditDueDateInput(String::new()),
         _ => return None,
     })
 }
@@ -397,6 +464,12 @@ fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
         KeyCode::Char('i') if on_journal => Action::JournalStartEntry,
         KeyCode::Char('H') if on_journal => Action::JournalToggleHidden,
         KeyCode::Char('D') if on_journal => Action::JournalDeleteEntry,
+        KeyCode::Char('D') if !on_journal && !in_sidebar && !in_visual => {
+            Action::RequestEditDueDate
+        }
+        KeyCode::Char('R') if !on_journal && !in_sidebar && !in_visual => {
+            Action::RequestEditRecurrence
+        }
         KeyCode::Char('X') if on_journal => Action::JournalDeleteDay,
         KeyCode::Char('J') if on_journal => Action::JournalNextDay,
         KeyCode::Char('K') if on_journal => Action::JournalPrevDay,
@@ -415,6 +488,18 @@ fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
         KeyCode::Char('a') if !on_journal => Action::OpenQuickAdd,
         KeyCode::Char('d') if on_journal && !in_visual => Action::JournalDeleteEntry,
         KeyCode::Char('d') if in_visual => Action::BulkDone,
+        KeyCode::Char('X') if in_visual && !on_journal => Action::BulkDelete,
+        KeyCode::Char('S') if in_visual => {
+            Action::BulkSetStatus(rondo_core::domain::task::Status::Pending)
+        }
+        KeyCode::Char('I') if in_visual => {
+            Action::BulkSetStatus(rondo_core::domain::task::Status::InProgress)
+        }
+        KeyCode::Char('C') if in_visual => Action::BulkSetDueDate(None),
+        KeyCode::Char('T') if in_visual => {
+            let today = chrono::Local::now().date_naive();
+            Action::BulkSetDueDate(Some(today))
+        }
         KeyCode::Char('d') if in_subtasks => Action::RequestDeleteFocusedSubtask,
         KeyCode::Char('d') if in_notes => Action::RequestDeleteFocusedNote,
         KeyCode::Char('d') if !in_visual && !in_sidebar => Action::RequestDeleteTask,

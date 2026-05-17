@@ -11,7 +11,7 @@ expression: s
 "└────────────────────────┘┃│  [builtin.bell]  Pomodoro Bell  v0.1.0                                             │━━━━━━━━━━━━━━━━━━━━━━━   │"
 "┌─ filtros rápidos ──────┐┃│    caps: [Notifier(Audio)]                                                         │                          │"
 "│  [u] ! URGENTES    1   │┃│                                                                                    │                          │"
-"│  [H] ↑ ALTA PRIO   2   │┃│  [builtin.dep-graph]  Dependency Graph  v0.1.0                                     │5-18 (Monday)             │"
+"│  [H] ↑ ALTA PRIO   2   │┃│  [builtin.dep-graph]  Dependency Graph  v0.1.0                                     │5-18 (WEEKDAY)             │"
 "│  [o] ⌧ VENCIDAS        │┃│    caps: [PageView, QueryAccess(Deps)]                                             │ork                       │"
 "│  [P] ◐ EN PROGRESO 1   │┃│                                                                                    │                          │"
 "│  [n] # SIN ETIQUETA 1  │┃│                                                                                    │───────────────────────   │"

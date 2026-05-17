@@ -33,6 +33,8 @@ pub enum ModalLayer {
     DescriptionEditor = 15,
     EditSubtask = 16,
     NoteEditor = 17,
+    EditDueDate = 18,
+    EditRecurrence = 19,
 }
 
 /// Modal/overlay UI state and associated buffers.
@@ -66,6 +68,9 @@ pub struct ModalsState {
     pub dep_overlay_open: bool,
     pub dep_overlay_buf: String,
     pub dep_overlay_mode: DepOverlayMode,
+    /// Highlighted row in the fuzzy task-picker results (E2). Reset whenever
+    /// the buffer changes or the overlay opens.
+    pub dep_overlay_cursor: usize,
     pub plugins_overlay_open: bool,
     /// If `Some(id)`, render the named plugin's last `Show` response
     /// full-screen as a page overlay. Set via `:<plugin>` commands.
@@ -82,6 +87,12 @@ pub struct ModalsState {
     /// to `note_task_id`.
     pub note_editing_id: Option<i64>,
     pub note_task_id: Option<i64>,
+    /// EditDueDate modal — typed buffer when the user picks `c)ustom`.
+    pub edit_due_date_open: bool,
+    pub edit_due_date_buf: String,
+    /// `true` once the user pressed `c` to start typing a custom date.
+    pub edit_due_date_custom_mode: bool,
+    pub edit_recurrence_open: bool,
 }
 
 impl Default for ModalsState {
@@ -112,6 +123,7 @@ impl Default for ModalsState {
             dep_overlay_open: false,
             dep_overlay_buf: String::new(),
             dep_overlay_mode: DepOverlayMode::Add,
+            dep_overlay_cursor: 0,
             plugins_overlay_open: false,
             plugin_page: None,
             description_editor_open: false,
@@ -124,6 +136,10 @@ impl Default for ModalsState {
             note_textarea: tui_textarea::TextArea::default(),
             note_editing_id: None,
             note_task_id: None,
+            edit_due_date_open: false,
+            edit_due_date_buf: String::new(),
+            edit_due_date_custom_mode: false,
+            edit_recurrence_open: false,
         }
     }
 }
@@ -136,6 +152,12 @@ impl ModalsState {
     /// the topmost open layer, and Escape closes it before lower ones.
     pub fn top_modal(&self) -> Option<ModalLayer> {
         // Check from highest to lowest priority.
+        if self.edit_recurrence_open {
+            return Some(ModalLayer::EditRecurrence);
+        }
+        if self.edit_due_date_open {
+            return Some(ModalLayer::EditDueDate);
+        }
         if self.note_editor_open {
             return Some(ModalLayer::NoteEditor);
         }
@@ -252,11 +274,13 @@ impl ModalsState {
         self.dep_overlay_buf.clear();
         self.dep_overlay_open = true;
         self.dep_overlay_mode = mode;
+        self.dep_overlay_cursor = 0;
     }
 
     pub fn close_dep_overlay(&mut self) {
         self.dep_overlay_open = false;
         self.dep_overlay_buf.clear();
+        self.dep_overlay_cursor = 0;
     }
 
     pub fn open_edit_subtask(&mut self, id: i64, current: String) {
@@ -306,6 +330,26 @@ impl ModalsState {
         self.description_task_id = None;
     }
 
+    pub fn open_edit_recurrence(&mut self) {
+        self.edit_recurrence_open = true;
+    }
+
+    pub fn close_edit_recurrence(&mut self) {
+        self.edit_recurrence_open = false;
+    }
+
+    pub fn open_edit_due_date(&mut self) {
+        self.edit_due_date_open = true;
+        self.edit_due_date_buf.clear();
+        self.edit_due_date_custom_mode = false;
+    }
+
+    pub fn close_edit_due_date(&mut self) {
+        self.edit_due_date_open = false;
+        self.edit_due_date_buf.clear();
+        self.edit_due_date_custom_mode = false;
+    }
+
     pub fn open_journal_editor(&mut self, editing: Option<(i64, &str)>) {
         let lines: Vec<String> = match editing {
             Some((_id, body)) => body.split('\n').map(|s| s.to_string()).collect(),
@@ -351,6 +395,14 @@ impl ModalsState {
     pub fn close_top_modal(&mut self) -> Option<ModalLayer> {
         let layer = self.top_modal()?;
         match layer {
+            ModalLayer::EditRecurrence => {
+                self.edit_recurrence_open = false;
+            }
+            ModalLayer::EditDueDate => {
+                self.edit_due_date_open = false;
+                self.edit_due_date_buf.clear();
+                self.edit_due_date_custom_mode = false;
+            }
             ModalLayer::NoteEditor => {
                 self.note_editor_open = false;
                 self.note_textarea = tui_textarea::TextArea::default();
@@ -380,6 +432,7 @@ impl ModalsState {
             ModalLayer::DepOverlay => {
                 self.dep_overlay_open = false;
                 self.dep_overlay_buf.clear();
+                self.dep_overlay_cursor = 0;
             }
             ModalLayer::AddSubtask => {
                 self.add_subtask_open = false;
@@ -440,6 +493,8 @@ impl ModalsState {
             || self.description_editor_open
             || self.edit_subtask_open
             || self.note_editor_open
+            || self.edit_due_date_open
+            || self.edit_recurrence_open
     }
 
     /// Pure modal mutations that don't need cross-substate access.
@@ -523,11 +578,13 @@ impl ModalsState {
             }
             Action::DepOverlayInput(s) => {
                 self.dep_overlay_buf = s;
+                self.dep_overlay_cursor = 0;
                 None
             }
             Action::CancelDepOverlay => {
                 self.dep_overlay_open = false;
                 self.dep_overlay_buf.clear();
+                self.dep_overlay_cursor = 0;
                 None
             }
             Action::ToggleDepOverlayMode => {

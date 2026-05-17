@@ -158,6 +158,7 @@ impl AppState {
             || handlers::task::handle(self, &action)
             || handlers::subtask::handle(self, &action)
             || handlers::dep::handle(self, &action)
+            || handlers::note::handle(self, &action)
         {
             if let Some(next) = follow_up.take() {
                 self.update(next);
@@ -329,134 +330,7 @@ impl AppState {
 
             // Subtask edit/delete handled in `handlers::subtask`.
 
-            Action::RequestAddNote => {
-                if !self.writable {
-                    self.toast("note: read-only");
-                } else if let Some(id) = self.data.selected_task_id() {
-                    self.modals.note_textarea = tui_textarea::TextArea::default();
-                    self.modals.note_editing_id = None;
-                    self.modals.note_task_id = Some(id);
-                    self.modals.note_editor_open = true;
-                    self.ui.mode = Mode::Insert;
-                }
-            }
-            Action::RequestEditFocusedNote => {
-                if !self.writable {
-                    self.toast("note: read-only");
-                } else if let Some(task) = self.data.selected_task() {
-                    if let Some(note) = task.notes.get(self.ui.focus.section_item) {
-                        self.modals.note_textarea = tui_textarea::TextArea::new(
-                            note.body.split('\n').map(|s| s.to_string()).collect(),
-                        );
-                        self.modals.note_editing_id = Some(note.id);
-                        self.modals.note_task_id = Some(task.id);
-                        self.modals.note_editor_open = true;
-                        self.ui.mode = Mode::Insert;
-                    }
-                }
-            }
-            Action::RequestDeleteFocusedNote => {
-                if !self.writable {
-                    self.toast("note: read-only");
-                } else if let Some(task) = self.data.selected_task() {
-                    if let Some(note) = task.notes.get(self.ui.focus.section_item) {
-                        let note_clone = note.clone();
-                        let task_id = task.id;
-                        let note_id = note.id;
-                        match self.data.store.delete_task_note(note_id) {
-                            Ok(_) => {
-                                self.undo
-                                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
-                                        rondo_core::domain::task::UndoKind::DeleteNote {
-                                            task_id,
-                                            note: note_clone,
-                                        },
-                                    ));
-                                self.refresh_tasks();
-                                let total = self
-                                    .data
-                                    .selected_task()
-                                    .map(|t| t.notes.len())
-                                    .unwrap_or(0);
-                                if self.ui.focus.section_item >= total && total > 0 {
-                                    self.ui.focus.section_item = total - 1;
-                                }
-                                self.toast(format!("deleted note #{}", note_id));
-                            }
-                            Err(e) => self.toast(format!("delete failed: {}", e)),
-                        }
-                    }
-                }
-            }
-            Action::NoteEditorKey(k) => {
-                self.modals
-                    .note_textarea
-                    .input(tui_textarea::Input::from(crossterm::event::Event::Key(k)));
-            }
-            Action::SubmitNote => {
-                let body = self.modals.note_textarea.lines().join("\n");
-                let editing = self.modals.note_editing_id;
-                let task_id = self.modals.note_task_id;
-                self.modals.note_editor_open = false;
-                self.modals.note_textarea = tui_textarea::TextArea::default();
-                self.modals.note_editing_id = None;
-                self.modals.note_task_id = None;
-                self.ui.mode = Mode::Normal;
-                if body.trim().is_empty() {
-                    return;
-                }
-                match (editing, task_id) {
-                    (Some(note_id), Some(tid)) => {
-                        // Capture the before-body so undo can restore exactly
-                        // what was there before this edit.
-                        let before_body = self
-                            .data
-                            .selected_task()
-                            .and_then(|t| t.notes.iter().find(|n| n.id == note_id))
-                            .map(|n| n.body.clone());
-                        match self.data.store.update_task_note(note_id, &body) {
-                            Ok(_) => {
-                                if let Some(before) = before_body {
-                                    self.undo.push(
-                                        rondo_core::domain::task::UndoSnapshot::from_kind(
-                                            rondo_core::domain::task::UndoKind::UpdateNote {
-                                                task_id: tid,
-                                                note_id,
-                                                before,
-                                            },
-                                        ),
-                                    );
-                                }
-                                self.refresh_tasks();
-                                self.toast("note updated");
-                            }
-                            Err(e) => self.toast(format!("note failed: {}", e)),
-                        }
-                    }
-                    (None, Some(tid)) => match self.data.store.add_task_note(tid, &body) {
-                        Ok(note_id) => {
-                            self.undo
-                                .push(rondo_core::domain::task::UndoSnapshot::from_kind(
-                                    rondo_core::domain::task::UndoKind::AddNote {
-                                        task_id: tid,
-                                        note_id,
-                                    },
-                                ));
-                            self.refresh_tasks();
-                            self.toast("note added");
-                        }
-                        Err(e) => self.toast(format!("note failed: {}", e)),
-                    },
-                    _ => {}
-                }
-            }
-            Action::CancelNote => {
-                self.modals.note_editor_open = false;
-                self.modals.note_textarea = tui_textarea::TextArea::default();
-                self.modals.note_editing_id = None;
-                self.modals.note_task_id = None;
-                self.ui.mode = Mode::Normal;
-            }
+            // Note add/edit/delete/submit handled in `handlers::note`.
 
             Action::Paste(text) => {
                 // Multiline textareas accept paste as-is.

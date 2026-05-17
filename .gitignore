@@ -6,3 +6,4 @@ Cargo.lock
 .direnv/
 *.log
 *.snap.new
+.demo-home/

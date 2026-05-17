@@ -6,11 +6,10 @@ impl SqliteStore {
     /// Read a plugin-scoped value. `Ok(None)` if the key is unset.
     pub fn kv_get(&self, plugin_id: &str, key: &str) -> Result<Option<Vec<u8>>> {
         let conn = self.conn.lock().unwrap();
-        let res: rusqlite::Result<Vec<u8>> = conn.query_row(
-            super::queries::KV_GET,
-            params![plugin_id, key],
-            |r| r.get::<_, Vec<u8>>(0),
-        );
+        let res: rusqlite::Result<Vec<u8>> =
+            conn.query_row(super::queries::KV_GET, params![plugin_id, key], |r| {
+                r.get::<_, Vec<u8>>(0)
+            });
         match res {
             Ok(v) => Ok(Some(v)),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),

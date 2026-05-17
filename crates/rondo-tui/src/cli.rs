@@ -6,7 +6,7 @@
 use color_eyre::eyre::{eyre, Result};
 use rondo_core::domain::task::{NewTask, Status, Task};
 use rondo_core::store::sqlite::SqliteStore;
-use std::io::BufRead;
+use std::io::{BufRead, Read};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -670,14 +670,62 @@ fn cli_stats(db_path: &Path, opts: &CliOpts) -> Result<()> {
     Ok(())
 }
 
+/// Maximum NDJSON lines processed per `batch` invocation. Bounds work
+/// to a sane amount even if the caller pipes an unbounded stream.
+const MAX_BATCH_LINES: usize = 10_000;
+/// Maximum bytes per NDJSON line. Larger lines are rejected rather than
+/// buffered — guards against runaway producers that omit newlines.
+const MAX_LINE_LEN: usize = 64 * 1024;
+
 fn cli_batch(db_path: &Path, opts: &CliOpts) -> Result<()> {
     require_write(opts, "batch")?;
     let (store, _guard) = open_rw_store(db_path)?;
     let stdin = std::io::stdin();
+    let mut handle = stdin.lock();
     let mut count: usize = 0;
     let mut errors: Vec<String> = Vec::new();
-    for line in stdin.lock().lines() {
-        let line = line?;
+    let mut line_no: usize = 0;
+    loop {
+        if line_no >= MAX_BATCH_LINES {
+            errors.push(format!(
+                "aborted: max {MAX_BATCH_LINES} lines per batch exceeded"
+            ));
+            break;
+        }
+        // Cap each line at MAX_LINE_LEN + 1 so we can detect overflow
+        // without buffering arbitrary input. We read up to the limit and,
+        // if no newline is found in that window, skip ahead to the next
+        // newline and record an error.
+        let mut buf: Vec<u8> = Vec::new();
+        let mut limited = (&mut handle).take((MAX_LINE_LEN + 1) as u64);
+        let read = limited.read_until(b'\n', &mut buf)?;
+        if read == 0 {
+            break;
+        }
+        line_no += 1;
+        let trailing_newline = buf.last() == Some(&b'\n');
+        if buf.len() > MAX_LINE_LEN && !trailing_newline {
+            // Drain to next newline so the next iteration starts fresh.
+            let mut sink: Vec<u8> = Vec::new();
+            let _ = handle.read_until(b'\n', &mut sink);
+            errors.push(format!(
+                "line {line_no}: exceeds max length of {MAX_LINE_LEN} bytes"
+            ));
+            continue;
+        }
+        if trailing_newline {
+            buf.pop();
+            if buf.last() == Some(&b'\r') {
+                buf.pop();
+            }
+        }
+        let line = match String::from_utf8(buf) {
+            Ok(s) => s,
+            Err(e) => {
+                errors.push(format!("line {line_no}: invalid utf-8: {e}"));
+                continue;
+            }
+        };
         if line.trim().is_empty() {
             continue;
         }

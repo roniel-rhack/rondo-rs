@@ -88,7 +88,27 @@ fn migrate_to_v3(conn: &Connection) -> Result<(), MigrationError> {
     Ok(())
 }
 
+/// Validate that `s` is a safe SQL identifier (ASCII letters, digits, `_`;
+/// must start with a letter). Used to gate identifier interpolation into
+/// PRAGMA statements where parameter binding is not supported.
+fn is_safe_ident(s: &str) -> bool {
+    !s.is_empty()
+        && s.chars().enumerate().all(|(i, c)| {
+            c == '_' || (i == 0 && c.is_ascii_alphabetic()) || (i > 0 && c.is_ascii_alphanumeric())
+        })
+}
+
 fn column_exists(conn: &Connection, table: &str, column: &str) -> rusqlite::Result<bool> {
+    if !is_safe_ident(table) {
+        return Err(rusqlite::Error::InvalidParameterName(format!(
+            "unsafe table identifier: {table:?}"
+        )));
+    }
+    if !is_safe_ident(column) {
+        return Err(rusqlite::Error::InvalidParameterName(format!(
+            "unsafe column identifier: {column:?}"
+        )));
+    }
     let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", table))?;
     let rows = stmt.query_map([], |r| r.get::<_, String>(1))?;
     for row in rows {
@@ -97,4 +117,35 @@ fn column_exists(conn: &Connection, table: &str, column: &str) -> rusqlite::Resu
         }
     }
     Ok(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_safe_ident;
+
+    #[test]
+    fn is_safe_ident_accepts_simple_names() {
+        assert!(is_safe_ident("tasks"));
+        assert!(is_safe_ident("metadata"));
+        assert!(is_safe_ident("focus_sessions"));
+        assert!(is_safe_ident("a"));
+        assert!(is_safe_ident("a_b_c_1"));
+    }
+
+    #[test]
+    fn is_safe_ident_rejects_bad_input() {
+        assert!(!is_safe_ident(""));
+        assert!(!is_safe_ident("1tasks"));
+        assert!(!is_safe_ident("tasks; DROP TABLE tasks"));
+        assert!(!is_safe_ident("tasks)"));
+        assert!(!is_safe_ident("tasks--"));
+        assert!(!is_safe_ident("tasks'"));
+        assert!(!is_safe_ident("tasks col"));
+    }
+
+    #[test]
+    fn is_safe_ident_allows_underscore_prefix() {
+        assert!(is_safe_ident("_leading"));
+        assert!(is_safe_ident("__"));
+    }
 }

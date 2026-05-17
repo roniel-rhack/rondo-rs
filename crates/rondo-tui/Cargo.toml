@@ -8,10 +8,12 @@ default-run = "rondo-tui"
 
 [lib]
 path = "src/lib.rs"
+bench = false
 
 [[bin]]
 name = "rondo-tui"
 path = "src/main.rs"
+bench = false
 
 [dependencies]
 rondo-core = { path = "../rondo-core" }
@@ -46,3 +48,8 @@ assert_cmd = "2"
 predicates = "3"
 serde_json = { workspace = true }
 proptest = "1"
+criterion = "0.5"
+
+[[bench]]
+name = "render"
+harness = false

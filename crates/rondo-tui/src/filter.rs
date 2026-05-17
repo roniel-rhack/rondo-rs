@@ -1,4 +1,4 @@
-use chrono::Local;
+use chrono::{Local, NaiveDate};
 use rondo_core::domain::task::{Priority, Status, Task};
 
 /// Active subset of tasks. Only filters that actually apply to rondo's
@@ -66,8 +66,18 @@ impl Filter {
         }
     }
 
+    /// Convenience wrapper that pulls today's date from the local clock.
+    ///
+    /// Avoid in hot loops — repeated `Local::now()` calls per task per filter
+    /// dominate sidebar count refresh. Prefer
+    /// [`Filter::applies_to_with_today`] when looping.
     pub fn applies_to(self, task: &Task) -> bool {
-        let today = Local::now().date_naive();
+        self.applies_to_with_today(task, Local::now().date_naive())
+    }
+
+    /// Date-aware variant that takes `today` as a parameter so the caller can
+    /// compute it once and amortise across many tasks/filters.
+    pub fn applies_to_with_today(self, task: &Task, today: NaiveDate) -> bool {
         match self {
             Self::Inbox => task.status != Status::Done,
             Self::Today => task.status != Status::Done && task.due_date == Some(today),

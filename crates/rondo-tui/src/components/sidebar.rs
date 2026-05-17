@@ -165,18 +165,20 @@ fn counts_for(f: Filter, c: &Counts) -> usize {
 }
 
 fn compute_counts(app: &AppState) -> Counts {
+    // Compute `today` once and reuse across every filter * task combination
+    // instead of paying for a `Local::now()` per `applies_to` call.
+    let today = Local::now().date_naive();
     let mut by_filter = std::collections::HashMap::new();
     for filter in SIDEBAR_ITEMS.iter().copied() {
         let n = app
             .data
             .tasks
             .iter()
-            .filter(|t| filter.applies_to(t))
+            .filter(|t| filter.applies_to_with_today(t, today))
             .count();
         by_filter.insert(filter, n);
     }
     // Status field is referenced only to ensure the trait is in scope.
     let _ = Status::Pending;
-    let _ = Local::now();
     Counts { by_filter }
 }

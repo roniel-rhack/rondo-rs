@@ -119,8 +119,7 @@ impl AppState {
     /// selection by id when possible. Sync's `data.selected_task` back
     /// to whatever row currently holds `ui.selected_task_id`.
     pub fn refresh_tasks(&mut self) {
-        self.data
-            .refresh_tasks_keeping_id(self.ui.selected_task_id);
+        self.data.refresh_tasks_keeping_id(self.ui.selected_task_id);
         if let Some(t) = self.data.tasks.get(self.data.selected_task) {
             self.ui.selected_task_id = Some(t.id);
         } else {
@@ -330,7 +329,6 @@ impl AppState {
             // Subtask edit/delete handled in `handlers::subtask`.
 
             // Note add/edit/delete/submit handled in `handlers::note`.
-
             Action::Paste(text) => {
                 // Multiline textareas accept paste as-is.
                 if self.modals.description_editor_open {
@@ -415,8 +413,7 @@ impl AppState {
                 let top = self.modals.top_modal();
                 // Visual mode wins over a bare pomodoro overlay (preserves
                 // pre-ModalLayer ordering).
-                if matches!(top, None | Some(ModalLayer::Pomodoro))
-                    && self.ui.mode == Mode::Visual
+                if matches!(top, None | Some(ModalLayer::Pomodoro)) && self.ui.mode == Mode::Visual
                 {
                     self.ui.mode = Mode::Normal;
                     self.ui.selection.clear();
@@ -427,8 +424,7 @@ impl AppState {
                             if let Some(id) = self.modals.plugin_page.take() {
                                 let ctx = rondo_plugin_api::PluginContext::new(&id);
                                 if let Some(p) = self.plugins.get_mut(&id) {
-                                    let _ =
-                                        p.handle(rondo_plugin_api::PluginAction::Hide, &ctx);
+                                    let _ = p.handle(rondo_plugin_api::PluginAction::Hide, &ctx);
                                 }
                             }
                         }

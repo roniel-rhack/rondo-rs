@@ -1,7 +1,7 @@
 //! Task-level Action handlers (delete, edit title, edit description).
 
 use crate::action::Action;
-use crate::app::{AppState, ro_msg};
+use crate::app::{ro_msg, AppState};
 use crate::focus::Mode;
 
 pub fn request_delete(app: &mut AppState) {

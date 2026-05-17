@@ -1,7 +1,7 @@
 //! Task dependency Action handlers.
 
 use crate::action::Action;
-use crate::app::{AppState, modals_state::DepOverlayMode, ro_msg};
+use crate::app::{modals_state::DepOverlayMode, ro_msg, AppState};
 use crate::focus::Mode;
 
 pub fn request_add(app: &mut AppState) {

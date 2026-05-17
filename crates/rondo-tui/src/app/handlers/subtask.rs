@@ -1,7 +1,7 @@
 //! Subtask Action handlers.
 
 use crate::action::Action;
-use crate::app::{AppState, ro_msg};
+use crate::app::{ro_msg, AppState};
 use crate::focus::Mode;
 
 pub fn request_add(app: &mut AppState) {

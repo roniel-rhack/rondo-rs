@@ -86,13 +86,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let end = (scroll + area_height.max(1)).min(visible.len());
     let slice = &visible[scroll..end];
 
-    let items = render_items(
-        app,
-        slice,
-        layout[1].width,
-        search_query.as_deref(),
-        scroll,
-    );
+    let items = render_items(app, slice, layout[1].width, search_query.as_deref(), scroll);
     // No REVERSED highlight — bg changes are theme-fragile. The accent ▌ gutter
     // already marks the cursor row. Use a slice-local ListState so ratatui's
     // own offset math doesn't compound with our pre-slicing.

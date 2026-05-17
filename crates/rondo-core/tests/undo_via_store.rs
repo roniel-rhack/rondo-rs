@@ -340,14 +340,18 @@ fn delete_task_undo_restores_subtree() {
     let after = store.task_by_id(id).unwrap();
     assert_eq!(after.id, before.id);
     assert_eq!(after.title, "parent");
-    assert!(after.subtasks.iter().any(|s| s.id == sub_id && s.title == "child 1"));
-    assert!(
-        after
-            .subtasks
-            .iter()
-            .any(|s| s.id == sub_id_2 && s.completed)
-    );
-    assert!(after.notes.iter().any(|n| n.id == note_id && n.body == "note body"));
+    assert!(after
+        .subtasks
+        .iter()
+        .any(|s| s.id == sub_id && s.title == "child 1"));
+    assert!(after
+        .subtasks
+        .iter()
+        .any(|s| s.id == sub_id_2 && s.completed));
+    assert!(after
+        .notes
+        .iter()
+        .any(|n| n.id == note_id && n.body == "note body"));
     assert!(after.tags.iter().any(|t| t == "alpha"));
     assert!(after.tags.iter().any(|t| t == "beta"));
     assert!(after.blocked_by_ids.contains(&blocker_id));

@@ -55,11 +55,7 @@ pub fn request_delete_focused(app: &mut AppState) {
                     },
                 ));
             app.refresh_tasks();
-            let total = app
-                .data
-                .selected_task()
-                .map(|t| t.notes.len())
-                .unwrap_or(0);
+            let total = app.data.selected_task().map(|t| t.notes.len()).unwrap_or(0);
             if app.ui.focus.section_item >= total && total > 0 {
                 app.ui.focus.section_item = total - 1;
             }

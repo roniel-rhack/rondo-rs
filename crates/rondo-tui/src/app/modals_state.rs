@@ -294,9 +294,8 @@ impl ModalsState {
     }
 
     pub fn open_description_editor(&mut self, task_id: i64, body: &str) {
-        self.description_textarea = tui_textarea::TextArea::new(
-            body.split('\n').map(|s| s.to_string()).collect(),
-        );
+        self.description_textarea =
+            tui_textarea::TextArea::new(body.split('\n').map(|s| s.to_string()).collect());
         self.description_task_id = Some(task_id);
         self.description_editor_open = true;
     }
@@ -564,10 +563,12 @@ mod tests {
     #[test]
     fn top_modal_respects_priority() {
         // Open several lower-priority modals; a high-priority one wins.
-        let mut m = ModalsState::default();
-        m.help_open = true;
-        m.search_open = true;
-        m.command_palette_open = true;
+        let mut m = ModalsState {
+            help_open: true,
+            search_open: true,
+            command_palette_open: true,
+            ..ModalsState::default()
+        };
         assert_eq!(m.top_modal(), Some(ModalLayer::Search));
 
         m.note_editor_open = true;

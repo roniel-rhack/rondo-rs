@@ -225,5 +225,4 @@ impl DataState {
             self.selected_journal_entry = self.journal_entries.len() - 1;
         }
     }
-
 }

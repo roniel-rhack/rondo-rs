@@ -638,13 +638,24 @@ impl SqliteStore {
         for sub in &task.subtasks {
             tx.execute(
                 super::queries::RESTORE_SUBTASK,
-                params![sub.id, sub.task_id, sub.title, sub.completed as i64, sub.position],
+                params![
+                    sub.id,
+                    sub.task_id,
+                    sub.title,
+                    sub.completed as i64,
+                    sub.position
+                ],
             )?;
         }
         for note in &task.notes {
             tx.execute(
                 super::queries::RESTORE_TASK_NOTE,
-                params![note.id, note.task_id, note.body, note.created_at.to_rfc3339()],
+                params![
+                    note.id,
+                    note.task_id,
+                    note.body,
+                    note.created_at.to_rfc3339()
+                ],
             )?;
         }
         for log in &task.time_logs {
@@ -660,16 +671,10 @@ impl SqliteStore {
             )?;
         }
         for blocker in &task.blocked_by_ids {
-            tx.execute(
-                super::queries::INSERT_DEPENDENCY,
-                params![task.id, blocker],
-            )?;
+            tx.execute(super::queries::INSERT_DEPENDENCY, params![task.id, blocker])?;
         }
         for blocked in &task.blocks_ids {
-            tx.execute(
-                super::queries::INSERT_DEPENDENCY,
-                params![blocked, task.id],
-            )?;
+            tx.execute(super::queries::INSERT_DEPENDENCY, params![blocked, task.id])?;
         }
         tx.commit()?;
         Ok(())

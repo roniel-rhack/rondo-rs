@@ -1,6 +1,6 @@
 use crate::action::{Action, Page};
-use crate::app::AppState;
 use crate::app::modals_state::ModalLayer;
+use crate::app::AppState;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 pub fn map(ev: Event, app: &AppState) -> Option<Action> {

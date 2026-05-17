@@ -996,6 +996,8 @@ impl AppState {
                 self.data
                     .task_list_state
                     .select(Some(self.data.selected_task));
+                let visible_len = self.data.visible_task_indices().len();
+                self.adjust_task_list_scroll(self.data.selected_task, visible_len);
                 if prev != self.data.selected_task {
                     self.spawn_detail_refresh();
                 }
@@ -1021,6 +1023,29 @@ impl AppState {
             }
             _ => {}
         }
+    }
+
+    /// Keep `selected_pos` (index into the visible slice) inside the
+    /// viewport derived from `last_task_list_rect`. Subtracts a small
+    /// constant for the column header + progress bar that share the
+    /// inner panel area.
+    fn adjust_task_list_scroll(&mut self, selected_pos: usize, total: usize) {
+        let area_h = self.ui.last_task_list_rect.height as usize;
+        // panel border (top + bottom) + column header + progress bar (2 lines)
+        let chrome = 6usize;
+        let viewport = area_h.saturating_sub(chrome).max(1);
+        let scroll = self.ui.task_list_scroll;
+        let new_scroll = if total == 0 {
+            0
+        } else if selected_pos < scroll {
+            selected_pos
+        } else if selected_pos >= scroll + viewport {
+            selected_pos + 1 - viewport
+        } else {
+            scroll
+        };
+        let max_scroll = total.saturating_sub(1);
+        self.ui.task_list_scroll = new_scroll.min(max_scroll);
     }
 
     fn move_selection(&mut self, delta: i32) {
@@ -1049,6 +1074,7 @@ impl AppState {
                 self.data.selected_task = new_task;
                 // ListState position is relative to visible slice, not full tasks.
                 self.data.task_list_state.select(Some(next));
+                self.adjust_task_list_scroll(next, visible.len());
                 self.ui.focus.section_item = 0;
                 if self.ui.mode == Mode::Visual {
                     if let Some(t) = self.data.tasks.get(self.data.selected_task) {

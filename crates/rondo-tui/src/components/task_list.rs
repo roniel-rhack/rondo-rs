@@ -74,11 +74,33 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         } else {
             None
         };
-    let items = render_items(app, &visible, layout[1].width, search_query.as_deref());
+
+    // Viewport-aware slice: each task expands to multiple lines, but the
+    // scroll offset is task-indexed (1 task ≈ 1 cursor step). We render at
+    // most `area_height` tasks — generous bound since rows are 1–5 lines.
+    let area_height = layout[1].height as usize;
+    let scroll = app.ui.task_list_scroll.min(visible.len().saturating_sub(1));
+    let end = (scroll + area_height.max(1)).min(visible.len());
+    let slice = &visible[scroll..end];
+
+    let items = render_items(
+        app,
+        slice,
+        layout[1].width,
+        search_query.as_deref(),
+        scroll,
+    );
     // No REVERSED highlight — bg changes are theme-fragile. The accent ▌ gutter
-    // already marks the cursor row.
+    // already marks the cursor row. Use a slice-local ListState so ratatui's
+    // own offset math doesn't compound with our pre-slicing.
+    let mut local_state = ratatui::widgets::ListState::default();
+    if let Some(sel) = app.data.task_list_state.selected() {
+        if sel >= scroll && sel < scroll + slice.len() {
+            local_state.select(Some(sel - scroll));
+        }
+    }
     let list = List::new(items);
-    f.render_stateful_widget(list, layout[1], &mut app.data.task_list_state);
+    f.render_stateful_widget(list, layout[1], &mut local_state);
 
     draw_progress_bar(app, f, layout[2], t);
 }
@@ -99,6 +121,7 @@ fn render_items(
     visible: &[usize],
     width: u16,
     query: Option<&str>,
+    scroll_offset: usize,
 ) -> Vec<ListItem<'static>> {
     let selected_pos = app.data.task_list_state.selected();
     let last_idx = visible.len().saturating_sub(1);
@@ -107,7 +130,8 @@ fn render_items(
         .iter()
         .enumerate()
         .map(|(pos, &idx)| {
-            let is_selected = Some(pos) == selected_pos;
+            let absolute_pos = scroll_offset + pos;
+            let is_selected = Some(absolute_pos) == selected_pos;
             let is_last = pos == last_idx;
             build_row(
                 &app.data.tasks[idx],

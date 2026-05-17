@@ -67,6 +67,9 @@ pub struct UiState {
     pub last_journal_entries_rect: Rect,
     pub sort_order: SortOrder,
     pub journal_pane: JournalPane,
+    /// First visible row in the task list. Updated by `move_selection`
+    /// to keep the cursor inside the viewport, and clamped on resize.
+    pub task_list_scroll: usize,
 }
 
 impl Default for UiState {
@@ -88,6 +91,7 @@ impl Default for UiState {
             last_journal_entries_rect: Rect::default(),
             sort_order: SortOrder::default(),
             journal_pane: JournalPane::default(),
+            task_list_scroll: 0,
         }
     }
 }

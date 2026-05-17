@@ -117,7 +117,9 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
 
     // Run live effects after all widgets have painted; effects mutate cells in
     // place to produce fades/sweeps/dissolves.
-    app.fx.tick_and_render(f);
+    if app.fx.any_running() {
+        app.fx.tick_and_render(f);
+    }
 }
 
 fn body_with_sidebar(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {

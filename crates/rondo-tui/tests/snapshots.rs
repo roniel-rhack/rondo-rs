@@ -56,7 +56,13 @@ fn snapshot(_name: &str, width: u16, height: u16, mutate: impl FnOnce(&mut AppSt
     // that look like weekday-ish single English/Spanish words.
     let re_weekday =
         regex::Regex::new(r"\((Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|lunes|martes|miércoles|jueves|viernes|sábado|domingo)\)").unwrap();
-    re_weekday.replace_all(&stage4, "(WEEKDAY)").to_string()
+    let stage5 = re_weekday.replace_all(&stage4, "(WEEKDAY)").to_string();
+    // The plugins overlay surfaces `$HOME/.rondo-rs/plugins` when no
+    // external plugin is installed. HOME differs per dev machine and per
+    // CI runner (`/Users/runner` macOS, `/home/runner` linux). Collapse
+    // both shapes to a placeholder so the snapshot stays portable.
+    let re_home = regex::Regex::new(r"(?:/Users|/home)/[^/\s]+").unwrap();
+    re_home.replace_all(&stage5, "$$HOME").to_string()
 }
 
 #[test]

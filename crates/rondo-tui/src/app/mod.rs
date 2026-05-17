@@ -24,6 +24,8 @@ pub struct AppState {
     pub fx: crate::fx::FxManager,
     pub plugins: PluginRegistry,
     pub theme: Theme,
+    /// Active UI language (Phase 1: header/sidebar/footer/task_list strings).
+    pub lang: rondo_core::config::Lang,
     pub should_quit: bool,
     pub status_msg: Option<String>,
     /// True when the underlying store was opened RW (so we can persist mutations).
@@ -55,6 +57,7 @@ impl AppState {
             fx: crate::fx::FxManager::new(),
             plugins,
             theme: Theme::dark(),
+            lang: rondo_core::config::Lang::default(),
             should_quit: false,
             status_msg: None,
             writable,
@@ -1050,7 +1053,16 @@ impl AppState {
 
     fn handle_command(&mut self, cmd: String) {
         self.modals.command_palette_open = false;
-        match cmd.trim() {
+        let trimmed = cmd.trim();
+        if let Some(rest) = trimmed.strip_prefix("theme ") {
+            self.switch_theme(rest.trim());
+            return;
+        }
+        if trimmed == "theme" {
+            self.toast("usage: :theme dark|light|high-contrast".to_string());
+            return;
+        }
+        match trimmed {
             "tasks" => self.ui.page = Page::Tasks,
             "journal" => self.ui.page = Page::Journal,
             "pomodoro" => {
@@ -1071,6 +1083,13 @@ impl AppState {
             "" => {}
             other => self.status_msg = Some(format!("unknown: {}", other)),
         }
+    }
+
+    fn switch_theme(&mut self, name: &str) {
+        let resolved = crate::theme::Theme::by_name(name);
+        let applied = resolved.name();
+        self.theme = resolved;
+        self.toast(format!("theme: {}", applied));
     }
 
     fn open_plugin_page(&mut self, id: &str) {
@@ -1100,6 +1119,8 @@ impl AppState {
             task_id,
             rondo_core::domain::focus::SessionKind::Work,
             total,
+            // E4: cycle index — wired to PomodoroConfig.cycles_per_long after B refactor.
+            1,
         ) {
             Ok(id) => {
                 self.modals.pomodoro_session_id = Some(id);

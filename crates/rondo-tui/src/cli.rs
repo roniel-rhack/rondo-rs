@@ -596,8 +596,12 @@ fn cli_focus(db_path: &Path, opts: &CliOpts, action: FocusAction) -> Result<()> 
 fn cli_focus_start(db_path: &Path, opts: &CliOpts) -> Result<()> {
     require_write(opts, "focus start")?;
     let (store, _guard) = open_rw_store(db_path)?;
-    let id =
-        store.start_focus_session(None, rondo_core::domain::focus::SessionKind::Work, 25 * 60)?;
+    let id = store.start_focus_session(
+        None,
+        rondo_core::domain::focus::SessionKind::Work,
+        25 * 60,
+        1,
+    )?;
     if opts.json {
         println!("{}", serde_json::json!({ "session_id": id }));
     } else {

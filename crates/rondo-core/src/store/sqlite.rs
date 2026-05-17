@@ -356,17 +356,29 @@ impl SqliteStore {
     }
 
     /// Persist a freshly started focus session. Returns the row id.
+    ///
+    /// `cycle_idx` is the 1-based position within the pomodoro cycle (Work 1/4,
+    /// Work 2/4, …). Use 0 for ad-hoc sessions that aren't part of a cycle.
     pub fn start_focus_session(
         &self,
         task_id: Option<i64>,
         kind: SessionKind,
         duration_secs: u64,
+        cycle_idx: u8,
     ) -> Result<i64> {
         let conn = self.conn.lock().unwrap();
         let now = Utc::now().to_rfc3339();
+        let phase = kind as i64;
         conn.execute(
             super::queries::INSERT_FOCUS_SESSION,
-            params![task_id, kind as i64, &now, duration_secs as i64],
+            params![
+                task_id,
+                phase,
+                &now,
+                duration_secs as i64,
+                phase,
+                cycle_idx as i64
+            ],
         )?;
         Ok(conn.last_insert_rowid())
     }
@@ -415,11 +427,12 @@ impl SqliteStore {
             .query_map([], |r| {
                 let started: String = r.get(3)?;
                 let completed: Option<String> = r.get(4)?;
+                let cycle_idx: i64 = r.get(7).unwrap_or(0);
                 Ok(Session {
                     id: Some(r.get::<_, i64>(0)?),
                     task_id: r.get::<_, Option<i64>>(1)?,
                     kind: SessionKind::from_db(r.get::<_, i64>(2)?),
-                    cycle_pos: 0,
+                    cycle_pos: cycle_idx.clamp(0, u8::MAX as i64) as u8,
                     started_at: parse_dt_sql(&started)?,
                     completed_at: completed.as_deref().map(parse_dt_sql).transpose()?,
                     duration_secs: r.get::<_, i64>(5)? as u64,

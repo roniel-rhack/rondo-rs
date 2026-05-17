@@ -2,8 +2,8 @@
 source: crates/rondo-tui/tests/snapshots.rs
 expression: s
 ---
-" ▌rondo v0.1.0       // SISTEMA DE GESTIÓN DE TAREAS AVANZADO //                ⊙ ONLINE · HH:MM:SS · ◷ 1/2 · ⏵ P1 · ☑3 "
-"┌─ navegación ───────────┐┏━ inbox · 3 tareas ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+" ▌rondo v0.1.0       // SISTEMA DE GESTIÓN DE TAREAS AVANZADO //                    ⊙ RO · HH:MM:SS · ◷ 1/2 · ⏵ P1 · ☑3 "
+"┌─ navegación ───────────┐┏━ inbox · 3 tareas · default (status, priority, due) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
 "│  [i] ◉ INBOX       3   │┃     ESTADO  PRI     TAREA                                                                  ┃"
 "│  [t] ◷ HOY         1   │┃ ▌ ▌ [ ]   ◖URG◗  Refactor pomodoro module   ◖in 1d◗   ⛒ blocked                            ┃"
 "│  [p] ⏵ PRÓXIMAS    2   │┃           #refactor  #work                                                                 ┃"
@@ -33,4 +33,4 @@ expression: s
 "│   ○    2  Pendient ││   17   18   19   20   21   22  ││                                  ││         ⌬                │"
 "│   !    0  Vencidas ││                                ││                                  ││                          │"
 "└────────────────────┘└────────────────────────────────┘└──────────────────────────────────┘└──────────────────────────┘"
-" [NOR]  [p → toggle] [Esc → close] [: → cmd] [q → quit]  · ? more                                                       "
+" [NOR]  [p → toggle] [Esc → close] [: → cmd] [q → quit]  · ? ayuda                                                      "

@@ -14,6 +14,7 @@ pub struct Config {
     pub ui: UiConfig,
     pub pomodoro: PomodoroConfig,
     pub plugins: PluginsConfig,
+    pub lang: LangConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,6 +31,25 @@ pub struct PomodoroConfig {
     pub work_min: u32,
     pub short_break_min: u32,
     pub long_break_min: u32,
+    /// Number of work cycles before a long break is offered. Defaults to 4.
+    pub cycles_per_long: u32,
+}
+
+/// Workstream B will rename `work_min`→`work_mins` etc. when wiring config
+/// into `ModalsState`. For now the four-field shape matches the plan and the
+/// rest of the codebase still reads the legacy `*_min` names.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Lang {
+    #[default]
+    Es,
+    En,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LangConfig {
+    pub name: Lang,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -55,6 +75,7 @@ impl Default for PomodoroConfig {
             work_min: 25,
             short_break_min: 5,
             long_break_min: 15,
+            cycles_per_long: 4,
         }
     }
 }

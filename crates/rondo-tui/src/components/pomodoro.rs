@@ -39,8 +39,11 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         ])
         .split(inner);
 
-    // Row 0: phase label
-    let phase = "Focus 1/4";
+    // Row 0: phase label. Until Workstream B wires PomodoroConfig into
+    // ModalsState (cycle counter, current phase), we render the static
+    // Work phase against the default `cycles_per_long`. The struct field
+    // already exists on PomodoroConfig so palette commands can flip it.
+    let phase = phase_label(app);
     f.render_widget(
         Paragraph::new(Line::from(vec![Span::styled(
             phase,
@@ -89,4 +92,12 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         .ratio(ratio)
         .label("");
     f.render_widget(gauge, chunks[4]);
+}
+
+/// Pomodoro phase string. Reads `cycles_per_long` from PomodoroConfig
+/// defaults; once Workstream B threads the live config + cycle state into
+/// `ModalsState` this should be derived from `app.modals` instead.
+fn phase_label(_app: &AppState) -> String {
+    let cycles = rondo_core::config::PomodoroConfig::default().cycles_per_long;
+    format!("Focus 1/{}", cycles)
 }

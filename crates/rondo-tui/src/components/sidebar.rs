@@ -1,6 +1,7 @@
 use crate::app::AppState;
 use crate::filter::{Filter, NAV_BLOCK_LEN, SIDEBAR_ITEMS};
 use crate::focus::Pane;
+use crate::strings::{t as tr, StringKey};
 use crate::theme::Theme;
 use crate::widgets::bracket_panel::BracketPanel;
 use ratatui::{
@@ -29,7 +30,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 fn draw_nav(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
     let focused = app.ui.focus.pane == Pane::Sidebar && app.ui.focus.sidebar_item < NAV_BLOCK_LEN;
-    let panel = BracketPanel::new("navegación", t).active(focused);
+    let panel = BracketPanel::new(tr(app.lang, StringKey::NavPanel), t).active(focused);
     let inner = panel.inner(area);
     panel.render(area, f.buffer_mut());
 
@@ -46,7 +47,7 @@ fn draw_nav(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 fn draw_filters(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
     let focused = app.ui.focus.pane == Pane::Sidebar && app.ui.focus.sidebar_item >= NAV_BLOCK_LEN;
-    let panel = BracketPanel::new("filtros rápidos", t).active(focused);
+    let panel = BracketPanel::new(tr(app.lang, StringKey::QuickFiltersPanel), t).active(focused);
     let inner = panel.inner(area);
     panel.render(area, f.buffer_mut());
 
@@ -79,7 +80,7 @@ fn draw_leader_hint(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         ),
         Span::styled(" → ", t.muted()),
         Span::styled(
-            "pulsa letra",
+            tr(app.lang, StringKey::LeaderHint),
             Style::default().fg(t.warn).add_modifier(Modifier::BOLD),
         ),
     ]);

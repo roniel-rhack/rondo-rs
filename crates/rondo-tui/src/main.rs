@@ -25,6 +25,9 @@ struct Cli {
     /// Open the DB read-only (disables CRUD; default is read-write).
     #[arg(long, global = true)]
     read_only: bool,
+    /// Override theme: dark|light|high-contrast (or `hc`).
+    #[arg(long, global = true)]
+    theme: Option<String>,
     /// Emit JSON to stdout where applicable (CLI subcommands only)
     #[arg(long, global = true)]
     json: bool,
@@ -118,12 +121,15 @@ fn main() -> Result<()> {
     };
     let no_color_active = a11y::no_color() || cli_args.no_color;
     let reduced = a11y::reduced_motion(cli_args.reduced_motion);
+    let cfg = rondo_core::config::Config::from_env_or_default();
     let mut app = AppState::with_writable(store, writable)?;
+    let theme_name = cli_args.theme.as_deref().unwrap_or(cfg.ui.theme.as_str());
     app.theme = if no_color_active {
         Theme::no_color()
     } else {
-        Theme::dark()
+        Theme::by_name(theme_name)
     };
+    app.lang = cfg.lang.name;
     app.fx = FxManager::new_with_options(reduced);
     register_builtin_plugins(&mut app);
     let mut terminal = tui::init()?;

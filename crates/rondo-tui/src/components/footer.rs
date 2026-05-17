@@ -1,5 +1,6 @@
 use crate::app::AppState;
 use crate::focus::{DetailSection, Mode, Pane};
+use crate::strings::{t as tr, StringKey};
 use ratatui::{
     layout::Rect,
     style::{Modifier, Style},
@@ -25,8 +26,9 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     spans.push(Span::styled(
         mode_label,
         Style::default()
-            .fg(mode_color(mode, t))
-            .add_modifier(Modifier::BOLD | Modifier::REVERSED),
+            .fg(t.bg)
+            .bg(mode_color(mode, t))
+            .add_modifier(Modifier::BOLD),
     ));
     spans.push(Span::raw("  "));
 
@@ -44,9 +46,17 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         spans.push(Span::styled(msg.clone(), Style::default().fg(t.warn)));
         spans.push(Span::raw("  "));
     }
-    spans.push(Span::styled("· ", t.muted()));
-    spans.push(Span::styled("?", t.kbd()));
-    spans.push(Span::styled(" more ", t.muted()));
+    // E15: always-on `? help` hint. Rendered regardless of modal/page context
+    // so users discover the help overlay from any state. Suppressed only when
+    // the help overlay itself is already open.
+    if !app.modals.help_open {
+        spans.push(Span::styled("· ", t.muted()));
+        spans.push(Span::styled("?", t.kbd()));
+        spans.push(Span::styled(
+            format!(" {} ", tr(app.lang, StringKey::FooterHelpHint)),
+            t.muted(),
+        ));
+    }
 
     f.render_widget(Paragraph::new(Line::from(spans)), area);
 }
@@ -122,6 +132,8 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
             ("i / A", "nueva entrada"),
         ];
     }
+    // Cap each branch at 5 hints. The `:` palette appears in every
+    // non-modal context so users can always escape to the command palette.
     match app.ui.focus.pane {
         Pane::Sidebar => vec![
             ("j/k", "move"),
@@ -133,24 +145,24 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
         Pane::List => vec![
             ("a", "add"),
             ("space", "status"),
-            ("A", "+ subtarea"),
-            ("B", "+ dep"),
             ("v", "select"),
+            ("B", "+ dep"),
+            (":", "cmd"),
         ],
         Pane::Detail => match app.ui.focus.section {
             DetailSection::Header => vec![
                 ("e", "edit title"),
                 ("E", "edit description"),
                 ("space", "cycle status"),
-                ("1/2/3/4", "section jump"),
                 ("Tab", "next sect"),
+                (":", "cmd"),
             ],
             DetailSection::Subtasks => vec![
                 ("A", "+ subtarea"),
                 ("e", "rename"),
                 ("d", "delete"),
                 ("space", "check"),
-                ("1/2/3/4", "section jump"),
+                (":", "cmd"),
             ],
             DetailSection::Dependencies => vec![
                 ("B", "+/- dep"),
@@ -163,8 +175,8 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
                 ("a", "+ note"),
                 ("e", "edit note"),
                 ("d", "delete note"),
-                ("1/2/3/4", "section jump"),
                 ("Tab", "next sect"),
+                (":", "cmd"),
             ],
         },
     }

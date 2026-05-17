@@ -1,4 +1,5 @@
 use crate::app::AppState;
+use crate::strings::{t as tr, StringKey};
 use chrono::Local;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -40,7 +41,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let subtitle = Line::from(vec![
         Span::styled("// ", Style::default().fg(t.border_inactive)),
         Span::styled(
-            "SISTEMA DE GESTIÓN DE TAREAS AVANZADO",
+            tr(app.lang, StringKey::HeaderSubtitle),
             Style::default().fg(t.fg_muted),
         ),
         Span::styled(" //", Style::default().fg(t.border_inactive)),
@@ -81,11 +82,16 @@ fn telemetry(app: &AppState) -> Vec<Span<'static>> {
     };
     let sep = || Span::styled(" · ", Style::default().fg(t.border_inactive));
 
+    let (rw_label, rw_color) = if app.writable {
+        ("RW", t.success)
+    } else {
+        ("RO", t.warn)
+    };
     vec![
-        Span::styled("⊙ ", Style::default().fg(t.success)),
+        Span::styled("⊙ ", Style::default().fg(rw_color)),
         Span::styled(
-            "ONLINE",
-            Style::default().fg(t.success).add_modifier(Modifier::BOLD),
+            rw_label,
+            Style::default().fg(rw_color).add_modifier(Modifier::BOLD),
         ),
         sep(),
         Span::styled(time, Style::default().fg(t.fg).add_modifier(Modifier::BOLD)),

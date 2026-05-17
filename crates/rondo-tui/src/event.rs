@@ -80,7 +80,9 @@ pub fn map(ev: Event, app: &AppState) -> Option<Action> {
             width: w,
             height: h,
         }),
-        Event::Paste(s) => Some(Action::Paste(s)),
+        // Note: `Event::Paste` was already short-circuited at the top of
+        // `map()` (lines 9–11), so the arm previously living here was
+        // unreachable.
         _ => None,
     }
 }

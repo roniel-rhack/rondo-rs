@@ -149,18 +149,31 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
     // ─── SUBTASKS ───────────────────────────────────────────
     let (done, total) = task.subtask_progress();
+    let section_active =
+        app.ui.focus.pane == Pane::Detail && app.ui.focus.section == DetailSection::Subtasks;
+    lines.push(Line::raw(""));
+    section_header(
+        &mut lines,
+        "subtareas",
+        if total > 0 {
+            Some(format!("{}/{}", done, total))
+        } else {
+            Some("vacía".to_string())
+        }
+        .as_deref(),
+        section_active,
+        inner_width,
+        t,
+    );
+    if total == 0 {
+        lines.push(Line::from(vec![
+            Span::raw("  "),
+            Span::styled("(sin subtareas)  ", t.muted()),
+            Span::styled("A", t.kbd()),
+            Span::styled(" para añadir", t.muted()),
+        ]));
+    }
     if total > 0 {
-        let section_active =
-            app.ui.focus.pane == Pane::Detail && app.ui.focus.section == DetailSection::Subtasks;
-        lines.push(Line::raw(""));
-        section_header(
-            &mut lines,
-            "subtareas",
-            Some(&format!("{}/{}", done, total)),
-            section_active,
-            inner_width,
-            t,
-        );
         // Mini progress bar
         let bar_width = inner_width.saturating_sub(8);
         let filled = ((bar_width as f64) * (done as f64 / total as f64)).round() as usize;
@@ -221,50 +234,57 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     }
 
     // ─── DEPENDENCIES ───────────────────────────────────────
-    if task.is_blocked() || !task.blocks_ids.is_empty() {
-        let section_active = app.ui.focus.pane == Pane::Detail
-            && app.ui.focus.section == DetailSection::Dependencies;
-        lines.push(Line::raw(""));
-        section_header(
-            &mut lines,
-            "dependencias",
-            None,
-            section_active,
-            inner_width,
-            t,
-        );
-        if task.is_blocked() {
-            let blockers: Vec<Span<'static>> = task
-                .blocked_by_ids
-                .iter()
-                .flat_map(|id| {
-                    [
-                        Span::styled("  ⛒ ", Style::default().fg(t.danger)),
-                        Span::styled(
-                            format!("blocked by #{}", id),
-                            Style::default().fg(t.danger).add_modifier(Modifier::BOLD),
-                        ),
-                    ]
-                })
-                .collect();
-            lines.push(Line::from(blockers));
-        }
-        if !task.blocks_ids.is_empty() {
-            let blocks: Vec<Span<'static>> = task
-                .blocks_ids
-                .iter()
-                .flat_map(|id| {
-                    [
-                        Span::styled("  ⏵ ", Style::default().fg(t.warn)),
-                        Span::styled(
-                            format!("blocks #{}", id),
-                            Style::default().fg(t.warn).add_modifier(Modifier::BOLD),
-                        ),
-                    ]
-                })
-                .collect();
-            lines.push(Line::from(blocks));
-        }
+    let deps_section_active = app.ui.focus.pane == Pane::Detail
+        && app.ui.focus.section == DetailSection::Dependencies;
+    let has_deps = task.is_blocked() || !task.blocks_ids.is_empty();
+    lines.push(Line::raw(""));
+    section_header(
+        &mut lines,
+        "dependencias",
+        if has_deps { None } else { Some("vacía") },
+        deps_section_active,
+        inner_width,
+        t,
+    );
+    if task.is_blocked() {
+        let blockers: Vec<Span<'static>> = task
+            .blocked_by_ids
+            .iter()
+            .flat_map(|id| {
+                [
+                    Span::styled("  ⛒ ", Style::default().fg(t.danger)),
+                    Span::styled(
+                        format!("blocked by #{}", id),
+                        Style::default().fg(t.danger).add_modifier(Modifier::BOLD),
+                    ),
+                ]
+            })
+            .collect();
+        lines.push(Line::from(blockers));
+    }
+    if !task.blocks_ids.is_empty() {
+        let blocks: Vec<Span<'static>> = task
+            .blocks_ids
+            .iter()
+            .flat_map(|id| {
+                [
+                    Span::styled("  ⏵ ", Style::default().fg(t.warn)),
+                    Span::styled(
+                        format!("blocks #{}", id),
+                        Style::default().fg(t.warn).add_modifier(Modifier::BOLD),
+                    ),
+                ]
+            })
+            .collect();
+        lines.push(Line::from(blocks));
+    }
+    if !has_deps {
+        lines.push(Line::from(vec![
+            Span::raw("  "),
+            Span::styled("(sin dependencias)  ", t.muted()),
+            Span::styled("B", t.kbd()),
+            Span::styled(" para añadir/quitar", t.muted()),
+        ]));
     }
 
     // ─── TIME LOG ───────────────────────────────────────────
@@ -306,18 +326,32 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     }
 
     // ─── NOTAS ─────────────────────────────────────────────
+    let notes_section_active =
+        app.ui.focus.pane == Pane::Detail && app.ui.focus.section == DetailSection::Notes;
+    lines.push(Line::raw(""));
+    let notes_count_lbl = if task.notes.is_empty() {
+        "vacía".to_string()
+    } else {
+        format!("{}", task.notes.len())
+    };
+    section_header(
+        &mut lines,
+        "notas",
+        Some(notes_count_lbl.as_str()),
+        notes_section_active,
+        inner_width,
+        t,
+    );
+    if task.notes.is_empty() {
+        lines.push(Line::from(vec![
+            Span::raw("  "),
+            Span::styled("(sin notas)  ", t.muted()),
+            Span::styled("a", t.kbd()),
+            Span::styled(" para añadir", t.muted()),
+        ]));
+    }
     if !task.notes.is_empty() {
-        let section_active =
-            app.ui.focus.pane == Pane::Detail && app.ui.focus.section == DetailSection::Notes;
-        lines.push(Line::raw(""));
-        section_header(
-            &mut lines,
-            "notas",
-            Some(&format!("{}", task.notes.len())),
-            section_active,
-            inner_width,
-            t,
-        );
+        let section_active = notes_section_active;
         for (i, n) in task.notes.iter().take(3).enumerate() {
             let cursor_here = section_active && app.ui.focus.section_item == i;
             let gutter = if cursor_here {

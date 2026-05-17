@@ -23,6 +23,7 @@ pub enum Action {
     FocusRight,
     NextSection,
     PrevSection,
+    JumpDetailSection(u8),
     ToggleSelected,
     ResizeSplit { delta: i16 },
     ResetSplit,

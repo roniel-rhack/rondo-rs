@@ -166,6 +166,20 @@ impl UiState {
                 }
                 None
             }
+            Action::JumpDetailSection(idx) => {
+                use crate::focus::DetailSection;
+                let target = match idx {
+                    0 => DetailSection::Header,
+                    1 => DetailSection::Subtasks,
+                    2 => DetailSection::Dependencies,
+                    3 => DetailSection::Notes,
+                    _ => return None,
+                };
+                self.focus.pane = Pane::Detail;
+                self.focus.section = target;
+                self.focus.section_item = 0;
+                None
+            }
             Action::ResetSplit => {
                 self.split_ratio = 50;
                 None

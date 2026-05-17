@@ -88,7 +88,7 @@ the branch on merge.
 6. **Substate split** of `AppState` into `data`/`ui`/`modals` so writes,
    modals and undo don't sprawl into a single 1000-line `update()` match.
 7. **tachyonfx pinned to 0.13** (last version on ratatui 0.29).
-8. **extism pinned to 1.10** (newer versions need rustc ≥ 1.90; we target 1.83).
+8. **extism 1.21** (requires rustc ≥ 1.90 — workspace MSRV bumped accordingly to pull in wasmtime 41 security fixes).
 9. **`~/.rondo-rs/` confinement** — every path the binary writes (DB,
    backups, logs, lock, plugins, sync, config) lives under that single
    root; nothing outside is touched.

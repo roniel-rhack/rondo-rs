@@ -132,10 +132,30 @@ pub const UNHIDE_JOURNAL_NOTE: &str = "UPDATE journal_notes SET hidden = 0 WHERE
 
 pub const DELETE_JOURNAL_ENTRY: &str = "DELETE FROM journal_entries WHERE id = ?1";
 
+/// Re-insert a journal entry on undo, preserving its original id.
+pub const RESTORE_JOURNAL_ENTRY: &str =
+    "INSERT OR REPLACE INTO journal_entries (id, note_id, body, created_at) VALUES (?1, ?2, ?3, ?4)";
+
+/// Re-insert a journal day note on undo, preserving its original id.
+pub const RESTORE_JOURNAL_NOTE: &str =
+    "INSERT OR REPLACE INTO journal_notes (id, date, hidden, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)";
+
+/// Re-insert a task note on undo, preserving its original id.
+pub const RESTORE_TASK_NOTE: &str =
+    "INSERT OR REPLACE INTO task_notes (id, task_id, body, created_at) VALUES (?1, ?2, ?3, ?4)";
+
+/// Re-insert a subtask on undo, preserving its original id.
+pub const RESTORE_SUBTASK: &str =
+    "INSERT OR REPLACE INTO subtasks (id, task_id, title, completed, position) VALUES (?1, ?2, ?3, ?4, ?5)";
+
+/// Force-set a subtask's completed state to a specific value (for explicit
+/// toggle undo where we know the previous state and don't want diff-based
+/// flipping).
+pub const SET_SUBTASK_COMPLETED: &str = "UPDATE subtasks SET completed = ?1 WHERE id = ?2";
+
 pub const DELETE_JOURNAL_NOTE: &str = "DELETE FROM journal_notes WHERE id = ?1";
 
-pub const UPDATE_JOURNAL_ENTRY_BODY: &str =
-    "UPDATE journal_entries SET body = ?1 WHERE id = ?2";
+pub const UPDATE_JOURNAL_ENTRY_BODY: &str = "UPDATE journal_entries SET body = ?1 WHERE id = ?2";
 
 pub const NOTE_ID_FOR_ENTRY: &str = "SELECT note_id FROM journal_entries WHERE id = ?1";
 
@@ -153,5 +173,4 @@ ON CONFLICT (plugin_id, key) DO UPDATE SET value = excluded.value, updated_at = 
 
 pub const KV_DELETE: &str = "DELETE FROM plugin_kv WHERE plugin_id = ?1 AND key = ?2";
 
-pub const KV_LIST_FOR_PLUGIN: &str =
-    "SELECT key FROM plugin_kv WHERE plugin_id = ?1 ORDER BY key";
+pub const KV_LIST_FOR_PLUGIN: &str = "SELECT key FROM plugin_kv WHERE plugin_id = ?1 ORDER BY key";

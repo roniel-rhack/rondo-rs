@@ -25,4 +25,4 @@ expression: s
 "┃ PROGRESO GENERAL  [▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱] 25%   1/4     ┃"
 "┃                                                                              ┃"
 "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
-" [NOR]  [a → add] [A → + subtarea] [B → + dep] [v → select] [f<l> → filtro]  · ?"
+" [NOR]  [a → add] [space → status] [A → + subtarea] [B → + dep] [v → select]  · "

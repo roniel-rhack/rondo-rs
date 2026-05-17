@@ -12,7 +12,9 @@ fn empty_dir_returns_empty_list() {
 #[test]
 fn missing_dir_does_not_error() {
     let mut host = PluginHost::new();
-    let res = host.load_from_dir(std::path::Path::new("/tmp/nonexistent-rondo-plugin-dir-xyz"));
+    let res = host.load_from_dir(std::path::Path::new(
+        "/tmp/nonexistent-rondo-plugin-dir-xyz",
+    ));
     assert!(res.is_ok());
 }
 

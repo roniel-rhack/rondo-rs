@@ -80,7 +80,9 @@ pub fn map(ev: Event, app: &AppState) -> Option<Action> {
             width: w,
             height: h,
         }),
-        Event::Paste(s) => Some(Action::Paste(s)),
+        // Note: `Event::Paste` was already short-circuited at the top of
+        // `map()` (lines 9–11), so the arm previously living here was
+        // unreachable.
         _ => None,
     }
 }
@@ -159,7 +161,7 @@ fn sort_overlay_key(ev: Event) -> Option<Action> {
     };
     Some(match k.code {
         KeyCode::Esc => Action::CloseSortOverlay,
-        KeyCode::Char(c) if c.is_ascii_digit() => {
+        KeyCode::Char(c) if matches!(c, '1'..='5') => {
             let idx = (c as u8).saturating_sub(b'1') as usize;
             let order = SortOrder::ALL.get(idx).copied()?;
             Action::SetSortOrder(order)
@@ -445,7 +447,9 @@ fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
         KeyCode::Char('P') if in_visual => Action::BulkPriority,
         KeyCode::Char('A') if on_journal => Action::JournalStartEntry,
         KeyCode::Char('A') if !in_visual && !in_sidebar => Action::RequestAddSubtask,
-        KeyCode::Char('B') if !on_journal && !in_visual && !in_sidebar => Action::RequestAddDependency,
+        KeyCode::Char('B') if !on_journal && !in_visual && !in_sidebar => {
+            Action::RequestAddDependency
+        }
         KeyCode::Char('1') if in_detail => Action::JumpDetailSection(0),
         KeyCode::Char('2') if in_detail => Action::JumpDetailSection(1),
         KeyCode::Char('3') if in_detail => Action::JumpDetailSection(2),

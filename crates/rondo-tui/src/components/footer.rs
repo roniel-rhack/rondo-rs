@@ -14,8 +14,11 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
     let mut spans: Vec<Span<'static>> = Vec::new();
     spans.push(Span::raw(" "));
+    let undo_depth = app.undo.len();
     let mode_label = if mode == Mode::Visual && !app.ui.selection.is_empty() {
         format!("[VIS·{}]", app.ui.selection.len())
+    } else if undo_depth > 0 {
+        format!("[{}·{}]", mode.tag(), undo_depth)
     } else {
         format!("[{}]", mode.tag())
     };
@@ -101,10 +104,7 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
         ];
     }
     if app.ui.page == crate::action::Page::Journal {
-        let in_days = matches!(
-            app.ui.journal_pane,
-            crate::app::ui_state::JournalPane::Days
-        );
+        let in_days = matches!(app.ui.journal_pane, crate::app::ui_state::JournalPane::Days);
         if in_days {
             return vec![
                 ("h/l", "días ↔ entries"),
@@ -132,16 +132,16 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
         ],
         Pane::List => vec![
             ("a", "add"),
+            ("space", "status"),
             ("A", "+ subtarea"),
             ("B", "+ dep"),
             ("v", "select"),
-            ("f<l>", "filtro"),
         ],
         Pane::Detail => match app.ui.focus.section {
             DetailSection::Header => vec![
                 ("e", "edit title"),
                 ("E", "edit description"),
-                ("space", "toggle done"),
+                ("space", "cycle status"),
                 ("1/2/3/4", "section jump"),
                 ("Tab", "next sect"),
             ],

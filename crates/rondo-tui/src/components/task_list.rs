@@ -15,8 +15,11 @@ use rondo_core::domain::task::{Status, Task};
 
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
-    let visible: Vec<usize> =
-        sorted_indices(&app.data.tasks, app.ui.sort_order, app.visible_task_indices());
+    let visible: Vec<usize> = sorted_indices(
+        &app.data.tasks,
+        app.ui.sort_order,
+        app.visible_task_indices(),
+    );
     let filter_label = app.data.active_filter.label().to_lowercase();
     let title = if app.modals.search_open && !app.modals.search_buf.trim().is_empty() {
         format!(

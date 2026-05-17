@@ -5,7 +5,10 @@ pub enum Action {
     Tick,
     Quit,
     Render,
-    Resize { width: u16, height: u16 },
+    Resize {
+        width: u16,
+        height: u16,
+    },
 
     NextItem,
     PrevItem,
@@ -25,7 +28,9 @@ pub enum Action {
     PrevSection,
     JumpDetailSection(u8),
     ToggleSelected,
-    ResizeSplit { delta: i16 },
+    ResizeSplit {
+        delta: i16,
+    },
     ResetSplit,
 
     OpenPomodoro,

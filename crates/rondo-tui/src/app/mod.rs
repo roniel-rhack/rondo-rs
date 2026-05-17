@@ -44,7 +44,9 @@ impl AppState {
         plugins.register(Box::new(
             crate::plugins::builtin::dep_graph::DepGraphPlugin::new(Arc::clone(&store)),
         ));
-        plugins.register(Box::new(crate::plugins::builtin::analytics::AnalyticsPlugin));
+        plugins.register(Box::new(
+            crate::plugins::builtin::analytics::AnalyticsPlugin,
+        ));
         Ok(Self {
             data: DataState::new(store)?,
             ui: UiState::default(),
@@ -203,10 +205,11 @@ impl AppState {
                         let mut ok = 0usize;
                         let mut err: Option<String> = None;
                         for id in &ids {
-                            match self.data.store.set_status(
-                                *id,
-                                rondo_core::domain::task::Status::Done,
-                            ) {
+                            match self
+                                .data
+                                .store
+                                .set_status(*id, rondo_core::domain::task::Status::Done)
+                            {
                                 Ok(snap) => {
                                     self.undo.push(snap);
                                     ok += 1;
@@ -408,7 +411,7 @@ impl AppState {
             }
             Action::RequestDeleteTask => {
                 if !self.writable {
-                    self.toast("delete: read-only (start with --write)");
+                    self.toast(ro_msg("delete"));
                 } else if self.data.selected_task_id().is_some() {
                     self.modals.confirm_delete_open = true;
                 }
@@ -429,7 +432,7 @@ impl AppState {
             Action::CancelDelete => self.modals.confirm_delete_open = false,
             Action::RequestEditTitle => {
                 if !self.writable {
-                    self.toast("edit: read-only (start with --write)");
+                    self.toast(ro_msg("edit"));
                 } else if let Some(t) = self.data.selected_task() {
                     self.modals.edit_title_buf = t.title.clone();
                     self.modals.edit_title_open = true;
@@ -465,7 +468,7 @@ impl AppState {
             }
             Action::RequestAddSubtask => {
                 if !self.writable {
-                    self.toast("subtask: read-only (start with --write)");
+                    self.toast(ro_msg("subtask"));
                 } else if self.data.selected_task_id().is_some() {
                     self.modals.add_subtask_buf.clear();
                     self.modals.add_subtask_open = true;
@@ -497,12 +500,11 @@ impl AppState {
             }
             Action::RequestAddDependency => {
                 if !self.writable {
-                    self.toast("dep: read-only (start with --write)");
+                    self.toast(ro_msg("dep"));
                 } else if self.data.selected_task_id().is_some() {
                     self.modals.dep_overlay_buf.clear();
                     self.modals.dep_overlay_open = true;
-                    self.modals.dep_overlay_mode =
-                        crate::app::modals_state::DepOverlayMode::Add;
+                    self.modals.dep_overlay_mode = crate::app::modals_state::DepOverlayMode::Add;
                     self.ui.mode = Mode::Insert;
                 }
             }
@@ -512,8 +514,18 @@ impl AppState {
                     (Ok(blocker), Some(task_id)) if blocker > 0 && blocker != task_id => {
                         match self.data.store.add_dependency(task_id, blocker) {
                             Ok(()) => {
+                                self.undo
+                                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
+                                        rondo_core::domain::task::UndoKind::AddDep {
+                                            task_id,
+                                            blocker_id: blocker,
+                                        },
+                                    ));
                                 self.refresh_tasks();
                                 self.toast(format!("dep added: #{} blocks #{}", blocker, task_id));
+                            }
+                            Err(rondo_core::error::Error::CycleDetected(a, b)) => {
+                                self.toast(format!("can't add: would create cycle #{a} → #{b}"));
                             }
                             Err(e) => self.toast(format!("dep add failed: {}", e)),
                         }
@@ -531,6 +543,13 @@ impl AppState {
                     (Ok(blocker), Some(task_id)) => {
                         match self.data.store.remove_dependency(task_id, blocker) {
                             Ok(()) => {
+                                self.undo
+                                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
+                                        rondo_core::domain::task::UndoKind::RemoveDep {
+                                            task_id,
+                                            blocker_id: blocker,
+                                        },
+                                    ));
                                 self.refresh_tasks();
                                 self.toast(format!("dep removed: #{}", blocker));
                             }
@@ -553,7 +572,7 @@ impl AppState {
             }
             Action::RequestEditDescription => {
                 if !self.writable {
-                    self.toast("description: read-only (start with --write)");
+                    self.toast(ro_msg("description"));
                 } else if let Some(task) = self.data.selected_task() {
                     let body = task.description.clone().unwrap_or_default();
                     self.modals.description_textarea = tui_textarea::TextArea::new(
@@ -600,7 +619,7 @@ impl AppState {
 
             Action::RequestEditFocusedSubtask => {
                 if !self.writable {
-                    self.toast("subtask: read-only (start with --write)");
+                    self.toast(ro_msg("subtask"));
                 } else if let Some(task) = self.data.selected_task() {
                     if let Some(sub) = task.subtasks.get(self.ui.focus.section_item) {
                         self.modals.edit_subtask_buf = sub.title.clone();
@@ -640,9 +659,18 @@ impl AppState {
                     self.toast("subtask: read-only");
                 } else if let Some(task) = self.data.selected_task() {
                     if let Some(sub) = task.subtasks.get(self.ui.focus.section_item) {
+                        let sub_clone = sub.clone();
                         let sub_id = sub.id;
+                        let task_id = task.id;
                         match self.data.store.delete_subtask(sub_id) {
                             Ok(_) => {
+                                self.undo
+                                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
+                                        rondo_core::domain::task::UndoKind::DeleteSubtask {
+                                            task_id,
+                                            subtask: sub_clone,
+                                        },
+                                    ));
                                 self.refresh_tasks();
                                 let total = self
                                     .data
@@ -691,9 +719,18 @@ impl AppState {
                     self.toast("note: read-only");
                 } else if let Some(task) = self.data.selected_task() {
                     if let Some(note) = task.notes.get(self.ui.focus.section_item) {
+                        let note_clone = note.clone();
+                        let task_id = task.id;
                         let note_id = note.id;
                         match self.data.store.delete_task_note(note_id) {
                             Ok(_) => {
+                                self.undo
+                                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
+                                        rondo_core::domain::task::UndoKind::DeleteNote {
+                                            task_id,
+                                            note: note_clone,
+                                        },
+                                    ));
                                 self.refresh_tasks();
                                 let total = self
                                     .data
@@ -727,25 +764,49 @@ impl AppState {
                 if body.trim().is_empty() {
                     return;
                 }
-                let result = match (editing, task_id) {
-                    (Some(id), _) => self
-                        .data
-                        .store
-                        .update_task_note(id, &body)
-                        .map(|_| "note updated".to_string()),
-                    (None, Some(tid)) => self
-                        .data
-                        .store
-                        .add_task_note(tid, &body)
-                        .map(|_| "note added".to_string()),
-                    _ => return,
-                };
-                match result {
-                    Ok(msg) => {
-                        self.refresh_tasks();
-                        self.toast(msg);
+                match (editing, task_id) {
+                    (Some(note_id), Some(tid)) => {
+                        // Capture the before-body so undo can restore exactly
+                        // what was there before this edit.
+                        let before_body = self
+                            .data
+                            .selected_task()
+                            .and_then(|t| t.notes.iter().find(|n| n.id == note_id))
+                            .map(|n| n.body.clone());
+                        match self.data.store.update_task_note(note_id, &body) {
+                            Ok(_) => {
+                                if let Some(before) = before_body {
+                                    self.undo.push(
+                                        rondo_core::domain::task::UndoSnapshot::from_kind(
+                                            rondo_core::domain::task::UndoKind::UpdateNote {
+                                                task_id: tid,
+                                                note_id,
+                                                before,
+                                            },
+                                        ),
+                                    );
+                                }
+                                self.refresh_tasks();
+                                self.toast("note updated");
+                            }
+                            Err(e) => self.toast(format!("note failed: {}", e)),
+                        }
                     }
-                    Err(e) => self.toast(format!("note failed: {}", e)),
+                    (None, Some(tid)) => match self.data.store.add_task_note(tid, &body) {
+                        Ok(note_id) => {
+                            self.undo
+                                .push(rondo_core::domain::task::UndoSnapshot::from_kind(
+                                    rondo_core::domain::task::UndoKind::AddNote {
+                                        task_id: tid,
+                                        note_id,
+                                    },
+                                ));
+                            self.refresh_tasks();
+                            self.toast("note added");
+                        }
+                        Err(e) => self.toast(format!("note failed: {}", e)),
+                    },
+                    _ => {}
                 }
             }
             Action::CancelNote => {
@@ -799,10 +860,8 @@ impl AppState {
                 if let Some(id) = self.modals.plugin_page.clone() {
                     let ctx = rondo_plugin_api::PluginContext::new(&id);
                     if let Some(plugin) = self.plugins.get_mut(&id) {
-                        let _ = plugin.handle(
-                            rondo_plugin_api::PluginAction::KeyPress { key },
-                            &ctx,
-                        );
+                        let _ =
+                            plugin.handle(rondo_plugin_api::PluginAction::KeyPress { key }, &ctx);
                     }
                 }
             }
@@ -813,10 +872,19 @@ impl AppState {
                     match self.undo.pop() {
                         None => self.toast("nothing to undo"),
                         Some(snap) => {
+                            let touches_journal = matches!(
+                                snap.kind,
+                                rondo_core::domain::task::UndoKind::JournalDeleteEntry { .. }
+                                    | rondo_core::domain::task::UndoKind::JournalDeleteDay { .. }
+                            );
                             if let Err(e) = self.apply_undo(snap) {
                                 self.toast(format!("undo failed: {}", e));
                             } else {
                                 self.refresh_tasks();
+                                if touches_journal {
+                                    self.data.refresh_journal_notes();
+                                    self.data.reload_journal_entries();
+                                }
                                 self.toast("undone");
                             }
                         }
@@ -917,9 +985,13 @@ impl AppState {
     /// beyond the initial set, time logs, and notes attached to the
     /// original are NOT restored — only the core task plus initial
     /// tags from `NewTask`. Dependency edges are also lost.
-    fn apply_undo(&mut self, snap: rondo_core::domain::task::UndoSnapshot) -> rondo_core::Result<()> {
+    fn apply_undo(
+        &mut self,
+        snap: rondo_core::domain::task::UndoSnapshot,
+    ) -> rondo_core::Result<()> {
         use rondo_core::domain::task::{NewTask, TaskPatch, UndoKind};
-        match snap.kind {
+        let kind = snap.kind.clone();
+        match kind {
             UndoKind::Create => {
                 if let Some(id) = snap.created_id {
                     self.data.store.delete_task(id)?;
@@ -996,6 +1068,43 @@ impl AppState {
                         }
                     }
                 }
+            }
+            UndoKind::AddDep {
+                task_id,
+                blocker_id,
+            } => {
+                self.data.store.remove_dependency(task_id, blocker_id)?;
+            }
+            UndoKind::RemoveDep {
+                task_id,
+                blocker_id,
+            } => {
+                self.data.store.add_dependency(task_id, blocker_id)?;
+            }
+            UndoKind::DeleteSubtask { subtask, .. } => {
+                self.data.store.restore_subtask(&subtask)?;
+            }
+            UndoKind::SubtaskToggle {
+                subtask_id, before, ..
+            } => {
+                self.data.store.set_subtask_completed(subtask_id, before)?;
+            }
+            UndoKind::AddNote { note_id, .. } => {
+                self.data.store.delete_task_note(note_id)?;
+            }
+            UndoKind::UpdateNote {
+                note_id, before, ..
+            } => {
+                self.data.store.update_task_note(note_id, &before)?;
+            }
+            UndoKind::DeleteNote { note, .. } => {
+                self.data.store.restore_task_note(&note)?;
+            }
+            UndoKind::JournalDeleteEntry { entry } => {
+                self.data.store.restore_journal_entry(&entry)?;
+            }
+            UndoKind::JournalDeleteDay { note, entries } => {
+                self.data.store.restore_journal_day(&note, &entries)?;
             }
         }
         Ok(())
@@ -1200,11 +1309,44 @@ impl AppState {
 
     /// Space-bar action: meaning depends on focus context.
     fn handle_space(&mut self) {
-        if self.ui.focus.pane != Pane::Detail {
-            return;
+        match self.ui.focus.pane {
+            Pane::Detail if self.ui.focus.section == DetailSection::Subtasks => {
+                self.toggle_focused_subtask();
+            }
+            Pane::List if self.ui.page == Page::Tasks => {
+                self.cycle_focused_task_status();
+            }
+            _ => {}
         }
-        if self.ui.focus.section == DetailSection::Subtasks {
-            self.toggle_focused_subtask();
+    }
+
+    /// Cycle the currently-selected task's status Pending → InProgress → Done →
+    /// Pending. Persists when `writable`; otherwise mutates the in-memory copy
+    /// and toasts so the user still sees the cycle visually.
+    fn cycle_focused_task_status(&mut self) {
+        let (task_id, current) = match self.data.tasks.get(self.data.selected_task) {
+            Some(t) => (t.id, t.status),
+            None => return,
+        };
+        let next = current.next();
+        if self.writable {
+            match self.data.store.set_status(task_id, next) {
+                Ok(snap) => {
+                    self.undo.push(snap);
+                    self.data.refresh_tasks();
+                    self.ui.flash = Some((FlashTarget::Task(task_id), Instant::now()));
+                    self.toast(format!("task #{} → {}", task_id, next.label()));
+                }
+                Err(e) => self.toast(format!("status change failed: {}", e)),
+            }
+        } else if let Some(t) = self.data.tasks.get_mut(self.data.selected_task) {
+            t.status = next;
+            self.ui.flash = Some((FlashTarget::Task(task_id), Instant::now()));
+            self.toast(format!(
+                "task #{} → {} (read-only, in-memory)",
+                task_id,
+                next.label()
+            ));
         }
     }
 
@@ -1212,17 +1354,28 @@ impl AppState {
     /// `writable`; otherwise mutates the in-memory copy and toasts.
     fn toggle_focused_subtask(&mut self) {
         let item_idx = self.ui.focus.section_item;
-        let subtask_id = match self.data.tasks.get(self.data.selected_task) {
+        let (task_id, subtask_id, before_done) = match self.data.tasks.get(self.data.selected_task)
+        {
             Some(t) => match t.subtasks.get(item_idx) {
-                Some(s) => s.id,
+                Some(s) => (t.id, s.id, s.completed),
                 None => return,
             },
             None => return,
         };
         if self.writable {
             match self.data.store.toggle_subtask(subtask_id) {
-                Ok((_, snap)) => {
-                    self.undo.push(snap);
+                Ok((_, _legacy_snap)) => {
+                    // Push an explicit-state snapshot instead of the legacy
+                    // diff-based one so undo doesn't get confused if another
+                    // subtask changes between toggle and undo.
+                    self.undo
+                        .push(rondo_core::domain::task::UndoSnapshot::from_kind(
+                            rondo_core::domain::task::UndoKind::SubtaskToggle {
+                                task_id,
+                                subtask_id,
+                                before: before_done,
+                            },
+                        ));
                     self.refresh_tasks();
                     self.ui.flash = Some((FlashTarget::Subtask(subtask_id), Instant::now()));
                     self.toast(format!("subtask #{} toggled", subtask_id));
@@ -1274,7 +1427,7 @@ impl AppState {
             return;
         }
         if !self.writable {
-            self.toast("quick-add: read-only (start with --write)");
+            self.toast(ro_msg("quick-add"));
             return;
         }
         let new_task = rondo_core::domain::task::NewTask {
@@ -1284,7 +1437,7 @@ impl AppState {
             priority: parsed
                 .priority
                 .unwrap_or(rondo_core::domain::task::Priority::Low),
-            due_date: None,
+            due_date: parsed.due.as_deref().and_then(parse_due),
             recur_freq: rondo_core::domain::task::RecurFreq::None,
             recur_interval: 0,
             tags: parsed.tags.clone(),
@@ -1353,9 +1506,24 @@ impl AppState {
             .data
             .selected_journal
             .min(self.data.journal_notes.len() - 1);
-        let note_id = self.data.journal_notes[idx].id;
+        let note_clone = self.data.journal_notes[idx].clone();
+        let note_id = note_clone.id;
+        // Capture all entries before deletion so undo can fully restore them
+        // (delete_note cascades through the FK).
+        let entries = self
+            .data
+            .store
+            .entries_for_note(note_id)
+            .unwrap_or_default();
         match self.data.store.delete_note(note_id) {
             Ok(_) => {
+                self.undo
+                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
+                        rondo_core::domain::task::UndoKind::JournalDeleteDay {
+                            note: note_clone,
+                            entries,
+                        },
+                    ));
                 self.data.refresh_journal_notes();
                 if self.data.selected_journal >= self.data.journal_notes.len()
                     && !self.data.journal_notes.is_empty()
@@ -1380,9 +1548,16 @@ impl AppState {
             .data
             .selected_journal_entry
             .min(self.data.journal_entries.len() - 1);
-        let entry_id = self.data.journal_entries[idx].id;
+        let entry_clone = self.data.journal_entries[idx].clone();
+        let entry_id = entry_clone.id;
         match self.data.store.delete_entry(entry_id) {
             Ok(_) => {
+                self.undo
+                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
+                        rondo_core::domain::task::UndoKind::JournalDeleteEntry {
+                            entry: entry_clone,
+                        },
+                    ));
                 self.data.reload_journal_entries();
                 if self.data.selected_journal_entry >= self.data.journal_entries.len()
                     && !self.data.journal_entries.is_empty()
@@ -1560,6 +1735,28 @@ fn action_dismisses_quick_actions(a: &Action) -> bool {
     )
 }
 
+/// Build the toast string shown when an action is rejected because the store was
+/// opened read-only. The binary has no `--write` flag; the only way to mutate is
+/// to relaunch without `--read-only`.
+fn ro_msg(action: &str) -> String {
+    format!("{action}: read-only mode (restart without --read-only)")
+}
+
+/// Parse a `due:` token value into a `NaiveDate`.
+///
+/// Accepts the natural-language aliases `today`/`hoy`, `tmrw`/`tomorrow`/`mañana`,
+/// `next-week`/`semana`, or an ISO `YYYY-MM-DD` date.
+pub fn parse_due(raw: &str) -> Option<chrono::NaiveDate> {
+    use chrono::{Duration, Local, NaiveDate};
+    let today = Local::now().date_naive();
+    match raw.trim().to_lowercase().as_str() {
+        "today" | "hoy" => Some(today),
+        "tmrw" | "tomorrow" | "mañana" => today.checked_add_signed(Duration::days(1)),
+        "next-week" | "semana" => today.checked_add_signed(Duration::days(7)),
+        other => NaiveDate::parse_from_str(other, "%Y-%m-%d").ok(),
+    }
+}
+
 /// Parse quick-add syntax: `title with words #tag1 #tag2 !p3 due:tmrw`.
 pub fn parse_quick_add(raw: &str) -> QuickAddInput {
     let mut out = QuickAddInput::default();
@@ -1608,5 +1805,23 @@ mod tests {
         assert!(p.tags.is_empty());
         assert!(p.priority.is_none());
         assert!(p.due.is_none());
+    }
+
+    #[test]
+    fn quick_add_sets_due_date_for_known_tokens() {
+        use chrono::{Duration, Local};
+        let today = Local::now().date_naive();
+        assert_eq!(parse_due("today"), Some(today));
+        assert_eq!(parse_due("hoy"), Some(today));
+        assert_eq!(parse_due("tmrw"), Some(today + Duration::days(1)));
+        assert_eq!(parse_due("tomorrow"), Some(today + Duration::days(1)));
+        assert_eq!(parse_due("mañana"), Some(today + Duration::days(1)));
+        assert_eq!(parse_due("next-week"), Some(today + Duration::days(7)));
+        assert_eq!(parse_due("semana"), Some(today + Duration::days(7)));
+        assert_eq!(
+            parse_due("2026-12-31"),
+            chrono::NaiveDate::from_ymd_opt(2026, 12, 31)
+        );
+        assert_eq!(parse_due("not-a-date"), None);
     }
 }

@@ -35,9 +35,15 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         Line::raw(""),
         Line::from(vec![
             Span::raw("  "),
-            Span::styled(" y ", Style::default().fg(t.accent).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                " y ",
+                Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
+            ),
             Span::raw(" confirm    "),
-            Span::styled(" n/Esc ", Style::default().fg(t.accent).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                " n/Esc ",
+                Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
+            ),
             Span::raw(" cancel"),
         ]),
     ];

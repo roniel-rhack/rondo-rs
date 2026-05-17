@@ -26,9 +26,7 @@ pub enum Command {
         filter: String,
     },
     /// Mark a task as done by id
-    Done {
-        id: i64,
-    },
+    Done { id: i64 },
     /// Export tasks as markdown/json/ndjson
     Export {
         /// Format: md|json|ndjson
@@ -72,9 +70,7 @@ pub enum Command {
         action: TagAction,
     },
     /// Emit shell completion script (bash|zsh|fish|powershell|elvish)
-    Completion {
-        shell: clap_complete::Shell,
-    },
+    Completion { shell: clap_complete::Shell },
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -600,11 +596,8 @@ fn cli_focus(db_path: &Path, opts: &CliOpts, action: FocusAction) -> Result<()> 
 fn cli_focus_start(db_path: &Path, opts: &CliOpts) -> Result<()> {
     require_write(opts, "focus start")?;
     let (store, _guard) = open_rw_store(db_path)?;
-    let id = store.start_focus_session(
-        None,
-        rondo_core::domain::focus::SessionKind::Work,
-        25 * 60,
-    )?;
+    let id =
+        store.start_focus_session(None, rondo_core::domain::focus::SessionKind::Work, 25 * 60)?;
     if opts.json {
         println!("{}", serde_json::json!({ "session_id": id }));
     } else {
@@ -815,7 +808,10 @@ fn cli_recur_preview(db_path: &Path, opts: &CliOpts) -> Result<()> {
 
 fn cli_dep(db_path: &Path, opts: &CliOpts, action: DepAction) -> Result<()> {
     match action {
-        DepAction::Add { task_id, blocked_by } => {
+        DepAction::Add {
+            task_id,
+            blocked_by,
+        } => {
             require_write(opts, "dep add")?;
             let (store, _guard) = open_rw_store(db_path)?;
             store.add_dependency(task_id, blocked_by)?;
@@ -829,7 +825,10 @@ fn cli_dep(db_path: &Path, opts: &CliOpts, action: DepAction) -> Result<()> {
             }
             Ok(())
         }
-        DepAction::Remove { task_id, blocked_by } => {
+        DepAction::Remove {
+            task_id,
+            blocked_by,
+        } => {
             require_write(opts, "dep remove")?;
             let (store, _guard) = open_rw_store(db_path)?;
             store.remove_dependency(task_id, blocked_by)?;

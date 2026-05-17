@@ -520,11 +520,10 @@ impl SqliteStore {
         check_len("journal entry", body, MAX_JOURNAL)?;
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction()?;
-        let note_id: i64 = tx.query_row(
-            super::queries::NOTE_ID_FOR_ENTRY,
-            params![entry_id],
-            |r| r.get(0),
-        )?;
+        let note_id: i64 =
+            tx.query_row(super::queries::NOTE_ID_FOR_ENTRY, params![entry_id], |r| {
+                r.get(0)
+            })?;
         let now = Utc::now().to_rfc3339();
         tx.execute(
             super::queries::UPDATE_JOURNAL_ENTRY_BODY,
@@ -542,6 +541,95 @@ impl SqliteStore {
             .query_map([], row_to_note)?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
+    }
+
+    // -- Undo restoration helpers -----------------------------------------
+    //
+    // Each `restore_*` helper re-inserts a row preserving its original id so
+    // undo can produce a byte-for-byte match against pre-deletion state.
+
+    /// Re-insert a subtask, preserving its original id.
+    pub fn restore_subtask(&self, sub: &crate::domain::task::Subtask) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            super::queries::RESTORE_SUBTASK,
+            params![
+                sub.id,
+                sub.task_id,
+                sub.title,
+                sub.completed as i64,
+                sub.position,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Force-set a subtask's completed state to `done` (true ⇒ completed).
+    pub fn set_subtask_completed(&self, subtask_id: i64, done: bool) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            super::queries::SET_SUBTASK_COMPLETED,
+            params![done as i64, subtask_id],
+        )?;
+        Ok(())
+    }
+
+    /// Re-insert a task note, preserving its original id.
+    pub fn restore_task_note(&self, note: &crate::domain::task::TaskNote) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            super::queries::RESTORE_TASK_NOTE,
+            params![
+                note.id,
+                note.task_id,
+                note.body,
+                note.created_at.to_rfc3339(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Re-insert a journal entry, preserving its original id.
+    pub fn restore_journal_entry(&self, entry: &crate::domain::journal::Entry) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            super::queries::RESTORE_JOURNAL_ENTRY,
+            params![
+                entry.id,
+                entry.note_id,
+                entry.body,
+                entry.created_at.to_rfc3339(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Re-insert a journal day note plus all its entries, preserving ids.
+    pub fn restore_journal_day(
+        &self,
+        note: &crate::domain::journal::Note,
+        entries: &[crate::domain::journal::Entry],
+    ) -> Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        tx.execute(
+            super::queries::RESTORE_JOURNAL_NOTE,
+            params![
+                note.id,
+                note.date.format("%Y-%m-%d").to_string(),
+                note.hidden as i64,
+                note.created_at.to_rfc3339(),
+                note.updated_at.to_rfc3339(),
+            ],
+        )?;
+        for e in entries {
+            tx.execute(
+                super::queries::RESTORE_JOURNAL_ENTRY,
+                params![e.id, e.note_id, e.body, e.created_at.to_rfc3339()],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
     }
 }
 

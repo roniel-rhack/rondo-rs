@@ -29,9 +29,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         Span::styled(task_title, Style::default().fg(t.fg_muted)),
     ]);
 
-    let existing = task
-        .map(|t| t.blocked_by_ids.clone())
-        .unwrap_or_default();
+    let existing = task.map(|t| t.blocked_by_ids.clone()).unwrap_or_default();
     let existing_line = if existing.is_empty() {
         Line::from(vec![Span::styled(" blocked by: (none) ", t.muted())])
     } else {

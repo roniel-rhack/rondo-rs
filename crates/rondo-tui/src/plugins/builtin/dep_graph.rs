@@ -33,7 +33,10 @@ impl DepGraphPlugin {
         if let Some(id) = self.focus_task_id {
             return Some(id);
         }
-        self.store.list_tasks().ok().and_then(|ts| ts.first().map(|t| t.id))
+        self.store
+            .list_tasks()
+            .ok()
+            .and_then(|ts| ts.first().map(|t| t.id))
     }
 
     fn render_graph(&self, root: i64) -> Vec<Block> {
@@ -46,13 +49,7 @@ impl DepGraphPlugin {
         out
     }
 
-    fn walk(
-        &self,
-        id: i64,
-        depth: usize,
-        out: &mut Vec<Block>,
-        visited: &mut HashSet<i64>,
-    ) {
+    fn walk(&self, id: i64, depth: usize, out: &mut Vec<Block>, visited: &mut HashSet<i64>) {
         let indent = "  ".repeat(depth);
         if !visited.insert(id) {
             out.push(Block::Paragraph {
@@ -172,10 +169,10 @@ mod tests {
             .capabilities
             .iter()
             .any(|c| matches!(c, Capability::PageView)));
-        assert!(m.capabilities.iter().any(|c| matches!(
-            c,
-            Capability::QueryAccess(QueryScope::Deps)
-        )));
+        assert!(m
+            .capabilities
+            .iter()
+            .any(|c| matches!(c, Capability::QueryAccess(QueryScope::Deps))));
     }
 
     #[test]

@@ -296,7 +296,9 @@ fn journal_delete_entry_undo_via_restore() {
     store.delete_entry(eid).unwrap();
     store.restore_journal_entry(&captured).unwrap();
     let entries = store.entries_for_note(note.id).unwrap();
-    assert!(entries.iter().any(|e| e.id == eid && e.body == "diary line"));
+    assert!(entries
+        .iter()
+        .any(|e| e.id == eid && e.body == "diary line"));
 }
 
 #[test]

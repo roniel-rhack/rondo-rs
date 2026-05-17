@@ -201,12 +201,21 @@ pub enum UndoKind {
     AddTag,
     RemoveTag,
     /// Dependency edge `task_id` ← `blocker_id` was added; undo removes it.
-    AddDep { task_id: i64, blocker_id: i64 },
+    AddDep {
+        task_id: i64,
+        blocker_id: i64,
+    },
     /// Dependency edge `task_id` ← `blocker_id` was removed; undo re-adds it.
-    RemoveDep { task_id: i64, blocker_id: i64 },
+    RemoveDep {
+        task_id: i64,
+        blocker_id: i64,
+    },
     /// Subtask was deleted; undo re-creates it (original id is lost but title +
     /// completion state are preserved).
-    DeleteSubtask { task_id: i64, subtask: Subtask },
+    DeleteSubtask {
+        task_id: i64,
+        subtask: Subtask,
+    },
     /// Explicit subtask toggle that doesn't rely on diffing.
     SubtaskToggle {
         task_id: i64,
@@ -214,7 +223,10 @@ pub enum UndoKind {
         before: bool,
     },
     /// Task note was added; undo deletes the created note row.
-    AddNote { task_id: i64, note_id: i64 },
+    AddNote {
+        task_id: i64,
+        note_id: i64,
+    },
     /// Task note body was edited; undo restores the previous body.
     UpdateNote {
         task_id: i64,
@@ -222,11 +234,19 @@ pub enum UndoKind {
         before: String,
     },
     /// Task note was deleted; undo re-creates it (original id is lost).
-    DeleteNote { task_id: i64, note: TaskNote },
+    DeleteNote {
+        task_id: i64,
+        note: TaskNote,
+    },
     /// Journal entry deleted; undo recreates it on the same note id.
-    JournalDeleteEntry { entry: Entry },
+    JournalDeleteEntry {
+        entry: Entry,
+    },
     /// Journal day (note) deleted; undo recreates the day note and its entries.
-    JournalDeleteDay { note: Note, entries: Vec<Entry> },
+    JournalDeleteDay {
+        note: Note,
+        entries: Vec<Entry>,
+    },
 }
 
 #[derive(Debug, Clone)]

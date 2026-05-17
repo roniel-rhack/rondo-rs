@@ -899,73 +899,54 @@ impl AppState {
                 }
             }
             Action::EscapeContext => {
-                if self.modals.description_editor_open {
-                    self.modals.description_editor_open = false;
-                    self.modals.description_textarea = tui_textarea::TextArea::default();
-                    self.modals.description_task_id = None;
-                    self.ui.mode = Mode::Normal;
-                } else if self.modals.edit_subtask_open {
-                    self.modals.edit_subtask_open = false;
-                    self.modals.edit_subtask_buf.clear();
-                    self.modals.edit_subtask_id = None;
-                    self.ui.mode = Mode::Normal;
-                } else if self.modals.note_editor_open {
-                    self.modals.note_editor_open = false;
-                    self.modals.note_textarea = tui_textarea::TextArea::default();
-                    self.modals.note_editing_id = None;
-                    self.modals.note_task_id = None;
-                    self.ui.mode = Mode::Normal;
-                } else if self.modals.plugin_page.is_some() {
-                    // Notify plugin its page is hiding.
-                    if let Some(id) = self.modals.plugin_page.take() {
-                        let ctx = rondo_plugin_api::PluginContext::new(&id);
-                        if let Some(p) = self.plugins.get_mut(&id) {
-                            let _ = p.handle(rondo_plugin_api::PluginAction::Hide, &ctx);
-                        }
-                    }
-                } else if self.modals.plugins_overlay_open {
-                    self.modals.plugins_overlay_open = false;
-                } else if self.modals.help_open {
-                    self.modals.help_open = false;
-                } else if self.modals.confirm_delete_open {
-                    self.modals.confirm_delete_open = false;
-                } else if self.modals.edit_title_open {
-                    self.modals.edit_title_open = false;
-                    self.modals.edit_title_buf.clear();
-                    self.ui.mode = Mode::Normal;
-                } else if self.modals.add_subtask_open {
-                    self.modals.add_subtask_open = false;
-                    self.modals.add_subtask_buf.clear();
-                    self.ui.mode = Mode::Normal;
-                } else if self.modals.dep_overlay_open {
-                    self.modals.dep_overlay_open = false;
-                    self.modals.dep_overlay_buf.clear();
-                    self.ui.mode = Mode::Normal;
-                } else if self.modals.sort_overlay_open {
-                    self.modals.sort_overlay_open = false;
-                } else if self.modals.quick_actions_open {
-                    self.modals.quick_actions_open = false;
-                } else if self.modals.journal_editor_open {
-                    self.modals.journal_editor_open = false;
-                    self.modals.journal_editor_buf.clear();
-                    self.ui.mode = Mode::Normal;
-                } else if self.modals.quick_add_open {
-                    self.modals.quick_add_open = false;
-                    self.modals.quick_add_buf.clear();
-                    self.ui.mode = Mode::Normal;
-                } else if self.modals.command_palette_open {
-                    self.modals.command_palette_open = false;
-                } else if self.modals.search_open {
-                    self.modals.search_open = false;
-                    self.modals.search_buf.clear();
-                } else if self.ui.mode == Mode::Visual {
+                use crate::app::modals_state::ModalLayer;
+                let top = self.modals.top_modal();
+                // Visual mode wins over a bare pomodoro overlay (preserves
+                // pre-ModalLayer ordering).
+                if matches!(top, None | Some(ModalLayer::Pomodoro))
+                    && self.ui.mode == Mode::Visual
+                {
                     self.ui.mode = Mode::Normal;
                     self.ui.selection.clear();
-                } else if self.modals.pomodoro_open {
-                    self.modals.pomodoro_open = false;
-                    self.finalize_pomodoro_close();
-                } else if self.status_msg.is_some() {
-                    self.status_msg = None;
+                } else {
+                    match top {
+                        Some(ModalLayer::PluginPage) => {
+                            // Notify plugin BEFORE the field is cleared.
+                            if let Some(id) = self.modals.plugin_page.take() {
+                                let ctx = rondo_plugin_api::PluginContext::new(&id);
+                                if let Some(p) = self.plugins.get_mut(&id) {
+                                    let _ =
+                                        p.handle(rondo_plugin_api::PluginAction::Hide, &ctx);
+                                }
+                            }
+                        }
+                        Some(layer) => {
+                            let needs_normal_mode = matches!(
+                                layer,
+                                ModalLayer::DescriptionEditor
+                                    | ModalLayer::EditSubtask
+                                    | ModalLayer::NoteEditor
+                                    | ModalLayer::EditTitle
+                                    | ModalLayer::AddSubtask
+                                    | ModalLayer::DepOverlay
+                                    | ModalLayer::JournalEditor
+                                    | ModalLayer::QuickAdd
+                            );
+                            let was_pomodoro = matches!(layer, ModalLayer::Pomodoro);
+                            self.modals.close_top_modal();
+                            if needs_normal_mode {
+                                self.ui.mode = Mode::Normal;
+                            }
+                            if was_pomodoro {
+                                self.finalize_pomodoro_close();
+                            }
+                        }
+                        None => {
+                            if self.status_msg.is_some() {
+                                self.status_msg = None;
+                            }
+                        }
+                    }
                 }
             }
             _ => {}

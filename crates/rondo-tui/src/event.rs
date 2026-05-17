@@ -1,5 +1,6 @@
 use crate::action::{Action, Page};
 use crate::app::AppState;
+use crate::app::modals_state::ModalLayer;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 pub fn map(ev: Event, app: &AppState) -> Option<Action> {
@@ -9,50 +10,29 @@ pub fn map(ev: Event, app: &AppState) -> Option<Action> {
     if let Event::Paste(s) = ev {
         return Some(Action::Paste(s));
     }
-    if app.modals.help_open {
-        return help_key(ev);
-    }
-    if app.modals.command_palette_open {
-        return palette_key(ev, app);
-    }
-    if app.modals.search_open {
-        return search_key(ev, app);
-    }
-    if app.modals.quick_add_open {
-        return quick_add_key(ev, app);
-    }
-    if app.modals.journal_editor_open {
-        return journal_editor_key(ev, app);
-    }
-    if app.modals.sort_overlay_open {
-        return sort_overlay_key(ev);
-    }
-    if app.modals.confirm_delete_open {
-        return confirm_delete_key(ev);
-    }
-    if app.modals.edit_title_open {
-        return edit_title_key(ev, app);
-    }
-    if app.modals.add_subtask_open {
-        return add_subtask_key(ev, app);
-    }
-    if app.modals.dep_overlay_open {
-        return dep_overlay_key(ev, app);
-    }
-    if app.modals.quick_actions_open {
-        return quick_actions_key(ev, app);
-    }
-    if app.modals.plugin_page.is_some() {
-        return plugin_page_key(ev);
-    }
-    if app.modals.description_editor_open {
-        return description_editor_key(ev);
-    }
-    if app.modals.edit_subtask_open {
-        return edit_subtask_key(ev, app);
-    }
-    if app.modals.note_editor_open {
-        return note_editor_key(ev);
+    // Modal interception: priority ordering is owned by `ModalLayer`.
+    // Pomodoro is tracked as a modal layer but does NOT intercept input —
+    // global bindings remain active while a pomodoro is running.
+    if let Some(layer) = app.modals.top_modal() {
+        match layer {
+            ModalLayer::NoteEditor => return note_editor_key(ev),
+            ModalLayer::EditSubtask => return edit_subtask_key(ev, app),
+            ModalLayer::DescriptionEditor => return description_editor_key(ev),
+            ModalLayer::PluginPage => return plugin_page_key(ev),
+            ModalLayer::PluginsOverlay => {} // pass through to global keys
+            ModalLayer::QuickActions => return quick_actions_key(ev, app),
+            ModalLayer::DepOverlay => return dep_overlay_key(ev, app),
+            ModalLayer::AddSubtask => return add_subtask_key(ev, app),
+            ModalLayer::EditTitle => return edit_title_key(ev, app),
+            ModalLayer::ConfirmDelete => return confirm_delete_key(ev),
+            ModalLayer::SortOverlay => return sort_overlay_key(ev),
+            ModalLayer::JournalEditor => return journal_editor_key(ev, app),
+            ModalLayer::QuickAdd => return quick_add_key(ev, app),
+            ModalLayer::Search => return search_key(ev, app),
+            ModalLayer::CommandPalette => return palette_key(ev, app),
+            ModalLayer::Help => return help_key(ev),
+            ModalLayer::Pomodoro => {} // pass through to global keys
+        }
     }
     if app.ui.leader_goto {
         if let Event::Key(k) = ev {

@@ -8,6 +8,33 @@ pub enum DepOverlayMode {
     Remove,
 }
 
+/// Single source of truth for modal priority. Higher numeric value =
+/// higher priority (closes first on Escape; intercepts input first).
+///
+/// The list mirrors the order used by `event.rs::map()` modal interception
+/// and `EscapeContext` handling in `app/mod.rs`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(u8)]
+pub enum ModalLayer {
+    Pomodoro = 1,
+    Help = 2,
+    CommandPalette = 3,
+    Search = 4,
+    QuickAdd = 5,
+    JournalEditor = 6,
+    SortOverlay = 7,
+    ConfirmDelete = 8,
+    EditTitle = 9,
+    AddSubtask = 10,
+    DepOverlay = 11,
+    QuickActions = 12,
+    PluginsOverlay = 13,
+    PluginPage = 14,
+    DescriptionEditor = 15,
+    EditSubtask = 16,
+    NoteEditor = 17,
+}
+
 /// Modal/overlay UI state and associated buffers.
 pub struct ModalsState {
     pub pomodoro_open: bool,
@@ -106,6 +133,145 @@ impl Default for ModalsState {
 }
 
 impl ModalsState {
+    /// Highest-priority modal currently open, if any. Drives both event
+    /// interception (event.rs) and Escape handling (app/mod.rs).
+    ///
+    /// Priority follows `ModalLayer`'s numeric values: input is routed to
+    /// the topmost open layer, and Escape closes it before lower ones.
+    pub fn top_modal(&self) -> Option<ModalLayer> {
+        // Check from highest to lowest priority.
+        if self.note_editor_open {
+            return Some(ModalLayer::NoteEditor);
+        }
+        if self.edit_subtask_open {
+            return Some(ModalLayer::EditSubtask);
+        }
+        if self.description_editor_open {
+            return Some(ModalLayer::DescriptionEditor);
+        }
+        if self.plugin_page.is_some() {
+            return Some(ModalLayer::PluginPage);
+        }
+        if self.plugins_overlay_open {
+            return Some(ModalLayer::PluginsOverlay);
+        }
+        if self.quick_actions_open {
+            return Some(ModalLayer::QuickActions);
+        }
+        if self.dep_overlay_open {
+            return Some(ModalLayer::DepOverlay);
+        }
+        if self.add_subtask_open {
+            return Some(ModalLayer::AddSubtask);
+        }
+        if self.edit_title_open {
+            return Some(ModalLayer::EditTitle);
+        }
+        if self.confirm_delete_open {
+            return Some(ModalLayer::ConfirmDelete);
+        }
+        if self.sort_overlay_open {
+            return Some(ModalLayer::SortOverlay);
+        }
+        if self.journal_editor_open {
+            return Some(ModalLayer::JournalEditor);
+        }
+        if self.quick_add_open {
+            return Some(ModalLayer::QuickAdd);
+        }
+        if self.search_open {
+            return Some(ModalLayer::Search);
+        }
+        if self.command_palette_open {
+            return Some(ModalLayer::CommandPalette);
+        }
+        if self.help_open {
+            return Some(ModalLayer::Help);
+        }
+        if self.pomodoro_open {
+            return Some(ModalLayer::Pomodoro);
+        }
+        None
+    }
+
+    /// Close the topmost modal, returning the layer that was closed.
+    /// Returns `None` if no modal is open.
+    ///
+    /// Callers that need to perform cross-substate side-effects (e.g.
+    /// resetting `ui.mode = Normal`, notifying plugin Hide, finalising
+    /// pomodoro) should match on the returned layer.
+    pub fn close_top_modal(&mut self) -> Option<ModalLayer> {
+        let layer = self.top_modal()?;
+        match layer {
+            ModalLayer::NoteEditor => {
+                self.note_editor_open = false;
+                self.note_textarea = tui_textarea::TextArea::default();
+                self.note_editing_id = None;
+                self.note_task_id = None;
+            }
+            ModalLayer::EditSubtask => {
+                self.edit_subtask_open = false;
+                self.edit_subtask_buf.clear();
+                self.edit_subtask_id = None;
+            }
+            ModalLayer::DescriptionEditor => {
+                self.description_editor_open = false;
+                self.description_textarea = tui_textarea::TextArea::default();
+                self.description_task_id = None;
+            }
+            ModalLayer::PluginPage => {
+                // Caller should notify the plugin (needs &mut plugins).
+                self.plugin_page = None;
+            }
+            ModalLayer::PluginsOverlay => {
+                self.plugins_overlay_open = false;
+            }
+            ModalLayer::QuickActions => {
+                self.quick_actions_open = false;
+            }
+            ModalLayer::DepOverlay => {
+                self.dep_overlay_open = false;
+                self.dep_overlay_buf.clear();
+            }
+            ModalLayer::AddSubtask => {
+                self.add_subtask_open = false;
+                self.add_subtask_buf.clear();
+            }
+            ModalLayer::EditTitle => {
+                self.edit_title_open = false;
+                self.edit_title_buf.clear();
+            }
+            ModalLayer::ConfirmDelete => {
+                self.confirm_delete_open = false;
+            }
+            ModalLayer::SortOverlay => {
+                self.sort_overlay_open = false;
+            }
+            ModalLayer::JournalEditor => {
+                self.journal_editor_open = false;
+                self.journal_editor_buf.clear();
+            }
+            ModalLayer::QuickAdd => {
+                self.quick_add_open = false;
+                self.quick_add_buf.clear();
+            }
+            ModalLayer::Search => {
+                self.search_open = false;
+                self.search_buf.clear();
+            }
+            ModalLayer::CommandPalette => {
+                self.command_palette_open = false;
+            }
+            ModalLayer::Help => {
+                self.help_open = false;
+            }
+            ModalLayer::Pomodoro => {
+                self.pomodoro_open = false;
+            }
+        }
+        Some(layer)
+    }
+
     /// Any modal open?
     pub fn any_open(&self) -> bool {
         self.pomodoro_open
@@ -230,5 +396,90 @@ impl ModalsState {
             }
             _ => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn top_modal_none_when_idle() {
+        let m = ModalsState::default();
+        assert_eq!(m.top_modal(), None);
+    }
+
+    #[test]
+    fn top_modal_respects_priority() {
+        // Open several lower-priority modals; a high-priority one wins.
+        let mut m = ModalsState::default();
+        m.help_open = true;
+        m.search_open = true;
+        m.command_palette_open = true;
+        assert_eq!(m.top_modal(), Some(ModalLayer::Search));
+
+        m.note_editor_open = true;
+        assert_eq!(m.top_modal(), Some(ModalLayer::NoteEditor));
+
+        m.note_editor_open = false;
+        m.edit_subtask_open = true;
+        assert_eq!(m.top_modal(), Some(ModalLayer::EditSubtask));
+
+        m.edit_subtask_open = false;
+        m.description_editor_open = true;
+        assert_eq!(m.top_modal(), Some(ModalLayer::DescriptionEditor));
+
+        m.description_editor_open = false;
+        m.plugin_page = Some("foo".into());
+        assert_eq!(m.top_modal(), Some(ModalLayer::PluginPage));
+
+        m.plugin_page = None;
+        m.plugins_overlay_open = true;
+        assert_eq!(m.top_modal(), Some(ModalLayer::PluginsOverlay));
+
+        m.plugins_overlay_open = false;
+        m.quick_actions_open = true;
+        assert_eq!(m.top_modal(), Some(ModalLayer::QuickActions));
+
+        m.quick_actions_open = false;
+        m.dep_overlay_open = true;
+        assert_eq!(m.top_modal(), Some(ModalLayer::DepOverlay));
+
+        m.dep_overlay_open = false;
+        m.add_subtask_open = true;
+        assert_eq!(m.top_modal(), Some(ModalLayer::AddSubtask));
+
+        m.add_subtask_open = false;
+        m.edit_title_open = true;
+        assert_eq!(m.top_modal(), Some(ModalLayer::EditTitle));
+
+        m.edit_title_open = false;
+        m.confirm_delete_open = true;
+        assert_eq!(m.top_modal(), Some(ModalLayer::ConfirmDelete));
+
+        m.confirm_delete_open = false;
+        m.sort_overlay_open = true;
+        assert_eq!(m.top_modal(), Some(ModalLayer::SortOverlay));
+
+        m.sort_overlay_open = false;
+        m.journal_editor_open = true;
+        assert_eq!(m.top_modal(), Some(ModalLayer::JournalEditor));
+
+        m.journal_editor_open = false;
+        m.quick_add_open = true;
+        assert_eq!(m.top_modal(), Some(ModalLayer::QuickAdd));
+
+        m.quick_add_open = false;
+        // Search > CommandPalette > Help.
+        assert_eq!(m.top_modal(), Some(ModalLayer::Search));
+        m.search_open = false;
+        assert_eq!(m.top_modal(), Some(ModalLayer::CommandPalette));
+        m.command_palette_open = false;
+        assert_eq!(m.top_modal(), Some(ModalLayer::Help));
+        m.help_open = false;
+        m.pomodoro_open = true;
+        assert_eq!(m.top_modal(), Some(ModalLayer::Pomodoro));
+        m.pomodoro_open = false;
+        assert_eq!(m.top_modal(), None);
     }
 }

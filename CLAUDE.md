@@ -1,8 +1,7 @@
 # rondo-rs — Claude Code project memory
 
-Rust + ratatui port of the Go project at `/Users/roniel/Develop/rondo`.
-Coexists with the Go binary: all state lives under `~/.rondo-rs/`; the Go
-binary's `~/.todo-app/` is untouched.
+Rust + ratatui terminal task manager + journal. All state is contained
+under `~/.rondo-rs/`.
 
 ## What this is
 
@@ -41,8 +40,6 @@ cargo run -p rondo-tui -- --reduced-motion --no-color
 | [docs/architecture.md](docs/architecture.md) | Crate graph, AppState substate split, plugin contract, tick loop |
 | [docs/plugins.md](docs/plugins.md) | How to author + install a WASM plugin, capability cheat sheet |
 | [docs/dev.md](docs/dev.md) | Conventions, file map, test commands, deferred work |
-| [ROADMAP.md](ROADMAP.md) | Milestone status (post-architect review) |
-| [PARALLELISM.md](PARALLELISM.md) | Dependency graph between milestones |
 
 ## Conventions (the short list)
 
@@ -68,9 +65,9 @@ cargo run -p rondo-tui -- --reduced-motion --no-color
    modals and undo don't sprawl into a single 1000-line `update()` match.
 7. **tachyonfx pinned to 0.13** (last version on ratatui 0.29).
 8. **extism pinned to 1.10** (newer versions need rustc ≥ 1.90; we target 1.83).
-9. **`~/.rondo-rs/` separation** — every path the binary writes (DB, backups,
-   logs, lock, plugins, sync, config) is under that single root, so the Go
-   binary at `~/.todo-app/` is fully isolated.
+9. **`~/.rondo-rs/` confinement** — every path the binary writes (DB,
+   backups, logs, lock, plugins, sync, config) lives under that single
+   root; nothing outside is touched.
 
 ## Build / test / lint
 

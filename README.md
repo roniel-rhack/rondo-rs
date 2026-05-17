@@ -3,9 +3,8 @@
 A keyboard-driven terminal task manager + journal in Rust, with a plugin
 system that runs both in-process Rust plugins and external WASM modules.
 
-Coexists with the Go [rondo](https://github.com/roniel-rondo/rondo) binary:
-every byte rondo-rs writes lives under `~/.rondo-rs/`, isolated from the Go
-binary's `~/.todo-app/`.
+All state is contained under `~/.rondo-rs/`; nothing outside that directory
+is read or written.
 
 ## Highlights
 
@@ -313,9 +312,6 @@ Three sample plugins live in `examples/plugins/`:
         └── plugin.wasm
 ```
 
-The Go binary at `~/.todo-app/` is completely separate; rondo-rs never
-reads or writes there.
-
 ## Documentation map
 
 - [docs/architecture.md](docs/architecture.md) — workspace layout, storage,
@@ -325,8 +321,6 @@ reads or writes there.
 - [docs/plugins.md](docs/plugins.md) — author + install guide, capability
   cheat sheet, host↔plugin protocol.
 - [docs/dev.md](docs/dev.md) — conventions, file map, test commands.
-- [ROADMAP.md](ROADMAP.md) — milestone tracking.
-
 ## License
 
 MIT. Personal project, no warranty.

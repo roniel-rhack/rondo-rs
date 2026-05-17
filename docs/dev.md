@@ -48,15 +48,6 @@ crates/rondo-tui/tests/cli_more.rs        # delete / journal / focus / stats / b
 crates/rondo-tui/tests/cli_plugins.rs     # plugins list / info / install / remove
 ```
 
-Roundtrip Rust↔Go SQLite harness:
-
-```
-crates/rondo-tui/tests/roundtrip/
-```
-
-Tests stay `#[ignore]` until `RONDO_GO` env is set. The skeleton smoke test
-always runs and validates the seed fixture loads.
-
 ## File map
 
 | File | Purpose |

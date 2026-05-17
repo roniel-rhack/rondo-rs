@@ -240,7 +240,8 @@ impl AppState {
                     self.ui.selection.insert(t.id);
                 }
             }
-            Action::BulkDone => {
+            Action::BulkDone =>
+            {
                 #[allow(clippy::collapsible_match)]
                 if self.ui.mode == Mode::Visual {
                     let ids: Vec<i64> = self.ui.selection.iter().copied().collect();
@@ -307,7 +308,8 @@ impl AppState {
                     self.ui.mode = Mode::Normal;
                 }
             }
-            Action::BulkPriority => {
+            Action::BulkPriority =>
+            {
                 #[allow(clippy::collapsible_match)]
                 if self.ui.mode == Mode::Visual {
                     let ids: Vec<i64> = self.ui.selection.iter().copied().collect();

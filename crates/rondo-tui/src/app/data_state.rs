@@ -85,8 +85,7 @@ impl DataState {
         self.task_haystacks.clear();
         self.task_haystacks.reserve(self.tasks.len());
         for t in &self.tasks {
-            self.task_haystacks
-                .push(Self::haystack_for(t));
+            self.task_haystacks.push(Self::haystack_for(t));
         }
     }
 

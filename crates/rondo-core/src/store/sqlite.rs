@@ -507,6 +507,12 @@ impl SqliteStore {
     }
 }
 
+/// Bound on how many nodes `would_create_cycle` will visit before
+/// giving up. Guards against pathological graphs (or future bugs that
+/// don't terminate the traversal) eating CPU/RAM. 1000 is far above any
+/// realistic dep graph for a personal task manager.
+const MAX_CYCLE_DEPTH: usize = 1000;
+
 fn would_create_cycle(conn: &Connection, task_id: i64, blocked_by: i64) -> Result<bool> {
     if task_id == blocked_by {
         return Ok(true);
@@ -516,6 +522,9 @@ fn would_create_cycle(conn: &Connection, task_id: i64, blocked_by: i64) -> Resul
     while let Some(current) = stack.pop() {
         if !visited.insert(current) {
             continue;
+        }
+        if visited.len() > MAX_CYCLE_DEPTH {
+            return Err(crate::error::Error::CycleDepthExceeded);
         }
         if current == task_id {
             return Ok(true);

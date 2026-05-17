@@ -14,6 +14,8 @@ pub enum Error {
     CycleDetected(i64, i64),
     #[error("could not parse datetime: {0:?}")]
     ParseDate(String),
+    #[error("cycle-detection traversal exceeded maximum depth")]
+    CycleDepthExceeded,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

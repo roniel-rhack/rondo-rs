@@ -45,3 +45,4 @@ serial_test = "3"
 assert_cmd = "2"
 predicates = "3"
 serde_json = { workspace = true }
+proptest = "1"

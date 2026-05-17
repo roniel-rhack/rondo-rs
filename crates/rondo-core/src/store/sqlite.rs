@@ -482,11 +482,10 @@ impl SqliteStore {
     pub fn update_journal_entry(&self, entry_id: i64, body: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction()?;
-        let note_id: i64 = tx.query_row(
-            super::queries::NOTE_ID_FOR_ENTRY,
-            params![entry_id],
-            |r| r.get(0),
-        )?;
+        let note_id: i64 =
+            tx.query_row(super::queries::NOTE_ID_FOR_ENTRY, params![entry_id], |r| {
+                r.get(0)
+            })?;
         let now = Utc::now().to_rfc3339();
         tx.execute(
             super::queries::UPDATE_JOURNAL_ENTRY_BODY,
@@ -646,7 +645,8 @@ fn row_to_entry(r: &Row<'_>) -> rusqlite::Result<Entry> {
     })
 }
 
-fn parse_dt(s: &str) -> DateTime<Utc> {
+#[doc(hidden)]
+pub fn parse_dt(s: &str) -> DateTime<Utc> {
     if let Ok(d) = DateTime::parse_from_rfc3339(s) {
         return d.with_timezone(&Utc);
     }

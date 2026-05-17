@@ -11,4 +11,5 @@
 
 pub mod journal;
 pub mod pomodoro;
+pub mod subtask;
 pub mod task;

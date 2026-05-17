@@ -156,6 +156,7 @@ impl AppState {
         if handlers::journal::handle(self, &action)
             || handlers::pomodoro::handle(self, &action)
             || handlers::task::handle(self, &action)
+            || handlers::subtask::handle(self, &action)
         {
             if let Some(next) = follow_up.take() {
                 self.update(next);
@@ -321,38 +322,7 @@ impl AppState {
                 self.toast(format!("sort: {}", order.label()));
             }
             // Task delete + edit title handled in `handlers::task`.
-            Action::RequestAddSubtask => {
-                if !self.writable {
-                    self.toast(ro_msg("subtask"));
-                } else if self.data.selected_task_id().is_some() {
-                    self.modals.add_subtask_buf.clear();
-                    self.modals.add_subtask_open = true;
-                    self.ui.mode = Mode::Insert;
-                }
-            }
-            Action::SubmitAddSubtask(title) => {
-                let trimmed = title.trim().to_string();
-                if !trimmed.is_empty() {
-                    if let Some(task_id) = self.data.selected_task_id() {
-                        match self.data.store.add_subtask(task_id, &trimmed) {
-                            Ok((_id, snap)) => {
-                                self.undo.push(snap);
-                                self.refresh_tasks();
-                                self.toast("subtask added");
-                            }
-                            Err(e) => self.toast(format!("subtask failed: {}", e)),
-                        }
-                    }
-                }
-                self.modals.add_subtask_open = false;
-                self.modals.add_subtask_buf.clear();
-                self.ui.mode = Mode::Normal;
-            }
-            Action::CancelAddSubtask => {
-                self.modals.add_subtask_open = false;
-                self.modals.add_subtask_buf.clear();
-                self.ui.mode = Mode::Normal;
-            }
+            // Subtask add handled in `handlers::subtask`.
             Action::RequestAddDependency => {
                 if !self.writable {
                     self.toast(ro_msg("dep"));
@@ -427,76 +397,7 @@ impl AppState {
             }
             // Edit-description handled in `handlers::task`.
 
-            Action::RequestEditFocusedSubtask => {
-                if !self.writable {
-                    self.toast(ro_msg("subtask"));
-                } else if let Some(task) = self.data.selected_task() {
-                    if let Some(sub) = task.subtasks.get(self.ui.focus.section_item) {
-                        self.modals.edit_subtask_buf = sub.title.clone();
-                        self.modals.edit_subtask_id = Some(sub.id);
-                        self.modals.edit_subtask_open = true;
-                        self.ui.mode = Mode::Insert;
-                    }
-                }
-            }
-            Action::SubmitEditSubtask(new_title) => {
-                let trimmed = new_title.trim().to_string();
-                let sub_id = self.modals.edit_subtask_id;
-                self.modals.edit_subtask_open = false;
-                self.modals.edit_subtask_buf.clear();
-                self.modals.edit_subtask_id = None;
-                self.ui.mode = Mode::Normal;
-                if !trimmed.is_empty() {
-                    if let Some(id) = sub_id {
-                        match self.data.store.update_subtask_title(id, &trimmed) {
-                            Ok(_) => {
-                                self.refresh_tasks();
-                                self.toast("subtask renamed");
-                            }
-                            Err(e) => self.toast(format!("rename failed: {}", e)),
-                        }
-                    }
-                }
-            }
-            Action::CancelEditSubtask => {
-                self.modals.edit_subtask_open = false;
-                self.modals.edit_subtask_buf.clear();
-                self.modals.edit_subtask_id = None;
-                self.ui.mode = Mode::Normal;
-            }
-            Action::RequestDeleteFocusedSubtask => {
-                if !self.writable {
-                    self.toast("subtask: read-only");
-                } else if let Some(task) = self.data.selected_task() {
-                    if let Some(sub) = task.subtasks.get(self.ui.focus.section_item) {
-                        let sub_clone = sub.clone();
-                        let sub_id = sub.id;
-                        let task_id = task.id;
-                        match self.data.store.delete_subtask(sub_id) {
-                            Ok(_) => {
-                                self.undo
-                                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
-                                        rondo_core::domain::task::UndoKind::DeleteSubtask {
-                                            task_id,
-                                            subtask: sub_clone,
-                                        },
-                                    ));
-                                self.refresh_tasks();
-                                let total = self
-                                    .data
-                                    .selected_task()
-                                    .map(|t| t.subtasks.len())
-                                    .unwrap_or(0);
-                                if self.ui.focus.section_item >= total && total > 0 {
-                                    self.ui.focus.section_item = total - 1;
-                                }
-                                self.toast(format!("deleted subtask #{}", sub_id));
-                            }
-                            Err(e) => self.toast(format!("delete failed: {}", e)),
-                        }
-                    }
-                }
-            }
+            // Subtask edit/delete handled in `handlers::subtask`.
 
             Action::RequestAddNote => {
                 if !self.writable {

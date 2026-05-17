@@ -93,6 +93,8 @@ pub enum Action {
     ToggleDepOverlayMode,
     CancelDepOverlay,
 
+    PluginKeyPress(String),
+
     Undo,
 
     Error(String),

@@ -101,12 +101,25 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
         ];
     }
     if app.ui.page == crate::action::Page::Journal {
+        let in_days = matches!(
+            app.ui.journal_pane,
+            crate::app::ui_state::JournalPane::Days
+        );
+        if in_days {
+            return vec![
+                ("h/l", "días ↔ entries"),
+                ("j/k", "cambiar día"),
+                ("i", "nueva entrada"),
+                ("g/G", "primer/último"),
+                ("H", "toggle hidden"),
+            ];
+        }
         return vec![
-            ("i", "nueva entrada"),
-            ("j/k", "navegar día"),
-            ("g/G", "primer/último"),
-            ("H", "toggle hidden"),
-            ("D", "delete entry"),
+            ("h/l", "días ↔ entries"),
+            ("j/k", "cambiar entry"),
+            ("e", "editar entry"),
+            ("d/D", "delete entry"),
+            ("i / A", "nueva entrada"),
         ];
     }
     match app.ui.focus.pane {

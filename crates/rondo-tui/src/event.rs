@@ -36,6 +36,9 @@ pub fn map(ev: Event, app: &AppState) -> Option<Action> {
     if app.modals.quick_actions_open {
         return quick_actions_key(ev, app);
     }
+    if app.modals.plugin_page.is_some() {
+        return plugin_page_key(ev);
+    }
     if app.ui.leader_goto {
         if let Event::Key(k) = ev {
             if let KeyCode::Char(c) = k.code {
@@ -239,6 +242,23 @@ fn quick_actions_key(ev: Event, _app: &AppState) -> Option<Action> {
     // sets the next modal regardless of prior overlay state. To make
     // sure the prior overlay disappears, we close it here via state.
     Some(action)
+}
+
+fn plugin_page_key(ev: Event) -> Option<Action> {
+    let Event::Key(k) = ev else {
+        return None;
+    };
+    Some(match k.code {
+        KeyCode::Esc => Action::EscapeContext,
+        KeyCode::Char(c) => Action::PluginKeyPress(c.to_string()),
+        KeyCode::Enter => Action::PluginKeyPress("Enter".into()),
+        KeyCode::Up => Action::PluginKeyPress("Up".into()),
+        KeyCode::Down => Action::PluginKeyPress("Down".into()),
+        KeyCode::Left => Action::PluginKeyPress("Left".into()),
+        KeyCode::Right => Action::PluginKeyPress("Right".into()),
+        KeyCode::Tab => Action::PluginKeyPress("Tab".into()),
+        _ => return None,
+    })
 }
 
 fn add_subtask_key(ev: Event, app: &AppState) -> Option<Action> {

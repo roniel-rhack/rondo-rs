@@ -42,6 +42,13 @@ impl SortOrder {
 
 pub const FLASH_DURATION_MS: u128 = 220;
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum JournalPane {
+    #[default]
+    Days,
+    Entries,
+}
+
 /// View-level state: page, focus, mode, splits, flashes, cached rects.
 pub struct UiState {
     pub page: Page,
@@ -58,6 +65,7 @@ pub struct UiState {
     pub last_pomodoro_rect: Rect,
     pub last_quick_add_rect: Rect,
     pub sort_order: SortOrder,
+    pub journal_pane: JournalPane,
 }
 
 impl Default for UiState {
@@ -77,6 +85,7 @@ impl Default for UiState {
             last_pomodoro_rect: Rect::default(),
             last_quick_add_rect: Rect::default(),
             sort_order: SortOrder::default(),
+            journal_pane: JournalPane::default(),
         }
     }
 }
@@ -109,19 +118,27 @@ impl UiState {
     pub fn update(&mut self, action: Action) -> Option<Action> {
         match action {
             Action::FocusLeft => {
-                self.focus.pane = match self.focus.pane {
-                    Pane::Detail => Pane::List,
-                    Pane::List | Pane::Sidebar => Pane::Sidebar,
-                };
-                self.focus.section_item = 0;
+                if self.page == Page::Journal {
+                    self.journal_pane = JournalPane::Days;
+                } else {
+                    self.focus.pane = match self.focus.pane {
+                        Pane::Detail => Pane::List,
+                        Pane::List | Pane::Sidebar => Pane::Sidebar,
+                    };
+                    self.focus.section_item = 0;
+                }
                 None
             }
             Action::FocusRight => {
-                self.focus.pane = match self.focus.pane {
-                    Pane::Sidebar => Pane::List,
-                    Pane::List | Pane::Detail => Pane::Detail,
-                };
-                self.focus.section_item = 0;
+                if self.page == Page::Journal {
+                    self.journal_pane = JournalPane::Entries;
+                } else {
+                    self.focus.pane = match self.focus.pane {
+                        Pane::Sidebar => Pane::List,
+                        Pane::List | Pane::Detail => Pane::Detail,
+                    };
+                    self.focus.section_item = 0;
+                }
                 None
             }
             Action::FocusNext => {

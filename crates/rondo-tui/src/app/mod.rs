@@ -525,6 +525,17 @@ impl AppState {
             Action::ToggleDepOverlayMode => {
                 // handled inside ModalsState::update already
             }
+            Action::PluginKeyPress(key) => {
+                if let Some(id) = self.modals.plugin_page.clone() {
+                    let ctx = rondo_plugin_api::PluginContext::new(&id);
+                    if let Some(plugin) = self.plugins.get_mut(&id) {
+                        let _ = plugin.handle(
+                            rondo_plugin_api::PluginAction::KeyPress { key },
+                            &ctx,
+                        );
+                    }
+                }
+            }
             Action::Undo => {
                 if !self.writable {
                     self.toast("undo: read-only");
@@ -775,14 +786,17 @@ impl AppState {
                     self.spawn_detail_refresh();
                 }
             }
-            Page::Journal => {
-                // j/k cycles entries within the focused day.
-                if !self.data.journal_entries.is_empty() {
-                    let len = self.data.journal_entries.len() as i32;
-                    let next = (self.data.selected_journal_entry as i32 + delta).rem_euclid(len);
-                    self.data.selected_journal_entry = next as usize;
+            Page::Journal => match self.ui.journal_pane {
+                crate::app::ui_state::JournalPane::Days => self.move_journal_day(delta),
+                crate::app::ui_state::JournalPane::Entries => {
+                    if !self.data.journal_entries.is_empty() {
+                        let len = self.data.journal_entries.len() as i32;
+                        let next =
+                            (self.data.selected_journal_entry as i32 + delta).rem_euclid(len);
+                        self.data.selected_journal_entry = next as usize;
+                    }
                 }
-            }
+            },
         }
     }
 

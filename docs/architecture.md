@@ -138,7 +138,7 @@ place.
 | Baked baseline | `crates/rondo-core/src/i18n/en.toml` |
 | Active pack handle | `arc_swap::ArcSwap<Translations>` in `i18n::ACTIVE` |
 | Selection persisted | `[ui].language` in `~/.rondo-rs/config.toml` |
-| CLI surface | `rondo-tui lang scaffold|install|list|remove|current` |
+| CLI surface | `rondo-rs lang scaffold|install|list|remove|current` |
 | TUI palette | `:lang` opens `components::lang_picker` |
 
 `t(key)` resolves against the active pack first, then the baked baseline,

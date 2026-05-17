@@ -10,7 +10,7 @@ use rondo_tui::{
 };
 
 #[derive(Parser)]
-#[command(name = "rondo-tui", version, about = "Rust + ratatui port of rondo")]
+#[command(name = "rondo-rs", version, about = "Rust + ratatui port of rondo")]
 struct Cli {
     /// Path to SQLite DB (default: ~/.rondo-rs/todo.db).
     /// First run creates the file and populates it with sample data.

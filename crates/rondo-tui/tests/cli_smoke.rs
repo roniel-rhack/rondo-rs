@@ -25,7 +25,7 @@ fn isolated_home() -> tempfile::TempDir {
 fn list_default_format() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -41,7 +41,7 @@ fn list_default_format() {
 fn list_json() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -63,7 +63,7 @@ fn list_json() {
 fn export_markdown() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -79,7 +79,7 @@ fn export_markdown() {
 fn export_ndjson_one_line_per_task() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -104,7 +104,7 @@ fn export_ndjson_one_line_per_task() {
 fn add_with_read_only_flag_errors() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -118,14 +118,14 @@ fn add_with_read_only_flag_errors() {
 fn add_with_write_creates_task() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
         .arg("add")
         .arg("CLI added");
     cmd.assert().success();
-    let mut list = Command::cargo_bin("rondo-tui").unwrap();
+    let mut list = Command::cargo_bin("rondo-rs").unwrap();
     list.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -141,7 +141,7 @@ fn add_with_write_creates_task() {
 fn done_marks_task() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -154,7 +154,7 @@ fn done_marks_task() {
 fn unknown_filter_errors() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -168,7 +168,7 @@ fn unknown_filter_errors() {
 fn unknown_export_format_errors() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())

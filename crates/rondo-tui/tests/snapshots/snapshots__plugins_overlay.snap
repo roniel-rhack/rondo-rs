@@ -19,7 +19,7 @@ expression: s
 "│                        │┃│                                                                                    │ spec done.               │"
 "│                        │┃│  (none installed in /snapshot-fixture/.rondo-rs/plugins)                           │                          │"
 "│                        │┃│                                                                                    │                          │"
-"│                        │┃│ CLI: rondo-tui plugins list / info <id> / install <path> / remove <id>             │                          │"
+"│                        │┃│ CLI: rondo-rs plugins list / info <id> / install <path> / remove <id>              │                          │"
 "│                        │┃│ Esc close                                                                          │───────────────────────   │"
 "│                        │┃│                                                                                    │                          │"
 "│                        │┃│                                                                                    │                          │"

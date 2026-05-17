@@ -59,7 +59,7 @@ const BINDINGS: &[(&str, &str)] = &[
     ("p", "toggle pomodoro"),
     ("", ""),
     ("Plugins", ""),
-    ("(CLI)", "rondo-tui plugins list / info / install / remove"),
+    ("(CLI)", "rondo-rs plugins list / info / install / remove"),
     (
         "(built-in)",
         "pomodoro · bell · calendar · focus-page · dep-graph · analytics",

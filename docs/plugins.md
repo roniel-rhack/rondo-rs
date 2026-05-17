@@ -2,7 +2,7 @@
 
 Two kinds:
 
-1. **Builtin plugins** — Rust types compiled into the `rondo-tui` binary.
+1. **Builtin plugins** — Rust types compiled into the `rondo-rs` binary.
    Implement `rondo_plugin_api::Plugin` directly, registered at startup in
    `main.rs::register_builtin_plugins`. Currently shipped:
    `builtin.pomodoro`, `builtin.bell`, `builtin.calendar`,
@@ -147,14 +147,14 @@ cp target/wasm32-wasip1/release/my_plugin.wasm plugin.wasm
 ### 6. Install
 
 ```bash
-rondo-tui plugins install /path/to/my-plugin
+rondo-rs plugins install /path/to/my-plugin
 ```
 
 That copies the directory into `~/.rondo-rs/plugins/my-plugin/`. Verify:
 
 ```bash
-rondo-tui plugins list
-rondo-tui plugins info my-plugin
+rondo-rs plugins list
+rondo-rs plugins info my-plugin
 ```
 
 ### 7. Grant permissions
@@ -185,7 +185,7 @@ Syncer, Notifier, CliSubcommand), the host will load you with
 | `MutationAccess(scope)` | NO | Plugin can issue mutation follow-ups; user grant required |
 | `Syncer` | NO | Plugin acts as a sync backend; user grant required |
 | `Notifier(channel)` | NO | Plugin emits desktop/system/audio notifications; user grant required |
-| `CliSubcommand` | NO | Plugin contributes a `rondo-tui <name>` subcommand; user grant required |
+| `CliSubcommand` | NO | Plugin contributes a `rondo-rs <name>` subcommand; user grant required |
 
 ## Plugin <-> host communication
 
@@ -239,7 +239,7 @@ in-process and trusted.
 
 ## Invoking external plugins from the TUI
 
-`rondo-tui plugins install <dir>` copies the plugin to
+`rondo-rs plugins install <dir>` copies the plugin to
 `~/.rondo-rs/plugins/<id>/`. On the next TUI start the runtime calls
 `PluginHost::load_from_dir` automatically (see
 `crates/rondo-tui/src/main.rs::load_external_plugins`) and the plugin

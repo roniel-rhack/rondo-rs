@@ -1,4 +1,4 @@
-//! D3: `rondo-tui batch` enforces hard caps on the NDJSON stream
+//! D3: `rondo-rs batch` enforces hard caps on the NDJSON stream
 //! shape (per-line byte length and total line count) so a runaway
 //! producer can't burn arbitrary CPU/RAM. These tests pipe synthetic
 //! input via stdin and assert the reported error / processed counts.
@@ -33,7 +33,7 @@ fn batch_rejects_oversize_line() {
     let huge_title = "a".repeat(70 * 1024);
     let stdin_payload = format!(r#"{{"op":"add","title":"{huge_title}"}}"#);
 
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -59,7 +59,7 @@ fn batch_aborts_after_max_lines() {
         payload.push('\n');
     }
 
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -78,7 +78,7 @@ fn batch_accepts_normal_input() {
     let db = make_db();
     let home = isolated_home();
     let payload = "{\"op\":\"add\",\"title\":\"hello\"}\n";
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())

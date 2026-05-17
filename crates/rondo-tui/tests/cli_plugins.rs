@@ -8,7 +8,7 @@ fn plugin_dir_in(home: &std::path::Path) -> std::path::PathBuf {
 #[test]
 fn plugins_list_empty_runs() {
     let dir = tempfile::tempdir().unwrap();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", dir.path()).arg("plugins").arg("list");
     cmd.assert()
         .success()
@@ -18,7 +18,7 @@ fn plugins_list_empty_runs() {
 #[test]
 fn plugins_list_json_runs() {
     let dir = tempfile::tempdir().unwrap();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", dir.path())
         .arg("--json")
         .arg("plugins")
@@ -37,7 +37,7 @@ fn plugins_list_json_runs() {
 #[test]
 fn plugins_remove_idempotent() {
     let dir = tempfile::tempdir().unwrap();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", dir.path())
         .arg("plugins")
         .arg("remove")
@@ -61,7 +61,7 @@ capabilities = ["OverlayView"]
     .unwrap();
 
     // install
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("plugins")
         .arg("install")
@@ -75,14 +75,14 @@ capabilities = ["OverlayView"]
         .exists());
 
     // list
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path()).arg("plugins").arg("list");
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("hello"));
 
     // info
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("plugins")
         .arg("info")
@@ -93,7 +93,7 @@ capabilities = ["OverlayView"]
         .stdout(predicate::str::contains("hello"));
 
     // duplicate install errors
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("plugins")
         .arg("install")
@@ -101,7 +101,7 @@ capabilities = ["OverlayView"]
     cmd.assert().failure();
 
     // remove
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("plugins")
         .arg("remove")
@@ -115,7 +115,7 @@ capabilities = ["OverlayView"]
 #[test]
 fn plugins_info_missing_id_fails() {
     let dir = tempfile::tempdir().unwrap();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", dir.path())
         .arg("plugins")
         .arg("info")
@@ -126,7 +126,7 @@ fn plugins_info_missing_id_fails() {
 #[test]
 fn plugins_install_rejects_bad_path() {
     let dir = tempfile::tempdir().unwrap();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", dir.path())
         .arg("plugins")
         .arg("install")

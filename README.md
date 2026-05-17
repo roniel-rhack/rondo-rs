@@ -97,7 +97,7 @@ Requires Rust 1.83 (toolchain pinned via `rust-toolchain.toml`).
 git clone https://github.com/roniel-rhack/rondo-rs
 cd rondo-rs
 cargo build --release
-./target/release/rondo-tui
+./target/release/rondo-rs
 ```
 
 First run creates `~/.rondo-rs/` and seeds the DB with a small set of
@@ -155,34 +155,34 @@ Env overrides:
 The same binary acts as a non-TUI CLI when a subcommand is provided:
 
 ```bash
-rondo-tui add "Review PR #42 #work !p3 due:tmrw"
-rondo-tui list --filter all
-rondo-tui done 7
-rondo-tui delete 3
-rondo-tui journal add "Shipped v0.1.0 today"
-rondo-tui journal list
-rondo-tui focus start
-rondo-tui focus stats
-rondo-tui stats --json
-rondo-tui export --format md
-rondo-tui export --format json
-rondo-tui export --format ndjson
-rondo-tui recur preview
-rondo-tui dep add 4 1                  # task 4 blocked by task 1
-rondo-tui dep remove 4 1
-rondo-tui tag add 3 personal
-rondo-tui tag remove 3 personal
-rondo-tui batch < bulk-ops.ndjson      # one {"op":"...","..."} per line
-rondo-tui completion bash > rondo.bash
-rondo-tui plugins list
-rondo-tui plugins info my-plugin
-rondo-tui plugins install ./path/to/my-plugin
-rondo-tui plugins remove my-plugin
-rondo-tui lang scaffold es --name "Español" --out es.toml
-rondo-tui lang install es.toml
-rondo-tui lang list
-rondo-tui lang current
-rondo-tui lang remove es
+rondo-rs add "Review PR #42 #work !p3 due:tmrw"
+rondo-rs list --filter all
+rondo-rs done 7
+rondo-rs delete 3
+rondo-rs journal add "Shipped v0.1.0 today"
+rondo-rs journal list
+rondo-rs focus start
+rondo-rs focus stats
+rondo-rs stats --json
+rondo-rs export --format md
+rondo-rs export --format json
+rondo-rs export --format ndjson
+rondo-rs recur preview
+rondo-rs dep add 4 1                  # task 4 blocked by task 1
+rondo-rs dep remove 4 1
+rondo-rs tag add 3 personal
+rondo-rs tag remove 3 personal
+rondo-rs batch < bulk-ops.ndjson      # one {"op":"...","..."} per line
+rondo-rs completion bash > rondo.bash
+rondo-rs plugins list
+rondo-rs plugins info my-plugin
+rondo-rs plugins install ./path/to/my-plugin
+rondo-rs plugins remove my-plugin
+rondo-rs lang scaffold es --name "Español" --out es.toml
+rondo-rs lang install es.toml
+rondo-rs lang list
+rondo-rs lang current
+rondo-rs lang remove es
 ```
 
 ## Languages
@@ -192,10 +192,10 @@ translate, and install:
 
 ```bash
 # 1. Generate a translator-ready file (values seeded with English text).
-rondo-tui lang scaffold es --name "Español" --out es.toml
+rondo-rs lang scaffold es --name "Español" --out es.toml
 # 2. Edit `es.toml` — keep `{name}` placeholders intact.
 # 3. Install into ~/.rondo-rs/lang/
-rondo-tui lang install es.toml
+rondo-rs lang install es.toml
 # 4. From inside the TUI: type `:lang`, pick the row, Enter.
 #    The choice is persisted in `~/.rondo-rs/config.toml` ([ui].language).
 ```
@@ -270,7 +270,7 @@ queue the host processes (e.g. `KvSet` persists to a namespaced
 | `builtin.analytics` | PageView, QueryAccess(Tasks, FocusSessions) | 4-panel dashboard (vista general donut, próximas 7d bars, tag distribution, sync block) |
 
 Open any of them with `:calendar`, `:focus`, `:deps`, `:analytics`.
-List + manage with `rondo-tui plugins list`.
+List + manage with `rondo-rs plugins list`.
 
 ### Creating a WASM plugin
 
@@ -357,8 +357,8 @@ Build + install:
 rustup target add wasm32-wasip1
 cargo build --release
 cp target/wasm32-wasip1/release/my_plugin.wasm plugin.wasm
-rondo-tui plugins install /path/to/my-plugin
-rondo-tui plugins list
+rondo-rs plugins install /path/to/my-plugin
+rondo-rs plugins list
 ```
 
 If your manifest declares `MutationAccess`, `Syncer`, `Notifier` or

@@ -1,6 +1,6 @@
 //! End-to-end CLI mutation round-trips.
 //!
-//! Each test spawns the `rondo-tui` binary multiple times against the same
+//! Each test spawns the `rondo-rs` binary multiple times against the same
 //! temp DB and asserts that mutations observed via `list`/`journal list`
 //! reflect prior `add`/`done`/`tag`/`dep`/`batch` invocations.
 //!
@@ -32,7 +32,7 @@ fn isolated_home() -> tempfile::TempDir {
 }
 
 fn rondo() -> Command {
-    Command::cargo_bin("rondo-tui").unwrap()
+    Command::cargo_bin("rondo-rs").unwrap()
 }
 
 #[test]

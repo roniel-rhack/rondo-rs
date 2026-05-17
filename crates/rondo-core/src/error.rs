@@ -12,6 +12,8 @@ pub enum Error {
     Migration(#[from] crate::store::migrations::MigrationError),
     #[error("cycle detected: adding {0} -> {1} would create a cycle")]
     CycleDetected(i64, i64),
+    #[error("could not parse datetime: {0:?}")]
+    ParseDate(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

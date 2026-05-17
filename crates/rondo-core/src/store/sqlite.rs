@@ -384,8 +384,8 @@ impl SqliteStore {
                     task_id: r.get::<_, Option<i64>>(1)?,
                     kind: SessionKind::from_db(r.get::<_, i64>(2)?),
                     cycle_pos: 0,
-                    started_at: parse_dt(&started),
-                    completed_at: completed.as_deref().map(parse_dt),
+                    started_at: parse_dt_sql(&started)?,
+                    completed_at: completed.as_deref().map(parse_dt_sql).transpose()?,
                     duration_secs: r.get::<_, i64>(5)? as u64,
                 })
             })?
@@ -415,8 +415,8 @@ impl SqliteStore {
                 id,
                 date,
                 hidden: hidden != 0,
-                created_at: parse_dt(&created_at),
-                updated_at: parse_dt(&updated_at),
+                created_at: parse_dt(&created_at)?,
+                updated_at: parse_dt(&updated_at)?,
             }),
             Err(rusqlite::Error::QueryReturnedNoRows) => {
                 let now = Utc::now().to_rfc3339();
@@ -429,8 +429,8 @@ impl SqliteStore {
                     id,
                     date,
                     hidden: false,
-                    created_at: parse_dt(&now),
-                    updated_at: parse_dt(&now),
+                    created_at: parse_dt(&now)?,
+                    updated_at: parse_dt(&now)?,
                 })
             }
             Err(e) => Err(e.into()),
@@ -544,7 +544,7 @@ fn row_to_task_shallow(r: &Row<'_>) -> rusqlite::Result<Task> {
         status: Status::from_db(r.get(3)?),
         priority: Priority::from_db(r.get(4)?),
         due_date: due_str.and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
-        created_at: parse_dt(&created_str),
+        created_at: parse_dt_sql(&created_str)?,
         recur_freq: RecurFreq::from_db(r.get(7)?),
         recur_interval: r.get(8)?,
         metadata,
@@ -592,7 +592,7 @@ fn hydrate(conn: &Connection, t: &mut Task) -> Result<()> {
                     } else {
                         Some(note_str)
                     },
-                    logged_at: parse_dt(&r.get::<_, String>(4)?),
+                    logged_at: parse_dt_sql(&r.get::<_, String>(4)?)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -605,7 +605,7 @@ fn hydrate(conn: &Connection, t: &mut Task) -> Result<()> {
                     id: r.get(0)?,
                     task_id: r.get(1)?,
                     body: r.get(2)?,
-                    created_at: parse_dt(&r.get::<_, String>(3)?),
+                    created_at: parse_dt_sql(&r.get::<_, String>(3)?)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -632,8 +632,8 @@ fn row_to_note(r: &Row<'_>) -> rusqlite::Result<Note> {
         date: NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
             .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).expect("epoch date is valid")),
         hidden: r.get::<_, i64>(2)? != 0,
-        created_at: parse_dt(&r.get::<_, String>(3)?),
-        updated_at: parse_dt(&r.get::<_, String>(4)?),
+        created_at: parse_dt_sql(&r.get::<_, String>(3)?)?,
+        updated_at: parse_dt_sql(&r.get::<_, String>(4)?)?,
     })
 }
 
@@ -642,16 +642,33 @@ fn row_to_entry(r: &Row<'_>) -> rusqlite::Result<Entry> {
         id: r.get(0)?,
         note_id: r.get(1)?,
         body: r.get(2)?,
-        created_at: parse_dt(&r.get::<_, String>(3)?),
+        created_at: parse_dt_sql(&r.get::<_, String>(3)?)?,
     })
 }
 
-fn parse_dt(s: &str) -> DateTime<Utc> {
+fn parse_dt(s: &str) -> Result<DateTime<Utc>> {
     if let Ok(d) = DateTime::parse_from_rfc3339(s) {
-        return d.with_timezone(&Utc);
+        return Ok(d.with_timezone(&Utc));
     }
     if let Ok(nd) = chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S") {
-        return DateTime::<Utc>::from_naive_utc_and_offset(nd, Utc);
+        return Ok(DateTime::<Utc>::from_naive_utc_and_offset(nd, Utc));
     }
-    Utc::now()
+    Err(crate::error::Error::ParseDate(s.to_string()))
+}
+
+/// Adapter for use inside rusqlite row-mapper closures (which must return
+/// `rusqlite::Result<T>`). Wraps a `parse_dt` failure as a SQLite
+/// conversion-failure error so the row read fails loudly instead of
+/// silently substituting a default.
+fn parse_dt_sql(s: &str) -> rusqlite::Result<DateTime<Utc>> {
+    parse_dt(s).map_err(|e| {
+        rusqlite::Error::FromSqlConversionFailure(
+            0,
+            rusqlite::types::Type::Text,
+            Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                e.to_string(),
+            )),
+        )
+    })
 }

@@ -10,7 +10,7 @@ expression: s
 "│  [A] ◇ TODAS       4   │┃           ↳ Config testing                            ┃│   Refactor pomodoro module                            │"
 "└────────────────────────┘┃           #backend  #work                             ┃│   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   │"
 "┌─ filtros rápidos ──────┐┃                                                       ┃│                                                       │"
-"│  [u] ! URGENTES    1   │┃                                                       ┃│   CREADA    2026-05-16 HH:MM                          │"
+"│  [u] ! URGENTES    1   │┃                                                       ┃│   CREADA    2026-05-17 HH:MM                          │"
 "│  [H] ↑ ALTA PRIO   2   │┃                                                       ┃│   VENCE     ◖in 1d◗   2026-05-18 (Monday)             │"
 "│  [o] ⌧ VENCIDAS        │┃                                                       ┃│   TAGS      #refactor  ·  #work                       │"
 "│  [n] # SIN ETIQUETA 1  │┃                                                       ┃│                                                       │"

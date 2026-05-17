@@ -22,10 +22,14 @@ fn fixture_store() -> Arc<SqliteStore> {
 }
 
 fn snapshot(_name: &str, width: u16, height: u16, mutate: impl FnOnce(&mut AppState)) -> String {
-    // Pin `today` so calendar/journal renderings are deterministic.
-    // SAFETY: `set_var` is single-threaded in this test harness; we only
-    // ever set, never unset, and use the same value across all tests.
-    unsafe { std::env::set_var("RONDO_TEST_TODAY", "2026-05-17") };
+    // Pin clock + timezone so calendar/journal/task `created_at`
+    // renderings are deterministic across local devs and CI runners.
+    // SAFETY: every test sets the same value; this never observes a
+    // mid-flight rewrite from a different value.
+    unsafe {
+        std::env::set_var("RONDO_TEST_TODAY", "2026-05-17");
+        std::env::set_var("TZ", "UTC");
+    }
     let mut app = AppState::new(fixture_store()).unwrap();
     mutate(&mut app);
     let backend = TestBackend::new(width, height);

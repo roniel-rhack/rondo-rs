@@ -10,7 +10,7 @@ expression: s
 "│  [A] ◇ TODAS       4   │┃   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   ┃│   Refactor pomodoro module                                      │"
 "└────────────────────────┘┃   ▏ [ ]   ◖low◗  Buy groceries   ◖in 2d◗                        ┃│   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   │"
 "┌─ filtros rápidos ──────┐┃           #personal                                             ┃│                                                                 │"
-"│  [u] ! URGENTES    1   │┃   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   ┃│   CREADA    2026-05-16 HH:MM                                    │"
+"│  [u] ! URGENTES    1   │┃   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   ┃│   CREADA    2026-05-17 HH:MM                                    │"
 "│  [H] ↑ ALTA PRIO   2   │┃   ▍ [•]   ◖high◗  Review API spec   ◖today◗   ◔ 1/5             ┃│   VENCE     ◖in 1d◗   2026-05-18 (Monday)                       │"
 "│  [o] ⌧ VENCIDAS        │┃           ↳ Setup repo                                          ┃│   TAGS      #refactor  ·  #work                                 │"
 "│  [n] # SIN ETIQUETA 1  │┃           ↳ Config testing                                      ┃│                                                                 │"

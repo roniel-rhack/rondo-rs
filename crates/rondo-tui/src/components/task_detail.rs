@@ -116,16 +116,35 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     }
 
     // ─── DESCRIPCIÓN ────────────────────────────────────────
-    if let Some(desc) = &task.description {
-        if !desc.is_empty() {
-            lines.push(Line::raw(""));
-            section_header(&mut lines, "descripción", None, false, inner_width, t);
-            for l in markdown::render(desc, t).lines {
-                let mut spans = vec![Span::raw("  ")];
-                spans.extend(l.spans);
-                lines.push(Line::from(spans));
-            }
+    let header_active =
+        app.ui.focus.pane == Pane::Detail && app.ui.focus.section == DetailSection::Header;
+    let desc_body = task.description.as_deref().unwrap_or("");
+    let has_desc = !desc_body.trim().is_empty();
+    lines.push(Line::raw(""));
+    section_header(
+        &mut lines,
+        "descripción",
+        if has_desc { None } else { Some("vacía") },
+        header_active,
+        inner_width,
+        t,
+    );
+    if has_desc {
+        for l in markdown::render(desc_body, t).lines {
+            let mut spans = vec![Span::styled(
+                "▏ ",
+                Style::default().fg(t.border_inactive),
+            )];
+            spans.extend(l.spans);
+            lines.push(Line::from(spans));
         }
+    } else {
+        lines.push(Line::from(vec![
+            Span::styled("▏ ", Style::default().fg(t.border_inactive)),
+            Span::styled("(sin descripción)  ", t.muted()),
+            Span::styled("E", t.kbd()),
+            Span::styled(" para añadir", t.muted()),
+        ]));
     }
 
     // ─── SUBTASKS ───────────────────────────────────────────

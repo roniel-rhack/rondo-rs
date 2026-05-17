@@ -71,10 +71,9 @@ Single source of truth for every binding. Footer hints in the TUI mirror this.
 | Entries | `j` / `k` | next/prev entry within day |
 | both | `J` / `K` | next/prev day (works from either pane) |
 | both | `g` / `G` | first / last day |
-| both | `i` / `A` | new entry |
+| both | `a` / `i` / `A` | new entry |
 | both | `e` | edit focused entry |
 | both | `d` | delete focused entry |
-| both | `D` | (alias) delete focused entry |
 | both | `H` | toggle hidden filter |
 | both | `X` | delete focused DAY (cascade entries) |
 

@@ -119,7 +119,7 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
             return vec![
                 ("h/l", "días ↔ entries"),
                 ("j/k", "cambiar día"),
-                ("i", "nueva entrada"),
+                ("a/i", "nueva entrada"),
                 ("X", "delete day"),
                 ("H", "toggle hidden"),
             ];
@@ -128,8 +128,8 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
             ("h/l", "días ↔ entries"),
             ("j/k", "cambiar entry"),
             ("e", "editar entry"),
-            ("d/D", "delete entry"),
-            ("i / A", "nueva entrada"),
+            ("d", "delete entry"),
+            ("a/i/A", "nueva entrada"),
         ];
     }
     // Cap each branch at 5 hints. The `:` palette appears in every

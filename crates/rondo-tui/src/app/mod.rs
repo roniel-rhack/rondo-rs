@@ -1095,6 +1095,14 @@ impl AppState {
             self.toast("usage: :theme dark|light|high-contrast".to_string());
             return;
         }
+        if let Some(rest) = trimmed.strip_prefix("group ") {
+            self.set_group_by(rest.trim());
+            return;
+        }
+        if trimmed == "group" {
+            self.toast("usage: :group priority|status|due|none".to_string());
+            return;
+        }
         match trimmed {
             "tasks" => self.ui.page = Page::Tasks,
             "journal" => self.ui.page = Page::Journal,
@@ -1123,6 +1131,22 @@ impl AppState {
         let applied = resolved.name();
         self.theme = resolved;
         self.toast(format!("theme: {}", applied));
+    }
+
+    fn set_group_by(&mut self, raw: &str) {
+        match crate::sort::GroupBy::parse(raw) {
+            Ok(Some(by)) => {
+                self.ui.group_by = Some(by);
+                self.toast(format!("group: {}", by.label()));
+            }
+            Ok(None) => {
+                self.ui.group_by = None;
+                self.toast("group: none".to_string());
+            }
+            Err(bad) => {
+                self.toast(format!("group: unknown '{}'", bad));
+            }
+        }
     }
 
     fn open_plugin_page(&mut self, id: &str) {

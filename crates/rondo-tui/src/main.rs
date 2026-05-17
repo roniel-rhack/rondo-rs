@@ -54,11 +54,7 @@ fn main() -> Result<()> {
     }
     // Seed only when the chosen command actually needs the DB. Skips
     // `plugins …`, which is also DB-free.
-    let needs_db = cli_args
-        .command
-        .as_ref()
-        .map(cli::needs_db)
-        .unwrap_or(true);
+    let needs_db = cli_args.command.as_ref().map(cli::needs_db).unwrap_or(true);
     if writable && needs_db {
         match rondo_core::store::seed::ensure_seeded(&db_path) {
             Ok(true) => tracing::info!("seeded new DB at {}", db_path.display()),

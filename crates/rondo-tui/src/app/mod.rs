@@ -1471,10 +1471,7 @@ impl AppState {
         if all.iter().any(|n| n == input) {
             return CommandResolution::Exact(input.to_string());
         }
-        let matches: Vec<String> = all
-            .into_iter()
-            .filter(|n| n.starts_with(input))
-            .collect();
+        let matches: Vec<String> = all.into_iter().filter(|n| n.starts_with(input)).collect();
         match matches.len() {
             0 => CommandResolution::None,
             1 => CommandResolution::UniquePrefix(matches.into_iter().next().unwrap()),

@@ -1,5 +1,6 @@
 use crate::app::AppState;
 use crate::focus::{DetailSection, Mode, Pane};
+use crate::strings::{t as tr, StringKey};
 use ratatui::{
     layout::Rect,
     style::{Modifier, Style},
@@ -47,7 +48,10 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     }
     spans.push(Span::styled("· ", t.muted()));
     spans.push(Span::styled("?", t.kbd()));
-    spans.push(Span::styled(" more ", t.muted()));
+    spans.push(Span::styled(
+        format!(" {} ", tr(app.lang, StringKey::FooterMore)),
+        t.muted(),
+    ));
 
     f.render_widget(Paragraph::new(Line::from(spans)), area);
 }

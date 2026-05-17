@@ -1,4 +1,5 @@
 use crate::app::AppState;
+use crate::strings::{t as tr, StringKey};
 use chrono::Local;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -40,7 +41,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let subtitle = Line::from(vec![
         Span::styled("// ", Style::default().fg(t.border_inactive)),
         Span::styled(
-            "SISTEMA DE GESTIÓN DE TAREAS AVANZADO",
+            tr(app.lang, StringKey::HeaderSubtitle),
             Style::default().fg(t.fg_muted),
         ),
         Span::styled(" //", Style::default().fg(t.border_inactive)),

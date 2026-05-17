@@ -33,4 +33,4 @@ expression: s
 "│   ○    2  Pendient ││   17   18   19   20   21   22  ││                                                      ││         ⌬                │"
 "│   !    0  Vencidas ││                                ││                                                      ││                          │"
 "└────────────────────┘└────────────────────────────────┘└──────────────────────────────────────────────────────┘└──────────────────────────┘"
-" [NOR]  [j/k → move] [Enter → aplicar filtro] [l → list] [Esc → cancel] [: → cmd]  · ? more                                                 "
+" [NOR]  [j/k → move] [Enter → aplicar filtro] [l → list] [Esc → cancel] [: → cmd]  · ? más                                                  "

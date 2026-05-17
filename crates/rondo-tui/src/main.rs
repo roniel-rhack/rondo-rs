@@ -132,6 +132,7 @@ fn main() -> Result<()> {
     } else {
         Theme::by_name(theme_name)
     };
+    app.lang = cfg.lang.name;
     app.fx = FxManager::new_with_options(reduced);
     register_builtin_plugins(&mut app);
     let mut terminal = tui::init()?;

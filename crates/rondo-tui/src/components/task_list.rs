@@ -1,6 +1,8 @@
 use crate::app::ui_state::SortOrder;
 use crate::app::{AppState, FlashTarget};
+use crate::strings::{t as tr, StringKey};
 use crate::theme::Theme;
+use rondo_core::config::Lang;
 use crate::widgets::{
     bracket_panel::BracketPanel, due_badge, priority_badge, priority_spine, ring,
 };
@@ -22,19 +24,22 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     );
     let filter_label = app.data.active_filter.label().to_lowercase();
     let sort_label = app.ui.sort_order.label();
+    let tasks_word = tr(app.lang, StringKey::TasksCount);
     let title = if app.modals.search_open && !app.modals.search_buf.trim().is_empty() {
         format!(
-            "{} · {} tareas · {} · /{}",
+            "{} · {} {} · {} · /{}",
             filter_label,
             visible.len(),
+            tasks_word,
             sort_label,
             app.modals.search_buf
         )
     } else {
         format!(
-            "{} · {} tareas · {}",
+            "{} · {} {} · {}",
             filter_label,
             visible.len(),
+            tasks_word,
             sort_label
         )
     };
@@ -47,7 +52,11 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
             Line::raw(""),
             Line::raw(""),
             Line::from(Span::styled(
-                format!("  Sin tareas para '{}'", filter_label),
+                format!(
+                    "  {} '{}'",
+                    tr(app.lang, StringKey::TasksEmpty),
+                    filter_label
+                ),
                 t.muted(),
             )),
             Line::raw(""),
@@ -55,11 +64,11 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
                 Span::raw("  "),
                 Span::styled("h", t.kbd()),
                 Span::raw(" "),
-                Span::styled("cambiar filtro", t.muted()),
+                Span::styled(tr(app.lang, StringKey::HintChangeFilter), t.muted()),
                 Span::raw("    "),
                 Span::styled("?", t.kbd()),
                 Span::raw(" "),
-                Span::styled("ayuda", t.muted()),
+                Span::styled(tr(app.lang, StringKey::HintHelp), t.muted()),
             ]),
         ];
         f.render_widget(Paragraph::new(lines), inner);
@@ -76,7 +85,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         ])
         .split(inner);
 
-    draw_column_header(f, layout[0], t);
+    draw_column_header(f, layout[0], t, app.lang);
 
     let search_query: Option<String> =
         if app.modals.search_open && !app.modals.search_buf.trim().is_empty() {
@@ -115,13 +124,19 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     draw_progress_bar(app, f, layout[2], t);
 }
 
-fn draw_column_header(f: &mut Frame<'_>, area: Rect, t: &Theme) {
+fn draw_column_header(f: &mut Frame<'_>, area: Rect, t: &Theme, lang: Lang) {
     // Columns:  [ ] gutter | [pri] 8 | tarea flex | [tags] 18 | [vence] 10
     let header = Line::from(vec![
         Span::raw("    "),
-        Span::styled("ESTADO  ", t.muted()),
-        Span::styled("PRI     ", t.muted()),
-        Span::styled("TAREA", t.muted()),
+        Span::styled(
+            format!("{:<8}", tr(lang, StringKey::ColumnStatus)),
+            t.muted(),
+        ),
+        Span::styled(
+            format!("{:<8}", tr(lang, StringKey::ColumnPriority)),
+            t.muted(),
+        ),
+        Span::styled(tr(lang, StringKey::ColumnTask).to_string(), t.muted()),
     ]);
     f.render_widget(Paragraph::new(header), area);
 }
@@ -306,7 +321,10 @@ fn draw_progress_bar(app: &AppState, f: &mut Frame<'_>, area: Rect, t: &Theme) {
     let empty = bar_width.saturating_sub(filled);
     let pct = (ratio * 100.0).round() as u32;
     let mut spans: Vec<Span<'static>> = vec![
-        Span::styled("PROGRESO GENERAL  ", t.muted()),
+        Span::styled(
+            format!("{}  ", tr(app.lang, StringKey::OverallProgress)),
+            t.muted(),
+        ),
         Span::styled("[", Style::default().fg(t.border_inactive)),
         Span::styled(
             "▰".repeat(filled),

@@ -23,6 +23,8 @@ pub struct AppState {
     pub fx: crate::fx::FxManager,
     pub plugins: PluginRegistry,
     pub theme: Theme,
+    /// Active UI language (Phase 1: header/sidebar/footer/task_list strings).
+    pub lang: rondo_core::config::Lang,
     pub should_quit: bool,
     pub status_msg: Option<String>,
     /// True when the underlying store was opened RW (so we can persist mutations).
@@ -54,6 +56,7 @@ impl AppState {
             fx: crate::fx::FxManager::new(),
             plugins,
             theme: Theme::dark(),
+            lang: rondo_core::config::Lang::default(),
             should_quit: false,
             status_msg: None,
             writable,

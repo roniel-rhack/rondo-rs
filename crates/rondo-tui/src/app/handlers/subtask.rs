@@ -20,7 +20,7 @@ pub fn submit_add(app: &mut AppState, title: String) {
             match app.data.store.add_subtask(task_id, &trimmed) {
                 Ok((_id, snap)) => {
                     app.undo.push(snap);
-                    app.refresh_tasks();
+                    app.patch_task(task_id);
                     app.toast("subtask added");
                 }
                 Err(e) => app.toast(format!("subtask failed: {}", e)),
@@ -58,7 +58,11 @@ pub fn submit_edit(app: &mut AppState, new_title: String) {
         if let Some(id) = sub_id {
             match app.data.store.update_subtask_title(id, &trimmed) {
                 Ok(_) => {
-                    app.refresh_tasks();
+                    if let Some(task_id) = app.data.selected_task_id() {
+                        app.patch_task(task_id);
+                    } else {
+                        app.refresh_tasks();
+                    }
                     app.toast("subtask renamed");
                 }
                 Err(e) => app.toast(format!("rename failed: {}", e)),
@@ -95,7 +99,7 @@ pub fn request_delete_focused(app: &mut AppState) {
                         subtask: sub_clone,
                     },
                 ));
-            app.refresh_tasks();
+            app.patch_task(task_id);
             let total = app
                 .data
                 .selected_task()

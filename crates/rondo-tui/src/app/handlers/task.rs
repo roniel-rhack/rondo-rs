@@ -46,7 +46,7 @@ pub fn submit_edit_title(app: &mut AppState, new_title: String) {
             match app.data.store.update_task(id, patch) {
                 Ok(snap) => {
                     app.undo.push(snap);
-                    app.refresh_tasks();
+                    app.patch_task(id);
                     app.toast("title updated");
                 }
                 Err(e) => app.toast(format!("update failed: {}", e)),
@@ -92,7 +92,7 @@ pub fn submit_edit_description(app: &mut AppState) {
         match app.data.store.update_task(id, patch) {
             Ok(snap) => {
                 app.undo.push(snap);
-                app.refresh_tasks();
+                app.patch_task(id);
                 app.toast("description updated");
             }
             Err(e) => app.toast(format!("update failed: {}", e)),

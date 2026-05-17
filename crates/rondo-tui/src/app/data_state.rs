@@ -85,13 +85,35 @@ impl DataState {
         self.task_haystacks.clear();
         self.task_haystacks.reserve(self.tasks.len());
         for t in &self.tasks {
-            self.task_haystacks.push(format!(
-                "{} {} {}",
-                t.title,
-                t.tags.join(" "),
-                t.description.as_deref().unwrap_or("")
-            ));
+            self.task_haystacks
+                .push(Self::haystack_for(t));
         }
+    }
+
+    fn haystack_for(t: &rondo_core::domain::task::Task) -> String {
+        format!(
+            "{} {} {}",
+            t.title,
+            t.tags.join(" "),
+            t.description.as_deref().unwrap_or("")
+        )
+    }
+
+    /// Reload a single task from the store and replace its in-memory row
+    /// (plus haystack). Cheaper than `refresh_tasks` which lists every
+    /// task and re-hydrates each (N×5 child queries). Use after mutations
+    /// where the affected task id is known and no rows were inserted or
+    /// deleted (status toggle, title/description edit, dep add/remove,
+    /// subtask CRUD, note CRUD). Filter counts are refreshed because a
+    /// status/due/priority change can shift which filters include the row.
+    pub fn patch_task(&mut self, id: i64) {
+        if let Ok(updated) = self.store.task_by_id(id) {
+            if let Some(pos) = self.tasks.iter().position(|t| t.id == id) {
+                self.task_haystacks[pos] = Self::haystack_for(&updated);
+                self.tasks[pos] = updated;
+            }
+        }
+        self.refresh_filter_counts();
     }
 
     /// Recompute the per-filter cache. Cheap: a single linear pass over

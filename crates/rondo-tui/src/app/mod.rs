@@ -145,6 +145,15 @@ impl AppState {
         }
     }
 
+    /// Reload a single task from the store without touching the rest of
+    /// the list. Use after a mutation whose affected task id is known and
+    /// where no rows were inserted/deleted (status toggle, title/desc
+    /// edit, subtask CRUD, note CRUD, dep CRUD, recurrence/due edit).
+    /// Use [`Self::refresh_tasks`] instead after Create or Delete.
+    pub fn patch_task(&mut self, id: i64) {
+        self.data.patch_task(id);
+    }
+
     pub fn update(&mut self, action: Action) {
         // Clear pending leader on any action other than the leader itself.
         if !matches!(action, Action::LeaderGoto) {
@@ -835,7 +844,7 @@ impl AppState {
             match self.data.store.set_status(task_id, next) {
                 Ok(snap) => {
                     self.undo.push(snap);
-                    self.data.refresh_tasks();
+                    self.patch_task(task_id);
                     self.ui.flash = Some((FlashTarget::Task(task_id), Instant::now()));
                     self.toast(format!("task #{} → {}", task_id, next.label()));
                 }
@@ -878,7 +887,7 @@ impl AppState {
                                 before: before_done,
                             },
                         ));
-                    self.refresh_tasks();
+                    self.patch_task(task_id);
                     self.ui.flash = Some((FlashTarget::Subtask(subtask_id), Instant::now()));
                     self.toast(format!("subtask #{} toggled", subtask_id));
                 }

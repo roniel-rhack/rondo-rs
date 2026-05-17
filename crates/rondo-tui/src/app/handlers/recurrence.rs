@@ -24,7 +24,7 @@ pub fn submit(app: &mut AppState, freq: RecurFreq, interval: i64) {
     match app.data.store.update_task(id, patch) {
         Ok(snap) => {
             app.undo.push(snap);
-            app.refresh_tasks();
+            app.patch_task(id);
             match freq {
                 RecurFreq::None => app.toast("recur: cleared"),
                 _ => app.toast(format!("recur: every {} {:?}", interval.max(1), freq)),

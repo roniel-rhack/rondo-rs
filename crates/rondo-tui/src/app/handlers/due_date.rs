@@ -24,7 +24,7 @@ pub fn submit(app: &mut AppState, date: Option<chrono::NaiveDate>) {
     match app.data.store.update_task(id, patch) {
         Ok(snap) => {
             app.undo.push(snap);
-            app.refresh_tasks();
+            app.patch_task(id);
             match date {
                 Some(d) => app.toast(format!("due: {}", d.format("%Y-%m-%d"))),
                 None => app.toast("due: cleared"),

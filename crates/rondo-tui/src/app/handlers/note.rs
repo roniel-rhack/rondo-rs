@@ -54,7 +54,7 @@ pub fn request_delete_focused(app: &mut AppState) {
                         note: note_clone,
                     },
                 ));
-            app.refresh_tasks();
+            app.patch_task(task_id);
             let total = app.data.selected_task().map(|t| t.notes.len()).unwrap_or(0);
             if app.ui.focus.section_item >= total && total > 0 {
                 app.ui.focus.section_item = total - 1;
@@ -99,7 +99,7 @@ pub fn submit(app: &mut AppState) {
                                 },
                             ));
                     }
-                    app.refresh_tasks();
+                    app.patch_task(tid);
                     app.toast("note updated");
                 }
                 Err(e) => app.toast(format!("note failed: {}", e)),
@@ -114,7 +114,7 @@ pub fn submit(app: &mut AppState) {
                             note_id,
                         },
                     ));
-                app.refresh_tasks();
+                app.patch_task(tid);
                 app.toast("note added");
             }
             Err(e) => app.toast(format!("note failed: {}", e)),

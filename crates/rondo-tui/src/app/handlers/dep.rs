@@ -27,7 +27,7 @@ pub fn submit_add(app: &mut AppState, buf: String) {
                                 blocker_id: blocker,
                             },
                         ));
-                    app.refresh_tasks();
+                    app.patch_task(task_id);
                     app.toast(format!("dep added: #{} blocks #{}", blocker, task_id));
                 }
                 Err(rondo_core::error::Error::CycleDetected(a, b)) => {
@@ -55,7 +55,7 @@ pub fn submit_remove(app: &mut AppState, buf: String) {
                             blocker_id: blocker,
                         },
                     ));
-                app.refresh_tasks();
+                app.patch_task(task_id);
                 app.toast(format!("dep removed: #{}", blocker));
             }
             Err(e) => app.toast(format!("dep remove failed: {}", e)),

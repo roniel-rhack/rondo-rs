@@ -12,6 +12,12 @@ pub enum Error {
     Migration(#[from] crate::store::migrations::MigrationError),
     #[error("cycle detected: adding {0} -> {1} would create a cycle")]
     CycleDetected(i64, i64),
+    #[error("could not parse datetime: {0:?}")]
+    ParseDate(String),
+    #[error("{field} exceeds maximum length of {max} characters")]
+    InputTooLong { field: &'static str, max: usize },
+    #[error("cycle-detection traversal exceeded maximum depth")]
+    CycleDepthExceeded,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

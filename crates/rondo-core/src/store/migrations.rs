@@ -1,6 +1,6 @@
 use rusqlite::Connection;
 
-pub const CURRENT_VERSION: u32 = 3;
+pub const CURRENT_VERSION: u32 = 4;
 
 #[derive(Debug, thiserror::Error)]
 pub enum MigrationError {
@@ -33,6 +33,9 @@ pub fn migrate(conn: &Connection) -> Result<u32, MigrationError> {
     }
     if from < 3 {
         migrate_to_v3(conn)?;
+    }
+    if from < 4 {
+        migrate_to_v4(conn)?;
     }
     set_user_version(conn, CURRENT_VERSION)?;
     Ok(CURRENT_VERSION)
@@ -88,7 +91,46 @@ fn migrate_to_v3(conn: &Connection) -> Result<(), MigrationError> {
     Ok(())
 }
 
+/// v3 → v4: extend `focus_sessions` with pomodoro cycle bookkeeping.
+/// `phase` mirrors `SessionKind` (0=Work, 1=ShortBreak, 2=LongBreak) and
+/// `cycle_idx` is the 1-based position within the cycles_per_long window.
+/// Both default to 0 for legacy rows so existing data round-trips without
+/// loss.
+fn migrate_to_v4(conn: &Connection) -> Result<(), MigrationError> {
+    let tx = conn.unchecked_transaction()?;
+    if !column_exists(&tx, "focus_sessions", "phase")? {
+        tx.execute_batch("ALTER TABLE focus_sessions ADD COLUMN phase INTEGER NOT NULL DEFAULT 0")?;
+    }
+    if !column_exists(&tx, "focus_sessions", "cycle_idx")? {
+        tx.execute_batch(
+            "ALTER TABLE focus_sessions ADD COLUMN cycle_idx INTEGER NOT NULL DEFAULT 0",
+        )?;
+    }
+    tx.commit()?;
+    Ok(())
+}
+
+/// Validate that `s` is a safe SQL identifier (ASCII letters, digits, `_`;
+/// must start with a letter). Used to gate identifier interpolation into
+/// PRAGMA statements where parameter binding is not supported.
+fn is_safe_ident(s: &str) -> bool {
+    !s.is_empty()
+        && s.chars().enumerate().all(|(i, c)| {
+            c == '_' || (i == 0 && c.is_ascii_alphabetic()) || (i > 0 && c.is_ascii_alphanumeric())
+        })
+}
+
 fn column_exists(conn: &Connection, table: &str, column: &str) -> rusqlite::Result<bool> {
+    if !is_safe_ident(table) {
+        return Err(rusqlite::Error::InvalidParameterName(format!(
+            "unsafe table identifier: {table:?}"
+        )));
+    }
+    if !is_safe_ident(column) {
+        return Err(rusqlite::Error::InvalidParameterName(format!(
+            "unsafe column identifier: {column:?}"
+        )));
+    }
     let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", table))?;
     let rows = stmt.query_map([], |r| r.get::<_, String>(1))?;
     for row in rows {
@@ -97,4 +139,35 @@ fn column_exists(conn: &Connection, table: &str, column: &str) -> rusqlite::Resu
         }
     }
     Ok(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_safe_ident;
+
+    #[test]
+    fn is_safe_ident_accepts_simple_names() {
+        assert!(is_safe_ident("tasks"));
+        assert!(is_safe_ident("metadata"));
+        assert!(is_safe_ident("focus_sessions"));
+        assert!(is_safe_ident("a"));
+        assert!(is_safe_ident("a_b_c_1"));
+    }
+
+    #[test]
+    fn is_safe_ident_rejects_bad_input() {
+        assert!(!is_safe_ident(""));
+        assert!(!is_safe_ident("1tasks"));
+        assert!(!is_safe_ident("tasks; DROP TABLE tasks"));
+        assert!(!is_safe_ident("tasks)"));
+        assert!(!is_safe_ident("tasks--"));
+        assert!(!is_safe_ident("tasks'"));
+        assert!(!is_safe_ident("tasks col"));
+    }
+
+    #[test]
+    fn is_safe_ident_allows_underscore_prefix() {
+        assert!(is_safe_ident("_leading"));
+        assert!(is_safe_ident("__"));
+    }
 }

@@ -119,10 +119,18 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
     if app.modals.edit_subtask_open {
         components::edit_subtask::draw(app, f, centered(70, 6, area));
     }
+    if app.modals.edit_due_date_open {
+        components::edit_due_date::draw(app, f, centered(60, 14, area));
+    }
+    if app.modals.edit_recurrence_open {
+        components::edit_recurrence::draw(app, f, centered(60, 12, area));
+    }
 
     // Run live effects after all widgets have painted; effects mutate cells in
     // place to produce fades/sweeps/dissolves.
-    app.fx.tick_and_render(f);
+    if app.fx.any_running() {
+        app.fx.tick_and_render(f);
+    }
 }
 
 fn body_with_sidebar(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {

@@ -23,7 +23,7 @@ fn fixture() -> (tempfile::NamedTempFile, SqliteStore) {
 fn migration_v2_creates_focus_sessions_table() {
     let (_f, store) = fixture();
     let id = store
-        .start_focus_session(None, SessionKind::Work, 1500)
+        .start_focus_session(None, SessionKind::Work, 1500, 0)
         .unwrap();
     assert!(id > 0);
 }
@@ -32,7 +32,7 @@ fn migration_v2_creates_focus_sessions_table() {
 fn start_then_complete_persists_completed_at() {
     let (_f, store) = fixture();
     let id = store
-        .start_focus_session(None, SessionKind::Work, 1500)
+        .start_focus_session(None, SessionKind::Work, 1500, 0)
         .unwrap();
     store.complete_focus_session(id).unwrap();
     let sessions = store.list_focus_sessions().unwrap();
@@ -50,7 +50,7 @@ fn start_then_complete_persists_completed_at() {
 fn started_without_complete_has_null_completed_at() {
     let (_f, store) = fixture();
     let id = store
-        .start_focus_session(None, SessionKind::Work, 1500)
+        .start_focus_session(None, SessionKind::Work, 1500, 0)
         .unwrap();
     let sessions = store.list_focus_sessions().unwrap();
     let s = sessions.iter().find(|s| s.id == Some(id)).unwrap();
@@ -67,7 +67,7 @@ fn streak_zero_when_no_completed_work_today() {
 fn streak_zero_when_only_incomplete() {
     let (_f, store) = fixture();
     let _ = store
-        .start_focus_session(None, SessionKind::Work, 1500)
+        .start_focus_session(None, SessionKind::Work, 1500, 0)
         .unwrap();
     assert_eq!(store.focus_streak().unwrap(), 0);
 }
@@ -76,7 +76,7 @@ fn streak_zero_when_only_incomplete() {
 fn streak_one_after_completing_today() {
     let (_f, store) = fixture();
     let id = store
-        .start_focus_session(None, SessionKind::Work, 1500)
+        .start_focus_session(None, SessionKind::Work, 1500, 0)
         .unwrap();
     store.complete_focus_session(id).unwrap();
     assert_eq!(store.focus_streak().unwrap(), 1);
@@ -86,7 +86,7 @@ fn streak_one_after_completing_today() {
 fn streak_ignores_break_sessions() {
     let (_f, store) = fixture();
     let id = store
-        .start_focus_session(None, SessionKind::ShortBreak, 300)
+        .start_focus_session(None, SessionKind::ShortBreak, 300, 0)
         .unwrap();
     store.complete_focus_session(id).unwrap();
     assert_eq!(store.focus_streak().unwrap(), 0);
@@ -97,7 +97,7 @@ fn task_deletion_nulls_task_id() {
     let (_f, store) = fixture();
     let (task_id, _) = store.create_task(NewTask::quick("focus target")).unwrap();
     let session_id = store
-        .start_focus_session(Some(task_id), SessionKind::Work, 1500)
+        .start_focus_session(Some(task_id), SessionKind::Work, 1500, 0)
         .unwrap();
     store.complete_focus_session(session_id).unwrap();
     store.delete_task(task_id).unwrap();

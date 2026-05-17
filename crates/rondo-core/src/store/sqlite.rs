@@ -12,6 +12,24 @@ use rusqlite::{params, Connection, OpenFlags, Row};
 use std::path::Path;
 use std::sync::Mutex;
 
+/// Maximum byte length for free-form text fields stored in the DB. These
+/// are upper bounds against accidental or malicious giant inputs (paste
+/// loops, runaway scripts) rather than a UX hint — normal use is well
+/// below these caps. Validated at the store boundary so every caller
+/// (TUI, CLI, plugins, future RPC) is covered.
+const MAX_TITLE: usize = 500;
+const MAX_DESC: usize = 50_000;
+const MAX_NOTE: usize = 50_000;
+const MAX_JOURNAL: usize = 100_000;
+const MAX_TAG: usize = 64;
+
+fn check_len(field: &'static str, value: &str, max: usize) -> Result<()> {
+    if value.len() > max {
+        return Err(crate::error::Error::InputTooLong { field, max });
+    }
+    Ok(())
+}
+
 pub struct SqliteStore {
     pub(super) conn: Mutex<Connection>,
 }
@@ -82,6 +100,13 @@ impl SqliteStore {
     }
 
     pub fn create_task(&self, input: NewTask) -> Result<(i64, UndoSnapshot)> {
+        check_len("title", &input.title, MAX_TITLE)?;
+        if let Some(desc) = input.description.as_deref() {
+            check_len("description", desc, MAX_DESC)?;
+        }
+        for tag in &input.tags {
+            check_len("tag", tag, MAX_TAG)?;
+        }
         let due = input.due_date.map(|d| d.format("%Y-%m-%d").to_string());
         let created_at = Utc::now().to_rfc3339();
         let mut conn = self.conn.lock().unwrap();
@@ -115,6 +140,12 @@ impl SqliteStore {
     }
 
     pub fn update_task(&self, id: i64, patch: TaskPatch) -> Result<UndoSnapshot> {
+        if let Some(title) = patch.title.as_deref() {
+            check_len("title", title, MAX_TITLE)?;
+        }
+        if let Some(Some(desc)) = patch.description.as_ref() {
+            check_len("description", desc, MAX_DESC)?;
+        }
         let before = self.task_by_id(id)?;
         let mut conn = self.conn.lock().unwrap();
         let tx = conn.transaction()?;
@@ -181,6 +212,7 @@ impl SqliteStore {
     }
 
     pub fn add_subtask(&self, task_id: i64, title: &str) -> Result<(i64, UndoSnapshot)> {
+        check_len("subtask title", title, MAX_TITLE)?;
         let before = self.task_by_id(task_id)?;
         let mut conn = self.conn.lock().unwrap();
         let tx = conn.transaction()?;
@@ -212,12 +244,14 @@ impl SqliteStore {
     }
 
     pub fn update_subtask_title(&self, id: i64, title: &str) -> Result<()> {
+        check_len("subtask title", title, MAX_TITLE)?;
         let conn = self.conn.lock().unwrap();
         conn.execute(super::queries::UPDATE_SUBTASK_TITLE, params![title, id])?;
         Ok(())
     }
 
     pub fn add_task_note(&self, task_id: i64, body: &str) -> Result<i64> {
+        check_len("note", body, MAX_NOTE)?;
         let conn = self.conn.lock().unwrap();
         let now = Utc::now().to_rfc3339();
         conn.execute(
@@ -228,6 +262,7 @@ impl SqliteStore {
     }
 
     pub fn update_task_note(&self, id: i64, body: &str) -> Result<()> {
+        check_len("note", body, MAX_NOTE)?;
         let conn = self.conn.lock().unwrap();
         conn.execute(super::queries::UPDATE_TASK_NOTE, params![body, id])?;
         Ok(())
@@ -269,6 +304,7 @@ impl SqliteStore {
     }
 
     pub fn add_tag(&self, task_id: i64, name: &str) -> Result<UndoSnapshot> {
+        check_len("tag", name, MAX_TAG)?;
         let before = self.task_by_id(task_id)?;
         let mut conn = self.conn.lock().unwrap();
         let tx = conn.transaction()?;
@@ -320,17 +356,29 @@ impl SqliteStore {
     }
 
     /// Persist a freshly started focus session. Returns the row id.
+    ///
+    /// `cycle_idx` is the 1-based position within the pomodoro cycle (Work 1/4,
+    /// Work 2/4, …). Use 0 for ad-hoc sessions that aren't part of a cycle.
     pub fn start_focus_session(
         &self,
         task_id: Option<i64>,
         kind: SessionKind,
         duration_secs: u64,
+        cycle_idx: u8,
     ) -> Result<i64> {
         let conn = self.conn.lock().unwrap();
         let now = Utc::now().to_rfc3339();
+        let phase = kind as i64;
         conn.execute(
             super::queries::INSERT_FOCUS_SESSION,
-            params![task_id, kind as i64, &now, duration_secs as i64],
+            params![
+                task_id,
+                phase,
+                &now,
+                duration_secs as i64,
+                phase,
+                cycle_idx as i64
+            ],
         )?;
         Ok(conn.last_insert_rowid())
     }
@@ -379,13 +427,14 @@ impl SqliteStore {
             .query_map([], |r| {
                 let started: String = r.get(3)?;
                 let completed: Option<String> = r.get(4)?;
+                let cycle_idx: i64 = r.get(7).unwrap_or(0);
                 Ok(Session {
                     id: Some(r.get::<_, i64>(0)?),
                     task_id: r.get::<_, Option<i64>>(1)?,
                     kind: SessionKind::from_db(r.get::<_, i64>(2)?),
-                    cycle_pos: 0,
-                    started_at: parse_dt(&started),
-                    completed_at: completed.as_deref().map(parse_dt),
+                    cycle_pos: cycle_idx.clamp(0, u8::MAX as i64) as u8,
+                    started_at: parse_dt_sql(&started)?,
+                    completed_at: completed.as_deref().map(parse_dt_sql).transpose()?,
                     duration_secs: r.get::<_, i64>(5)? as u64,
                 })
             })?
@@ -415,8 +464,8 @@ impl SqliteStore {
                 id,
                 date,
                 hidden: hidden != 0,
-                created_at: parse_dt(&created_at),
-                updated_at: parse_dt(&updated_at),
+                created_at: parse_dt(&created_at)?,
+                updated_at: parse_dt(&updated_at)?,
             }),
             Err(rusqlite::Error::QueryReturnedNoRows) => {
                 let now = Utc::now().to_rfc3339();
@@ -429,8 +478,8 @@ impl SqliteStore {
                     id,
                     date,
                     hidden: false,
-                    created_at: parse_dt(&now),
-                    updated_at: parse_dt(&now),
+                    created_at: parse_dt(&now)?,
+                    updated_at: parse_dt(&now)?,
                 })
             }
             Err(e) => Err(e.into()),
@@ -438,6 +487,7 @@ impl SqliteStore {
     }
 
     pub fn add_journal_entry(&self, note_id: i64, body: &str) -> Result<i64> {
+        check_len("journal entry", body, MAX_JOURNAL)?;
         let conn = self.conn.lock().unwrap();
         let now = Utc::now().to_rfc3339();
         let tx = conn.unchecked_transaction()?;
@@ -480,6 +530,7 @@ impl SqliteStore {
     /// Replace the body text of an existing journal entry. Also bumps the
     /// parent note's `updated_at`. Inside a single transaction.
     pub fn update_journal_entry(&self, entry_id: i64, body: &str) -> Result<()> {
+        check_len("journal entry", body, MAX_JOURNAL)?;
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction()?;
         let note_id: i64 =
@@ -504,7 +555,178 @@ impl SqliteStore {
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
     }
+
+    // -- Undo restoration helpers -----------------------------------------
+    //
+    // Each `restore_*` helper re-inserts a row preserving its original id so
+    // undo can produce a byte-for-byte match against pre-deletion state.
+
+    /// Re-insert a subtask, preserving its original id.
+    pub fn restore_subtask(&self, sub: &crate::domain::task::Subtask) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            super::queries::RESTORE_SUBTASK,
+            params![
+                sub.id,
+                sub.task_id,
+                sub.title,
+                sub.completed as i64,
+                sub.position,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Force-set a subtask's completed state to `done` (true ⇒ completed).
+    pub fn set_subtask_completed(&self, subtask_id: i64, done: bool) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            super::queries::SET_SUBTASK_COMPLETED,
+            params![done as i64, subtask_id],
+        )?;
+        Ok(())
+    }
+
+    /// Re-insert a task note, preserving its original id.
+    pub fn restore_task_note(&self, note: &crate::domain::task::TaskNote) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            super::queries::RESTORE_TASK_NOTE,
+            params![
+                note.id,
+                note.task_id,
+                note.body,
+                note.created_at.to_rfc3339(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Re-insert a journal entry, preserving its original id.
+    pub fn restore_journal_entry(&self, entry: &crate::domain::journal::Entry) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            super::queries::RESTORE_JOURNAL_ENTRY,
+            params![
+                entry.id,
+                entry.note_id,
+                entry.body,
+                entry.created_at.to_rfc3339(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Re-insert a deleted task with its full sub-tree (subtasks, tags,
+    /// notes, time logs, dependency edges), preserving the original id
+    /// for every row. Used by `apply_undo` on `UndoKind::Delete`.
+    ///
+    /// All inserts run in a single transaction. Rows are inserted with
+    /// `INSERT OR REPLACE` so re-applying onto an existing id is safe
+    /// (idempotent restore).
+    pub fn restore_task(&self, task: &crate::domain::task::Task) -> Result<()> {
+        let metadata_json =
+            serde_json::to_string(&task.metadata).unwrap_or_else(|_| "{}".to_string());
+        let due = task.due_date.map(|d| d.format("%Y-%m-%d").to_string());
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        tx.execute(
+            super::queries::RESTORE_TASK,
+            params![
+                task.id,
+                task.title,
+                task.description,
+                task.status as i64,
+                task.priority as i64,
+                due,
+                task.created_at.to_rfc3339(),
+                task.recur_freq as i64,
+                task.recur_interval,
+                metadata_json,
+            ],
+        )?;
+        for tag in &task.tags {
+            tx.execute(super::queries::INSERT_TAG, params![task.id, tag])?;
+        }
+        for sub in &task.subtasks {
+            tx.execute(
+                super::queries::RESTORE_SUBTASK,
+                params![
+                    sub.id,
+                    sub.task_id,
+                    sub.title,
+                    sub.completed as i64,
+                    sub.position
+                ],
+            )?;
+        }
+        for note in &task.notes {
+            tx.execute(
+                super::queries::RESTORE_TASK_NOTE,
+                params![
+                    note.id,
+                    note.task_id,
+                    note.body,
+                    note.created_at.to_rfc3339()
+                ],
+            )?;
+        }
+        for log in &task.time_logs {
+            tx.execute(
+                super::queries::RESTORE_TIME_LOG,
+                params![
+                    log.id,
+                    log.task_id,
+                    log.duration_secs,
+                    log.note,
+                    log.logged_at.to_rfc3339(),
+                ],
+            )?;
+        }
+        for blocker in &task.blocked_by_ids {
+            tx.execute(super::queries::INSERT_DEPENDENCY, params![task.id, blocker])?;
+        }
+        for blocked in &task.blocks_ids {
+            tx.execute(super::queries::INSERT_DEPENDENCY, params![blocked, task.id])?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Re-insert a journal day note plus all its entries, preserving ids.
+    pub fn restore_journal_day(
+        &self,
+        note: &crate::domain::journal::Note,
+        entries: &[crate::domain::journal::Entry],
+    ) -> Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        tx.execute(
+            super::queries::RESTORE_JOURNAL_NOTE,
+            params![
+                note.id,
+                note.date.format("%Y-%m-%d").to_string(),
+                note.hidden as i64,
+                note.created_at.to_rfc3339(),
+                note.updated_at.to_rfc3339(),
+            ],
+        )?;
+        for e in entries {
+            tx.execute(
+                super::queries::RESTORE_JOURNAL_ENTRY,
+                params![e.id, e.note_id, e.body, e.created_at.to_rfc3339()],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
 }
+
+/// Bound on how many nodes `would_create_cycle` will visit before
+/// giving up. Guards against pathological graphs (or future bugs that
+/// don't terminate the traversal) eating CPU/RAM. 1000 is far above any
+/// realistic dep graph for a personal task manager.
+const MAX_CYCLE_DEPTH: usize = 1000;
 
 fn would_create_cycle(conn: &Connection, task_id: i64, blocked_by: i64) -> Result<bool> {
     if task_id == blocked_by {
@@ -515,6 +737,9 @@ fn would_create_cycle(conn: &Connection, task_id: i64, blocked_by: i64) -> Resul
     while let Some(current) = stack.pop() {
         if !visited.insert(current) {
             continue;
+        }
+        if visited.len() > MAX_CYCLE_DEPTH {
+            return Err(crate::error::Error::CycleDepthExceeded);
         }
         if current == task_id {
             return Ok(true);
@@ -532,18 +757,22 @@ fn would_create_cycle(conn: &Connection, task_id: i64, blocked_by: i64) -> Resul
 }
 
 fn row_to_task_shallow(r: &Row<'_>) -> rusqlite::Result<Task> {
+    let task_id: i64 = r.get(0)?;
     let metadata_json: String = r.get(9)?;
-    let metadata = serde_json::from_str(&metadata_json).unwrap_or_default();
+    let metadata = serde_json::from_str(&metadata_json).unwrap_or_else(|e| {
+        tracing::warn!(task_id, error = ?e, "corrupt metadata json, defaulting to empty");
+        Default::default()
+    });
     let due_str: Option<String> = r.get(5)?;
     let created_str: String = r.get(6)?;
     Ok(Task {
-        id: r.get(0)?,
+        id: task_id,
         title: r.get(1)?,
         description: r.get(2)?,
         status: Status::from_db(r.get(3)?),
         priority: Priority::from_db(r.get(4)?),
         due_date: due_str.and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
-        created_at: parse_dt(&created_str),
+        created_at: parse_dt_sql(&created_str)?,
         recur_freq: RecurFreq::from_db(r.get(7)?),
         recur_interval: r.get(8)?,
         metadata,
@@ -591,7 +820,7 @@ fn hydrate(conn: &Connection, t: &mut Task) -> Result<()> {
                     } else {
                         Some(note_str)
                     },
-                    logged_at: parse_dt(&r.get::<_, String>(4)?),
+                    logged_at: parse_dt_sql(&r.get::<_, String>(4)?)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -604,7 +833,7 @@ fn hydrate(conn: &Connection, t: &mut Task) -> Result<()> {
                     id: r.get(0)?,
                     task_id: r.get(1)?,
                     body: r.get(2)?,
-                    created_at: parse_dt(&r.get::<_, String>(3)?),
+                    created_at: parse_dt_sql(&r.get::<_, String>(3)?)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -631,8 +860,8 @@ fn row_to_note(r: &Row<'_>) -> rusqlite::Result<Note> {
         date: NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
             .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).expect("epoch date is valid")),
         hidden: r.get::<_, i64>(2)? != 0,
-        created_at: parse_dt(&r.get::<_, String>(3)?),
-        updated_at: parse_dt(&r.get::<_, String>(4)?),
+        created_at: parse_dt_sql(&r.get::<_, String>(3)?)?,
+        updated_at: parse_dt_sql(&r.get::<_, String>(4)?)?,
     })
 }
 
@@ -641,16 +870,34 @@ fn row_to_entry(r: &Row<'_>) -> rusqlite::Result<Entry> {
         id: r.get(0)?,
         note_id: r.get(1)?,
         body: r.get(2)?,
-        created_at: parse_dt(&r.get::<_, String>(3)?),
+        created_at: parse_dt_sql(&r.get::<_, String>(3)?)?,
     })
 }
 
-fn parse_dt(s: &str) -> DateTime<Utc> {
+#[doc(hidden)]
+pub fn parse_dt(s: &str) -> Result<DateTime<Utc>> {
     if let Ok(d) = DateTime::parse_from_rfc3339(s) {
-        return d.with_timezone(&Utc);
+        return Ok(d.with_timezone(&Utc));
     }
     if let Ok(nd) = chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S") {
-        return DateTime::<Utc>::from_naive_utc_and_offset(nd, Utc);
+        return Ok(DateTime::<Utc>::from_naive_utc_and_offset(nd, Utc));
     }
-    Utc::now()
+    Err(crate::error::Error::ParseDate(s.to_string()))
+}
+
+/// Adapter for use inside rusqlite row-mapper closures (which must return
+/// `rusqlite::Result<T>`). Wraps a `parse_dt` failure as a SQLite
+/// conversion-failure error so the row read fails loudly instead of
+/// silently substituting a default.
+fn parse_dt_sql(s: &str) -> rusqlite::Result<DateTime<Utc>> {
+    parse_dt(s).map_err(|e| {
+        rusqlite::Error::FromSqlConversionFailure(
+            0,
+            rusqlite::types::Type::Text,
+            Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                e.to_string(),
+            )),
+        )
+    })
 }

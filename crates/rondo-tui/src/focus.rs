@@ -1,4 +1,4 @@
-use strum::{Display, EnumIter, IntoEnumIterator};
+use strum::Display;
 
 /// Top-level pane that has user focus inside the current page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
@@ -9,7 +9,7 @@ pub enum Pane {
 }
 
 /// Sections cycled by Tab/Shift+Tab within the Detail pane.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, EnumIter)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
 pub enum DetailSection {
     Header,
     Subtasks,
@@ -19,14 +19,20 @@ pub enum DetailSection {
 
 impl DetailSection {
     pub fn next(self) -> Self {
-        let all: Vec<Self> = Self::iter().collect();
-        let idx = all.iter().position(|s| *s == self).unwrap_or(0);
-        all[(idx + 1) % all.len()]
+        match self {
+            Self::Header => Self::Subtasks,
+            Self::Subtasks => Self::Dependencies,
+            Self::Dependencies => Self::Notes,
+            Self::Notes => Self::Header,
+        }
     }
     pub fn prev(self) -> Self {
-        let all: Vec<Self> = Self::iter().collect();
-        let idx = all.iter().position(|s| *s == self).unwrap_or(0);
-        all[(idx + all.len() - 1) % all.len()]
+        match self {
+            Self::Header => Self::Notes,
+            Self::Subtasks => Self::Header,
+            Self::Dependencies => Self::Subtasks,
+            Self::Notes => Self::Dependencies,
+        }
     }
     pub fn label(self) -> &'static str {
         match self {

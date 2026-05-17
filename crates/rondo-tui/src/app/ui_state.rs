@@ -66,7 +66,17 @@ pub struct UiState {
     pub last_quick_add_rect: Rect,
     pub last_journal_entries_rect: Rect,
     pub sort_order: SortOrder,
+    /// Optional grouping pass applied on top of `sort_order` in the task
+    /// list. `None` renders the list flat (default).
+    pub group_by: Option<crate::sort::GroupBy>,
     pub journal_pane: JournalPane,
+    /// First visible row in the task list. Updated by `move_selection`
+    /// to keep the cursor inside the viewport, and clamped on resize.
+    pub task_list_scroll: usize,
+    /// Selected task as a stable id. Survives `refresh_tasks` reordering
+    /// and search-induced re-sorts that would otherwise leave the index
+    /// pointing at a different row.
+    pub selected_task_id: Option<i64>,
 }
 
 impl Default for UiState {
@@ -87,7 +97,10 @@ impl Default for UiState {
             last_quick_add_rect: Rect::default(),
             last_journal_entries_rect: Rect::default(),
             sort_order: SortOrder::default(),
+            group_by: None,
             journal_pane: JournalPane::default(),
+            task_list_scroll: 0,
+            selected_task_id: None,
         }
     }
 }

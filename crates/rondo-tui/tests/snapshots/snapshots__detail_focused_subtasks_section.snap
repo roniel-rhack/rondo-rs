@@ -2,7 +2,7 @@
 source: crates/rondo-tui/tests/snapshots.rs
 expression: s
 ---
-" ▌rondo v0.1.0       // SISTEMA DE GESTIÓN DE TAREAS AVANZADO //                  ⊙ ONLINE · HH:MM:SS · ◷ 1/2 · P— · ☑3 "
+" ▌rondo v0.1.0       // SISTEMA DE GESTIÓN DE TAREAS AVANZADO //                      ⊙ RO · HH:MM:SS · ◷ 1/2 · P— · ☑3 "
 "┌─ navegación ───────────┐┏━ detail · #1 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ inprogress · high ━┓"
 "│  [i] ◉ INBOX       3   │┃                                                                                            ┃"
 "│  [t] ◷ HOY         1   │┃   TSK-0001    ◖high◗   ◖in-progress◗                                                       ┃"
@@ -10,12 +10,12 @@ expression: s
 "│  [A] ◇ TODAS       4   │┃   Review API spec                                                                          ┃"
 "└────────────────────────┘┃   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   ┃"
 "┌─ filtros rápidos ──────┐┃                                                                                            ┃"
-"│  [u] ! URGENTES    1   │┃   CREADA    2026-05-17 HH:MM                                                               ┃"
-"│  [H] ↑ ALTA PRIO   2   │┃   VENCE     ◖today◗   2026-05-17 (Sunday)                                                  ┃"
+"│  [u] ! URGENTES    1   │┃   CREADA    YYYY-MM-DD HH:MM                                                               ┃"
+"│  [H] ↑ ALTA PRIO   2   │┃   VENCE     ◖today◗   YYYY-MM-DD (WEEKDAY)                                                  ┃"
 "│  [o] ⌧ VENCIDAS        │┃   TAGS      #backend  ·  #work                                                             ┃"
-"│  [n] # SIN ETIQUETA 1  │┃   OWNER     me                                                                             ┃"
-"│  [c] ✓ COMPLETADAS 1   │┃                                                                                            ┃"
-"│                        │┃ ▌ § DESCRIPCIÓN ────────────────────────────────────────────────────────────────────────   ┃"
+"│  [P] ◐ EN PROGRESO 1   │┃   OWNER     me                                                                             ┃"
+"│  [n] # SIN ETIQUETA 1  │┃                                                                                            ┃"
+"│  [c] ✓ COMPLETADAS 1   │┃ ▌ § DESCRIPCIÓN ────────────────────────────────────────────────────────────────────────   ┃"
 "│                        │┃                                                                                            ┃"
 "│                        │┃     Goals                                                                                  ┃"
 "│                        │┃                                                                                            ┃"
@@ -33,4 +33,4 @@ expression: s
 "│   ○    2  Pendient ││   17   18   19   20   21   22  ││                                  ││         ⌬                │"
 "│   !    0  Vencidas ││                                ││                                  ││                          │"
 "└────────────────────┘└────────────────────────────────┘└──────────────────────────────────┘└──────────────────────────┘"
-" [NOR]  [A → + subtarea] [e → rename] [d → delete] [space → check] [1/2/3/4 → section jump]  · ? more                   "
+" [NOR]  [A → + subtarea] [e → rename] [d → delete] [space → check] [: → cmd]  · ? ayuda                                 "

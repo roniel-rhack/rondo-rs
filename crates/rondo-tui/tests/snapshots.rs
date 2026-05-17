@@ -1,7 +1,8 @@
+use chrono::{TimeZone, Utc};
 use insta::assert_snapshot;
 use ratatui::{backend::TestBackend, Terminal};
 use rondo_core::store::sqlite::SqliteStore;
-use rondo_tui::{action::Page, app::AppState, components, filter};
+use rondo_tui::{action::Page, app::AppState, clock::FixedClock, components, filter};
 use std::sync::Arc;
 
 fn fixture_store() -> Arc<SqliteStore> {
@@ -21,27 +22,56 @@ fn fixture_store() -> Arc<SqliteStore> {
     Arc::new(SqliteStore::open_readonly(tmp.path()).unwrap())
 }
 
+/// Pinned clock so date strings (today's date, "in 2d" badges) are
+/// deterministic across snapshot runs and across machines.
+fn fixed_clock() -> Arc<FixedClock> {
+    Arc::new(FixedClock::new(
+        Utc.with_ymd_and_hms(2026, 5, 17, 10, 0, 0).unwrap(),
+    ))
+}
+
 fn snapshot(_name: &str, width: u16, height: u16, mutate: impl FnOnce(&mut AppState)) -> String {
-    // Pin clock + timezone so calendar/journal/task `created_at`
-    // renderings are deterministic across local devs and CI runners.
-    // SAFETY: every test sets the same value; this never observes a
-    // mid-flight rewrite from a different value.
+    // Pin HOME so anything that renders `$HOME/...` (plugins overlay)
+    // produces the same string length on every machine; otherwise
+    // `/Users/<user>` vs `/home/<user>` lengths shift the trailing
+    // column padding and churn the snapshot.
+    // SAFETY: every snapshot test sets the same value; this never
+    // observes a mid-flight rewrite from a different value.
     unsafe {
-        std::env::set_var("RONDO_TEST_TODAY", "2026-05-17");
-        std::env::set_var("TZ", "UTC");
+        std::env::set_var("HOME", "/snapshot-fixture");
     }
-    let mut app = AppState::new(fixture_store()).unwrap();
+    let mut app = AppState::with_writable_and_clock(fixture_store(), false, fixed_clock()).unwrap();
     mutate(&mut app);
     let backend = TestBackend::new(width, height);
     let mut term = Terminal::new(backend).unwrap();
     term.draw(|f| components::root::draw(&mut app, f)).unwrap();
     let raw = term.backend().to_string();
-    // Redact wall-clock timestamps so snapshots are stable across runs.
-    // Order matters: longer pattern first (HH:MM:SS), then plain HH:MM.
+    // The clock is pinned, but `pomodoro_started` (from `Instant::now()`)
+    // and other monotonic clock readings can still leak HH:MM:SS strings
+    // into the buffer. Keep the time-of-day redaction for those paths;
+    // the `today()` date string no longer needs redaction.
     let re_hms = regex::Regex::new(r"\d{2}:\d{2}:\d{2}").unwrap();
     let stage1 = re_hms.replace_all(&raw, "HH:MM:SS").to_string();
     let re_hm = regex::Regex::new(r"\b\d{2}:\d{2}\b").unwrap();
-    re_hm.replace_all(&stage1, "HH:MM").to_string()
+    let stage2 = re_hm.replace_all(&stage1, "HH:MM").to_string();
+    let re_hm_frag = regex::Regex::new(r"\b\d:\d{2}\b").unwrap();
+    let stage3 = re_hm_frag.replace_all(&stage2, "H:MM").to_string();
+    // Redact wall-clock dates that leak through detail-pane "CREADA" /
+    // "VENCE" rows (`YYYY-MM-DD`) so snapshots don't churn each midnight.
+    let re_date = regex::Regex::new(r"\d{4}-\d{2}-\d{2}").unwrap();
+    let stage4 = re_date.replace_all(&stage3, "YYYY-MM-DD").to_string();
+    // Localised weekday names trail some date strings (e.g. "(Monday)" /
+    // "(lunes)"). They also rotate with the clock — strip parentheticals
+    // that look like weekday-ish single English/Spanish words.
+    let re_weekday =
+        regex::Regex::new(r"\((Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|lunes|martes|miércoles|jueves|viernes|sábado|domingo)\)").unwrap();
+    let stage5 = re_weekday.replace_all(&stage4, "(WEEKDAY)").to_string();
+    // The plugins overlay surfaces `$HOME/.rondo-rs/plugins` when no
+    // external plugin is installed. HOME differs per dev machine and per
+    // CI runner (`/Users/runner` macOS, `/home/runner` linux). Collapse
+    // both shapes to a placeholder so the snapshot stays portable.
+    let re_home = regex::Regex::new(r"(?:/Users|/home)/[^/\s]+").unwrap();
+    re_home.replace_all(&stage5, "$$HOME").to_string()
 }
 
 #[test]
@@ -212,6 +242,91 @@ fn edit_title_overlay() {
         a.modals.edit_title_open = true;
         a.modals.edit_title_buf = "ship the demo".to_string();
         a.ui.mode = rondo_tui::focus::Mode::Insert;
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn calendar_plugin_page() {
+    let s = snapshot("calendar_plugin_page", 140, 36, |a| {
+        a.modals.plugin_page = Some("builtin.calendar".to_string());
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn dep_graph_plugin_page() {
+    let s = snapshot("dep_graph_plugin_page", 140, 36, |a| {
+        a.modals.plugin_page = Some("builtin.dep-graph".to_string());
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn focus_plugin_page() {
+    let s = snapshot("focus_plugin_page", 140, 36, |a| {
+        a.modals.plugin_page = Some("builtin.focus-page".to_string());
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn analytics_plugin_page() {
+    let s = snapshot("analytics_plugin_page", 140, 36, |a| {
+        a.modals.plugin_page = Some("builtin.analytics".to_string());
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn plugins_overlay() {
+    let s = snapshot("plugins_overlay", 140, 36, |a| {
+        a.modals.plugins_overlay_open = true;
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn sort_overlay_default() {
+    let s = snapshot("sort_overlay_default", 120, 32, |a| {
+        a.modals.sort_overlay_open = true;
+        a.ui.sort_order = rondo_tui::app::ui_state::SortOrder::Default;
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn sort_overlay_priority_desc() {
+    let s = snapshot("sort_overlay_priority_desc", 120, 32, |a| {
+        a.modals.sort_overlay_open = true;
+        a.ui.sort_order = rondo_tui::app::ui_state::SortOrder::PriorityDesc;
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn sort_overlay_due_asc() {
+    let s = snapshot("sort_overlay_due_asc", 120, 32, |a| {
+        a.modals.sort_overlay_open = true;
+        a.ui.sort_order = rondo_tui::app::ui_state::SortOrder::DueAsc;
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn sort_overlay_created_desc() {
+    let s = snapshot("sort_overlay_created_desc", 120, 32, |a| {
+        a.modals.sort_overlay_open = true;
+        a.ui.sort_order = rondo_tui::app::ui_state::SortOrder::CreatedAtDesc;
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
+fn sort_overlay_title_asc() {
+    let s = snapshot("sort_overlay_title_asc", 120, 32, |a| {
+        a.modals.sort_overlay_open = true;
+        a.ui.sort_order = rondo_tui::app::ui_state::SortOrder::TitleAsc;
     });
     assert_snapshot!(s);
 }

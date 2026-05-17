@@ -1,10 +1,11 @@
-use crate::action::{Action, Page};
-use crate::filter::Filter;
+use crate::clock::Clock;
+use crate::filter::{Filter, SIDEBAR_ITEMS};
 use ratatui::widgets::ListState;
 use rondo_core::domain::{
     journal::{Entry, Note},
     task::Task,
 };
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Domain data + read-only store + selection indexes.
@@ -22,11 +23,26 @@ pub struct DataState {
     pub selected_journal_entry: usize,
     pub active_filter: Filter,
     pub journal_show_hidden: bool,
+    /// Cached per-filter counts, refreshed alongside `tasks`. Sidebar and
+    /// header use these instead of re-scanning `tasks` per render frame.
+    pub filter_counts: HashMap<Filter, usize>,
+    /// Lazily-built `title + tags + description` strings aligned by index
+    /// with `tasks`. Refreshed alongside `tasks` so fuzzy search avoids
+    /// re-formatting per call.
+    pub task_haystacks: Vec<String>,
+    /// Reused fuzzy-search engine. Pulled out of `DataState` so we keep
+    /// nucleo's internal scratch buffers across frames instead of
+    /// allocating a fresh `Matcher` per render.
+    pub search_engine: std::cell::RefCell<crate::search::SearchEngine>,
+    /// Shared clock used by `refresh_filter_counts` so filter buckets are
+    /// computed against a deterministic `today` in tests.
+    clock: Arc<dyn Clock>,
 }
 
 impl DataState {
     pub fn new(
         store: Arc<rondo_core::store::sqlite::SqliteStore>,
+        clock: Arc<dyn Clock>,
     ) -> color_eyre::eyre::Result<Self> {
         let tasks = store.list_tasks()?;
         let journal_notes = store.list_journal_notes()?;
@@ -43,7 +59,7 @@ impl DataState {
         if !journal_notes.is_empty() {
             journal_list_state.select(Some(0));
         }
-        Ok(Self {
+        let mut state = Self {
             store,
             tasks,
             selected_task: 0,
@@ -55,7 +71,66 @@ impl DataState {
             selected_journal_entry: 0,
             active_filter: Filter::Inbox,
             journal_show_hidden: false,
-        })
+            filter_counts: HashMap::new(),
+            task_haystacks: Vec::new(),
+            search_engine: std::cell::RefCell::new(crate::search::SearchEngine::new()),
+            clock,
+        };
+        state.refresh_filter_counts();
+        state.rebuild_haystacks();
+        Ok(state)
+    }
+
+    fn rebuild_haystacks(&mut self) {
+        self.task_haystacks.clear();
+        self.task_haystacks.reserve(self.tasks.len());
+        for t in &self.tasks {
+            self.task_haystacks.push(Self::haystack_for(t));
+        }
+    }
+
+    fn haystack_for(t: &rondo_core::domain::task::Task) -> String {
+        format!(
+            "{} {} {}",
+            t.title,
+            t.tags.join(" "),
+            t.description.as_deref().unwrap_or("")
+        )
+    }
+
+    /// Reload a single task from the store and replace its in-memory row
+    /// (plus haystack). Cheaper than `refresh_tasks` which lists every
+    /// task and re-hydrates each (N×5 child queries). Use after mutations
+    /// where the affected task id is known and no rows were inserted or
+    /// deleted (status toggle, title/description edit, dep add/remove,
+    /// subtask CRUD, note CRUD). Filter counts are refreshed because a
+    /// status/due/priority change can shift which filters include the row.
+    pub fn patch_task(&mut self, id: i64) {
+        if let Ok(updated) = self.store.task_by_id(id) {
+            if let Some(pos) = self.tasks.iter().position(|t| t.id == id) {
+                self.task_haystacks[pos] = Self::haystack_for(&updated);
+                self.tasks[pos] = updated;
+            }
+        }
+        self.refresh_filter_counts();
+    }
+
+    /// Recompute the per-filter cache. Cheap: a single linear pass over
+    /// `tasks` checking each `Filter` variant, sharing a `today` value.
+    pub fn refresh_filter_counts(&mut self) {
+        let today = self.clock.today();
+        let mut counts: HashMap<Filter, usize> = HashMap::with_capacity(SIDEBAR_ITEMS.len());
+        for &f in SIDEBAR_ITEMS {
+            counts.insert(f, 0);
+        }
+        for task in &self.tasks {
+            for &f in SIDEBAR_ITEMS {
+                if f.applies_to_with_today(task, today) {
+                    *counts.entry(f).or_insert(0) += 1;
+                }
+            }
+        }
+        self.filter_counts = counts;
     }
 
     /// Currently selected task (if any), as a reference.
@@ -71,16 +146,32 @@ impl DataState {
     /// Reload tasks from the store. Used after mutations to keep the
     /// in-memory list in sync with persisted state.
     pub fn refresh_tasks(&mut self) {
+        self.refresh_tasks_keeping_id(None);
+    }
+
+    /// Reload tasks from the store and, when `keep_id` is provided, restore
+    /// `selected_task` to the row with that task id. Falls back to clamping
+    /// the previous index when the id is no longer present (e.g. deleted).
+    pub fn refresh_tasks_keeping_id(&mut self, keep_id: Option<i64>) {
         if let Ok(tasks) = self.store.list_tasks() {
             self.tasks = tasks;
         }
         if self.tasks.is_empty() {
             self.selected_task = 0;
             self.task_list_state.select(None);
-        } else if self.selected_task >= self.tasks.len() {
-            self.selected_task = self.tasks.len() - 1;
+        } else {
+            if let Some(id) = keep_id {
+                if let Some(pos) = self.tasks.iter().position(|t| t.id == id) {
+                    self.selected_task = pos;
+                }
+            }
+            if self.selected_task >= self.tasks.len() {
+                self.selected_task = self.tasks.len() - 1;
+            }
             self.task_list_state.select(Some(self.selected_task));
         }
+        self.refresh_filter_counts();
+        self.rebuild_haystacks();
     }
 
     /// Reload journal notes from the store, honoring the `journal_show_hidden` flag.
@@ -127,18 +218,12 @@ impl DataState {
         if q.is_empty() {
             return base;
         }
-        let mut engine = crate::search::SearchEngine::new();
+        let mut engine = self.search_engine.borrow_mut();
         let mut scored: Vec<(u16, usize)> = base
             .into_iter()
             .filter_map(|i| {
-                let t = &self.tasks[i];
-                let hay = format!(
-                    "{} {} {}",
-                    t.title,
-                    t.tags.join(" "),
-                    t.description.as_deref().unwrap_or("")
-                );
-                engine.score_only(q, &hay).map(|s| (s, i))
+                let hay = self.task_haystacks.get(i)?;
+                engine.score_only(q, hay).map(|s| (s, i))
             })
             .collect();
         scored.sort_by_key(|(score, _)| std::cmp::Reverse(*score));
@@ -164,19 +249,6 @@ impl DataState {
             self.selected_journal_entry = 0;
         } else if self.selected_journal_entry >= self.journal_entries.len() {
             self.selected_journal_entry = self.journal_entries.len() - 1;
-        }
-    }
-
-    /// Pure data-mutation handler. Returns optional follow-up for the dispatcher.
-    /// Most data changes are driven by other substates (which need cursor + focus
-    /// info) so this handler stays small for now.
-    pub fn update(&mut self, action: Action) -> Option<Action> {
-        match action {
-            Action::TogglePage(p) if p == Page::Tasks || p == Page::Journal => {
-                // Page is owned by UiState; this is a no-op at the data layer.
-                None
-            }
-            _ => None,
         }
     }
 }

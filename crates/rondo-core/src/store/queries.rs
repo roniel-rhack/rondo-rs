@@ -96,15 +96,15 @@ pub const DELETE_DEPENDENCY: &str =
     "DELETE FROM task_dependencies WHERE task_id = ?1 AND blocked_by = ?2";
 
 pub const INSERT_FOCUS_SESSION: &str = r#"
-INSERT INTO focus_sessions (task_id, kind, started_at, duration_secs)
-VALUES (?1, ?2, ?3, ?4)
+INSERT INTO focus_sessions (task_id, kind, started_at, duration_secs, phase, cycle_idx)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6)
 "#;
 
 pub const COMPLETE_FOCUS_SESSION: &str =
     "UPDATE focus_sessions SET completed_at = ?1 WHERE id = ?2";
 
 pub const LIST_FOCUS_SESSIONS: &str = r#"
-SELECT id, task_id, kind, started_at, completed_at, duration_secs
+SELECT id, task_id, kind, started_at, completed_at, duration_secs, phase, cycle_idx
 FROM focus_sessions
 ORDER BY started_at DESC
 LIMIT 1000
@@ -131,6 +131,40 @@ pub const HIDE_JOURNAL_NOTE: &str = "UPDATE journal_notes SET hidden = 1 WHERE i
 pub const UNHIDE_JOURNAL_NOTE: &str = "UPDATE journal_notes SET hidden = 0 WHERE id = ?1";
 
 pub const DELETE_JOURNAL_ENTRY: &str = "DELETE FROM journal_entries WHERE id = ?1";
+
+/// Re-insert a journal entry on undo, preserving its original id.
+pub const RESTORE_JOURNAL_ENTRY: &str =
+    "INSERT OR REPLACE INTO journal_entries (id, note_id, body, created_at) VALUES (?1, ?2, ?3, ?4)";
+
+/// Re-insert a journal day note on undo, preserving its original id.
+pub const RESTORE_JOURNAL_NOTE: &str =
+    "INSERT OR REPLACE INTO journal_notes (id, date, hidden, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)";
+
+/// Re-insert a task note on undo, preserving its original id.
+pub const RESTORE_TASK_NOTE: &str =
+    "INSERT OR REPLACE INTO task_notes (id, task_id, body, created_at) VALUES (?1, ?2, ?3, ?4)";
+
+/// Re-insert a subtask on undo, preserving its original id.
+pub const RESTORE_SUBTASK: &str =
+    "INSERT OR REPLACE INTO subtasks (id, task_id, title, completed, position) VALUES (?1, ?2, ?3, ?4, ?5)";
+
+/// Re-insert a task row on undo (after a delete), preserving its original id.
+pub const RESTORE_TASK: &str = r#"
+INSERT OR REPLACE INTO tasks
+    (id, title, description, status, priority, due_date, created_at, recur_freq, recur_interval, metadata)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+"#;
+
+/// Re-insert a time log on undo, preserving its original id.
+pub const RESTORE_TIME_LOG: &str = r#"
+INSERT OR REPLACE INTO time_logs (id, task_id, duration, note, logged_at)
+VALUES (?1, ?2, ?3, ?4, ?5)
+"#;
+
+/// Force-set a subtask's completed state to a specific value (for explicit
+/// toggle undo where we know the previous state and don't want diff-based
+/// flipping).
+pub const SET_SUBTASK_COMPLETED: &str = "UPDATE subtasks SET completed = ?1 WHERE id = ?2";
 
 pub const DELETE_JOURNAL_NOTE: &str = "DELETE FROM journal_notes WHERE id = ?1";
 

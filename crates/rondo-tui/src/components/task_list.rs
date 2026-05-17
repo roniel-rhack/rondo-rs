@@ -1,5 +1,6 @@
 use crate::app::ui_state::SortOrder;
 use crate::app::{AppState, FlashTarget};
+use crate::strings::{t as tr, StringKey};
 use crate::theme::Theme;
 use crate::widgets::{
     bracket_panel::BracketPanel, due_badge, priority_badge, priority_spine, ring,
@@ -11,6 +12,7 @@ use ratatui::{
     widgets::{List, ListItem, Paragraph, Widget},
     Frame,
 };
+use rondo_core::config::Lang;
 use rondo_core::domain::task::{Status, Task};
 
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
@@ -21,15 +23,32 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         app.visible_task_indices(),
     );
     let filter_label = app.data.active_filter.label().to_lowercase();
+    let sort_label = app.ui.sort_order.label();
+    let tasks_word = tr(app.lang, StringKey::TasksCount);
+    let group_suffix = app
+        .ui
+        .group_by
+        .map(|g| format!(" · group: {}", g.label()))
+        .unwrap_or_default();
     let title = if app.modals.search_open && !app.modals.search_buf.trim().is_empty() {
         format!(
-            "{} · {} tareas · /{}",
+            "{} · {} {} · {}{} · /{}",
             filter_label,
             visible.len(),
+            tasks_word,
+            sort_label,
+            group_suffix,
             app.modals.search_buf
         )
     } else {
-        format!("{} · {} tareas", filter_label, visible.len())
+        format!(
+            "{} · {} {} · {}{}",
+            filter_label,
+            visible.len(),
+            tasks_word,
+            sort_label,
+            group_suffix
+        )
     };
     let panel = BracketPanel::new(&title, t).active(app.ui.focus.pane == crate::focus::Pane::List);
     let inner = panel.inner(area);
@@ -40,7 +59,11 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
             Line::raw(""),
             Line::raw(""),
             Line::from(Span::styled(
-                format!("  Sin tareas para '{}'", filter_label),
+                format!(
+                    "  {} '{}'",
+                    tr(app.lang, StringKey::TasksEmpty),
+                    filter_label
+                ),
                 t.muted(),
             )),
             Line::raw(""),
@@ -48,11 +71,11 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
                 Span::raw("  "),
                 Span::styled("h", t.kbd()),
                 Span::raw(" "),
-                Span::styled("cambiar filtro", t.muted()),
+                Span::styled(tr(app.lang, StringKey::HintChangeFilter), t.muted()),
                 Span::raw("    "),
                 Span::styled("?", t.kbd()),
                 Span::raw(" "),
-                Span::styled("ayuda", t.muted()),
+                Span::styled(tr(app.lang, StringKey::HintHelp), t.muted()),
             ]),
         ];
         f.render_widget(Paragraph::new(lines), inner);
@@ -69,7 +92,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         ])
         .split(inner);
 
-    draw_column_header(f, layout[0], t);
+    draw_column_header(f, layout[0], t, app.lang);
 
     let search_query: Option<String> =
         if app.modals.search_open && !app.modals.search_buf.trim().is_empty() {
@@ -77,42 +100,111 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         } else {
             None
         };
-    let items = render_items(app, &visible, layout[1].width, search_query.as_deref());
+
+    // Viewport-aware slice: each task expands to multiple lines, but the
+    // scroll offset is task-indexed (1 task ≈ 1 cursor step). We render at
+    // most `area_height` tasks — generous bound since rows are 1–5 lines.
+    let area_height = layout[1].height as usize;
+    let scroll = app.ui.task_list_scroll.min(visible.len().saturating_sub(1));
+    let end = (scroll + area_height.max(1)).min(visible.len());
+    let slice = &visible[scroll..end];
+
+    let (items, header_offset) = if let Some(by) = app.ui.group_by {
+        let buckets =
+            crate::sort::group_sorted_indices(&app.data.tasks, &visible, app.clock.today(), by);
+        let items = render_grouped_items(
+            app,
+            &buckets,
+            layout[1].width,
+            search_query.as_deref(),
+            scroll,
+            end,
+        );
+        // Header rows that appear before the first visible task push the
+        // selection row down by N lines.
+        let mut headers_before_sel = 0usize;
+        if let Some(sel) = app.data.task_list_state.selected() {
+            let mut seen_tasks = 0usize;
+            for bucket in &buckets {
+                if seen_tasks >= scroll && seen_tasks + bucket.indices.len() > sel {
+                    if seen_tasks <= sel {
+                        headers_before_sel += 1;
+                    }
+                    break;
+                }
+                if seen_tasks >= scroll {
+                    headers_before_sel += 1;
+                }
+                seen_tasks += bucket.indices.len();
+            }
+        }
+        (items, headers_before_sel)
+    } else {
+        (
+            render_items(app, slice, layout[1].width, search_query.as_deref(), scroll),
+            0,
+        )
+    };
+
     // No REVERSED highlight — bg changes are theme-fragile. The accent ▌ gutter
-    // already marks the cursor row.
+    // already marks the cursor row. Use a slice-local ListState so ratatui's
+    // own offset math doesn't compound with our pre-slicing.
+    let mut local_state = ratatui::widgets::ListState::default();
+    if let Some(sel) = app.data.task_list_state.selected() {
+        if sel >= scroll && sel < scroll + slice.len() {
+            local_state.select(Some(sel - scroll + header_offset));
+        }
+    }
     let list = List::new(items);
-    f.render_stateful_widget(list, layout[1], &mut app.data.task_list_state);
+    f.render_stateful_widget(list, layout[1], &mut local_state);
 
     draw_progress_bar(app, f, layout[2], t);
 }
 
-fn draw_column_header(f: &mut Frame<'_>, area: Rect, t: &Theme) {
+fn draw_column_header(f: &mut Frame<'_>, area: Rect, t: &Theme, lang: Lang) {
     // Columns:  [ ] gutter | [pri] 8 | tarea flex | [tags] 18 | [vence] 10
     let header = Line::from(vec![
         Span::raw("    "),
-        Span::styled("ESTADO  ", t.muted()),
-        Span::styled("PRI     ", t.muted()),
-        Span::styled("TAREA", t.muted()),
+        Span::styled(
+            format!("{:<8}", tr(lang, StringKey::ColumnStatus)),
+            t.muted(),
+        ),
+        Span::styled(
+            format!("{:<8}", tr(lang, StringKey::ColumnPriority)),
+            t.muted(),
+        ),
+        Span::styled(tr(lang, StringKey::ColumnTask).to_string(), t.muted()),
     ]);
     f.render_widget(Paragraph::new(header), area);
 }
 
-fn render_items(
+/// Per-row data prepared for rendering. The `lines` are fully styled
+/// `Line<'static>` so the renderer just wraps them in `ListItem`s.
+pub(crate) struct TaskRow {
+    pub lines: Vec<Line<'static>>,
+    #[allow(dead_code)]
+    pub is_selected: bool,
+}
+
+/// Data-prep phase: walk `visible`, compute selection & last-row flags,
+/// borrow the search engine once, and produce a `TaskRow` per visible
+/// task. Keeps the render phase a thin `ListItem::new(row.lines)` loop.
+pub(crate) fn build_rows(
     app: &AppState,
     visible: &[usize],
     width: u16,
     query: Option<&str>,
-) -> Vec<ListItem<'static>> {
-    let selected_pos = app.data.task_list_state.selected();
+) -> Vec<TaskRow> {
+    let selected_task_idx = app.data.selected_task;
     let last_idx = visible.len().saturating_sub(1);
-    let mut engine = query.map(|_| crate::search::SearchEngine::new());
+    let mut engine_borrow = query.map(|_| app.data.search_engine.borrow_mut());
     visible
         .iter()
         .enumerate()
         .map(|(pos, &idx)| {
-            let is_selected = Some(pos) == selected_pos;
+            let is_selected = idx == selected_task_idx;
             let is_last = pos == last_idx;
-            build_row(
+            let lines = build_row_lines(
                 &app.data.tasks[idx],
                 is_selected,
                 is_last,
@@ -120,14 +212,86 @@ fn render_items(
                 &app.theme,
                 width,
                 query,
-                engine.as_mut(),
-            )
+                engine_borrow.as_deref_mut(),
+            );
+            TaskRow { lines, is_selected }
         })
         .collect()
 }
 
+fn render_items(
+    app: &AppState,
+    visible: &[usize],
+    width: u16,
+    query: Option<&str>,
+    scroll_offset: usize,
+) -> Vec<ListItem<'static>> {
+    let _ = scroll_offset;
+    build_rows(app, visible, width, query)
+        .into_iter()
+        .map(|r| ListItem::new(r.lines))
+        .collect()
+}
+
+/// Render items when a grouping is active. Walks `buckets` in order and
+/// emits one styled header line per bucket plus the task rows that fall
+/// inside the [`scroll`, `end`) viewport window expressed in task indices.
+fn render_grouped_items(
+    app: &AppState,
+    buckets: &[crate::sort::GroupedBucket],
+    width: u16,
+    query: Option<&str>,
+    scroll: usize,
+    end: usize,
+) -> Vec<ListItem<'static>> {
+    let t = &app.theme;
+    let mut items: Vec<ListItem<'static>> = Vec::new();
+    let mut task_pos = 0usize;
+    for bucket in buckets {
+        let bucket_end = task_pos + bucket.indices.len();
+        // Skip buckets entirely above the viewport.
+        if bucket_end <= scroll {
+            task_pos = bucket_end;
+            continue;
+        }
+        // Stop once we are past the viewport.
+        if task_pos >= end {
+            break;
+        }
+        items.push(ListItem::new(group_header_line(&bucket.label, width, t)));
+        let start = task_pos.max(scroll);
+        let stop = bucket_end.min(end);
+        let local_start = start - task_pos;
+        let local_stop = stop - task_pos;
+        let slice = &bucket.indices[local_start..local_stop];
+        let rows = build_rows(app, slice, width, query);
+        for row in rows {
+            items.push(ListItem::new(row.lines));
+        }
+        task_pos = bucket_end;
+    }
+    items
+}
+
+/// `── URGENT ───────────────────────────────` group header.
+fn group_header_line(label: &str, width: u16, t: &Theme) -> Line<'static> {
+    let prefix = "── ";
+    let label_owned = label.to_string();
+    let used = prefix.chars().count() + label_owned.chars().count() + 1;
+    let dashes = (width as usize).saturating_sub(used + 2);
+    Line::from(vec![
+        Span::styled(prefix, Style::default().fg(t.border_inactive)),
+        Span::styled(
+            label_owned,
+            Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(" "),
+        Span::styled("─".repeat(dashes), Style::default().fg(t.border_inactive)),
+    ])
+}
+
 #[allow(clippy::too_many_arguments)]
-fn build_row(
+fn build_row_lines(
     task: &Task,
     is_selected: bool,
     is_last: bool,
@@ -136,7 +300,7 @@ fn build_row(
     width: u16,
     query: Option<&str>,
     engine: Option<&mut crate::search::SearchEngine>,
-) -> ListItem<'static> {
+) -> Vec<Line<'static>> {
     let in_visual = app.ui.selection.contains(&task.id);
     let flashing = app.is_flashing(FlashTarget::Task(task.id));
     let gutter = || -> Span<'static> {
@@ -188,7 +352,7 @@ fn build_row(
         Span::raw("  "),
     ];
     primary.extend(title_spans);
-    if let Some(b) = due_badge::span(task.due_date, t) {
+    if let Some(b) = due_badge::span(task.due_date, app.clock.today(), t) {
         primary.push(Span::raw("   "));
         primary.push(b);
     }
@@ -222,7 +386,7 @@ fn build_row(
         lines.push(Line::from(vec![
             Span::raw(indent),
             Span::styled("↳ ", Style::default().fg(t.fg_muted)),
-            Span::styled(truncate(&st.title, 60), t.muted()),
+            Span::styled(truncate(&st.title, 60).into_owned(), t.muted()),
         ]));
     }
 
@@ -250,7 +414,7 @@ fn build_row(
         ]));
     }
 
-    ListItem::new(lines)
+    lines
 }
 
 fn draw_progress_bar(app: &AppState, f: &mut Frame<'_>, area: Rect, t: &Theme) {
@@ -271,7 +435,10 @@ fn draw_progress_bar(app: &AppState, f: &mut Frame<'_>, area: Rect, t: &Theme) {
     let empty = bar_width.saturating_sub(filled);
     let pct = (ratio * 100.0).round() as u32;
     let mut spans: Vec<Span<'static>> = vec![
-        Span::styled("PROGRESO GENERAL  ", t.muted()),
+        Span::styled(
+            format!("{}  ", tr(app.lang, StringKey::OverallProgress)),
+            t.muted(),
+        ),
         Span::styled("[", Style::default().fg(t.border_inactive)),
         Span::styled(
             "▰".repeat(filled),
@@ -363,12 +530,12 @@ fn sorted_indices(tasks: &[Task], order: SortOrder, base: Vec<usize>) -> Vec<usi
     out
 }
 
-fn truncate(s: &str, max: usize) -> String {
+fn truncate(s: &str, max: usize) -> std::borrow::Cow<'_, str> {
     if s.chars().count() <= max {
-        s.to_string()
+        std::borrow::Cow::Borrowed(s)
     } else {
         let mut out: String = s.chars().take(max - 1).collect();
         out.push('…');
-        out
+        std::borrow::Cow::Owned(out)
     }
 }

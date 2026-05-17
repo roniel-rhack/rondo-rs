@@ -6,7 +6,7 @@
 use color_eyre::eyre::{eyre, Result};
 use rondo_core::domain::task::{NewTask, Status, Task};
 use rondo_core::store::sqlite::SqliteStore;
-use std::io::BufRead;
+use std::io::{BufRead, Read};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -27,6 +27,19 @@ pub enum Command {
     },
     /// Mark a task as done by id
     Done { id: i64 },
+    /// Set or clear a task's due date.
+    ///
+    /// `--clear` removes the date. Otherwise pass a value parseable by the
+    /// quick-add `due:` token (`today`, `tmrw`, `next-week`, ISO `YYYY-MM-DD`).
+    Due {
+        id: i64,
+        /// Date value (alias or `YYYY-MM-DD`). Required unless `--clear`.
+        #[arg(default_value = "")]
+        date: String,
+        /// Clear the due date instead of setting one.
+        #[arg(long)]
+        clear: bool,
+    },
     /// Export tasks as markdown/json/ndjson
     Export {
         /// Format: md|json|ndjson
@@ -140,6 +153,7 @@ pub fn run(cmd: Command, opts: &CliOpts, db_path: &Path) -> Result<()> {
         Command::Add { title } => cli_add(db_path, opts, title),
         Command::List { filter } => cli_list(db_path, opts, &filter),
         Command::Done { id } => cli_done(db_path, opts, id),
+        Command::Due { id, date, clear } => cli_due(db_path, opts, id, &date, clear),
         Command::Export { format } => cli_export(db_path, opts, &format),
         Command::Plugins { action } => cli_plugins(opts, action),
         Command::Delete { id } => cli_delete(db_path, opts, id),
@@ -246,6 +260,38 @@ fn cli_done(db_path: &Path, opts: &CliOpts, id: i64) -> Result<()> {
         println!("{}", serde_json::json!({ "id": id, "status": "Done" }));
     } else {
         println!("task {id} done");
+    }
+    Ok(())
+}
+
+fn cli_due(db_path: &Path, opts: &CliOpts, id: i64, date: &str, clear: bool) -> Result<()> {
+    require_write(opts, "due")?;
+    let parsed = if clear {
+        None
+    } else {
+        let s = date.trim();
+        if s.is_empty() {
+            return Err(eyre!("due: pass a date value or --clear"));
+        }
+        match crate::app::parse_due(s) {
+            Some(d) => Some(d),
+            None => return Err(eyre!("due: invalid date '{}'", s)),
+        }
+    };
+    let (store, _guard) = open_rw_store(db_path)?;
+    let patch = rondo_core::domain::task::TaskPatch {
+        due_date: Some(parsed),
+        ..Default::default()
+    };
+    store.update_task(id, patch)?;
+    if opts.json {
+        let s = parsed.map(|d| d.format("%Y-%m-%d").to_string());
+        println!("{}", serde_json::json!({ "id": id, "due_date": s }));
+    } else {
+        match parsed {
+            Some(d) => println!("task {id} due {}", d.format("%Y-%m-%d")),
+            None => println!("task {id} due cleared"),
+        }
     }
     Ok(())
 }
@@ -596,8 +642,12 @@ fn cli_focus(db_path: &Path, opts: &CliOpts, action: FocusAction) -> Result<()> 
 fn cli_focus_start(db_path: &Path, opts: &CliOpts) -> Result<()> {
     require_write(opts, "focus start")?;
     let (store, _guard) = open_rw_store(db_path)?;
-    let id =
-        store.start_focus_session(None, rondo_core::domain::focus::SessionKind::Work, 25 * 60)?;
+    let id = store.start_focus_session(
+        None,
+        rondo_core::domain::focus::SessionKind::Work,
+        25 * 60,
+        1,
+    )?;
     if opts.json {
         println!("{}", serde_json::json!({ "session_id": id }));
     } else {
@@ -663,14 +713,62 @@ fn cli_stats(db_path: &Path, opts: &CliOpts) -> Result<()> {
     Ok(())
 }
 
+/// Maximum NDJSON lines processed per `batch` invocation. Bounds work
+/// to a sane amount even if the caller pipes an unbounded stream.
+const MAX_BATCH_LINES: usize = 10_000;
+/// Maximum bytes per NDJSON line. Larger lines are rejected rather than
+/// buffered — guards against runaway producers that omit newlines.
+const MAX_LINE_LEN: usize = 64 * 1024;
+
 fn cli_batch(db_path: &Path, opts: &CliOpts) -> Result<()> {
     require_write(opts, "batch")?;
     let (store, _guard) = open_rw_store(db_path)?;
     let stdin = std::io::stdin();
+    let mut handle = stdin.lock();
     let mut count: usize = 0;
     let mut errors: Vec<String> = Vec::new();
-    for line in stdin.lock().lines() {
-        let line = line?;
+    let mut line_no: usize = 0;
+    loop {
+        if line_no >= MAX_BATCH_LINES {
+            errors.push(format!(
+                "aborted: max {MAX_BATCH_LINES} lines per batch exceeded"
+            ));
+            break;
+        }
+        // Cap each line at MAX_LINE_LEN + 1 so we can detect overflow
+        // without buffering arbitrary input. We read up to the limit and,
+        // if no newline is found in that window, skip ahead to the next
+        // newline and record an error.
+        let mut buf: Vec<u8> = Vec::new();
+        let mut limited = (&mut handle).take((MAX_LINE_LEN + 1) as u64);
+        let read = limited.read_until(b'\n', &mut buf)?;
+        if read == 0 {
+            break;
+        }
+        line_no += 1;
+        let trailing_newline = buf.last() == Some(&b'\n');
+        if buf.len() > MAX_LINE_LEN && !trailing_newline {
+            // Drain to next newline so the next iteration starts fresh.
+            let mut sink: Vec<u8> = Vec::new();
+            let _ = handle.read_until(b'\n', &mut sink);
+            errors.push(format!(
+                "line {line_no}: exceeds max length of {MAX_LINE_LEN} bytes"
+            ));
+            continue;
+        }
+        if trailing_newline {
+            buf.pop();
+            if buf.last() == Some(&b'\r') {
+                buf.pop();
+            }
+        }
+        let line = match String::from_utf8(buf) {
+            Ok(s) => s,
+            Err(e) => {
+                errors.push(format!("line {line_no}: invalid utf-8: {e}"));
+                continue;
+            }
+        };
         if line.trim().is_empty() {
             continue;
         }

@@ -2,8 +2,8 @@
 source: crates/rondo-tui/tests/snapshots.rs
 expression: s
 ---
-" ▌rondo v0.1.0      // S                  ⊙ ONLINE · HH:MM:SS · ◷ 1/2 · P— · ☑3 "
-"┏━ inbox · 3 tareas ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+" ▌rondo v0.1.0      // S                      ⊙ RO · HH:MM:SS · ◷ 1/2 · P— · ☑3 "
+"┏━ inbox · 3 tareas · default (status, priority, due) ━━━━━━━━━━━━━━━━━━━━━━━━━┓"
 "┃     ESTADO  PRI     TAREA                                                    ┃"
 "┃ ▌ ▌ [ ]   ◖URG◗  Refactor pomodoro module   ◖in 1d◗   ⛒ blocked              ┃"
 "┃           #refactor  #work                                                   ┃"
@@ -25,4 +25,4 @@ expression: s
 "┃ PROGRESO GENERAL  [▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱] 25%   1/4     ┃"
 "┃                                                                              ┃"
 "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
-" [NOR]  [a → add] [A → + subtarea] [B → + dep] [v → select] [f<l> → filtro]  · ?"
+" [NOR]  [a → add] [space → status] [v → select] [B → + dep] [: → cmd]  · ? ayuda"

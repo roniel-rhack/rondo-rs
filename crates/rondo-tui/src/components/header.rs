@@ -1,4 +1,6 @@
 use crate::app::AppState;
+use crate::strings::{t as tr, StringKey};
+use chrono::{Local, TimeZone};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
@@ -39,7 +41,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let subtitle = Line::from(vec![
         Span::styled("// ", Style::default().fg(t.border_inactive)),
         Span::styled(
-            "SISTEMA DE GESTIÓN DE TAREAS AVANZADO",
+            tr(app.lang, StringKey::HeaderSubtitle),
             Style::default().fg(t.fg_muted),
         ),
         Span::styled(" //", Style::default().fg(t.border_inactive)),
@@ -57,27 +59,25 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
 fn telemetry(app: &AppState) -> Vec<Span<'static>> {
     let t = &app.theme;
-    let now = crate::clock::now();
-    let time = now.format("%H:%M:%S").to_string();
-    let today = now.date_naive();
-    let due_today = app
-        .data
-        .tasks
-        .iter()
-        .filter(|x| x.due_date == Some(today) && x.status != Status::Done)
-        .count();
-    let done_today = app
-        .data
-        .tasks
-        .iter()
-        .filter(|x| x.status == Status::Done)
-        .count();
-    let total_active = app
-        .data
-        .tasks
-        .iter()
-        .filter(|x| x.status != Status::Done)
-        .count();
+    // `now()` is UTC; rendering uses the local timezone for the wall-clock
+    // strip, while `today()` already lives in the user's local tz.
+    let now_utc = app.clock.now();
+    let now_local = Local.from_utc_datetime(&now_utc.naive_utc());
+    let time = now_local.format("%H:%M:%S").to_string();
+    let today = app.clock.today();
+    let mut due_today = 0usize;
+    let mut done_today = 0usize;
+    let mut total_active = 0usize;
+    for x in &app.data.tasks {
+        if x.status == Status::Done {
+            done_today += 1;
+        } else {
+            total_active += 1;
+            if x.due_date == Some(today) {
+                due_today += 1;
+            }
+        }
+    }
     let pomodoro = if app.modals.pomodoro_open {
         "⏵ P1"
     } else {
@@ -85,11 +85,16 @@ fn telemetry(app: &AppState) -> Vec<Span<'static>> {
     };
     let sep = || Span::styled(" · ", Style::default().fg(t.border_inactive));
 
+    let (rw_label, rw_color) = if app.writable {
+        ("RW", t.success)
+    } else {
+        ("RO", t.warn)
+    };
     vec![
-        Span::styled("⊙ ", Style::default().fg(t.success)),
+        Span::styled("⊙ ", Style::default().fg(rw_color)),
         Span::styled(
-            "ONLINE",
-            Style::default().fg(t.success).add_modifier(Modifier::BOLD),
+            rw_label,
+            Style::default().fg(rw_color).add_modifier(Modifier::BOLD),
         ),
         sep(),
         Span::styled(time, Style::default().fg(t.fg).add_modifier(Modifier::BOLD)),

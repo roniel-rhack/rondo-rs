@@ -34,6 +34,29 @@ INSTA_UPDATE=always cargo test -p rondo-tui --test snapshots
 cargo insta review
 ```
 
+Benchmarks (criterion, in `crates/rondo-core/benches/store.rs` and
+`crates/rondo-tui/benches/render.rs`):
+
+```bash
+# Full statistical run (~30–60s per group).
+cargo bench --workspace
+
+# Smoke run (fewer samples, ~seconds total) — use in CI / pre-commit.
+cargo bench --workspace -- --quick
+
+# Single crate.
+cargo bench -p rondo-core
+cargo bench -p rondo-tui
+```
+
+Fuzz tests use `proptest` and live in `crates/rondo-core/tests/fuzz_parse_dt.rs`
+and `crates/rondo-tui/tests/fuzz_parse_quick_add.rs`. Run with the rest of
+the test suite:
+
+```bash
+cargo test --workspace
+```
+
 Run against a custom DB without touching the default location:
 
 ```bash

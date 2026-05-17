@@ -6,9 +6,11 @@ use ratatui::{
 };
 
 /// Pill-shaped due badge: `◖overdue◗`, `◖today◗`, or near-future muted hint.
-pub fn span(due: Option<NaiveDate>, theme: &Theme) -> Option<Span<'static>> {
+///
+/// `today` is injected from the caller so deterministic tests can pin the
+/// rendered text without consulting wall-clock state.
+pub fn span(due: Option<NaiveDate>, today: NaiveDate, theme: &Theme) -> Option<Span<'static>> {
     let due = due?;
-    let today = crate::clock::today();
     let delta = (due - today).num_days();
     if delta < 0 {
         return Some(Span::styled(

@@ -1,9 +1,12 @@
 use crate::plugin::{Plugin, PluginManifest};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 #[derive(Default)]
 pub struct PluginRegistry {
-    plugins: HashMap<String, Box<dyn Plugin>>,
+    // BTreeMap keeps iteration order deterministic by plugin id — required
+    // for snapshot tests of the plugins overlay and for stable output of
+    // `plugins list` in the CLI.
+    plugins: BTreeMap<String, Box<dyn Plugin>>,
 }
 
 impl PluginRegistry {

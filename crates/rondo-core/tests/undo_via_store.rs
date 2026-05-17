@@ -108,3 +108,315 @@ fn add_tag_undo_via_remove() {
     store.remove_tag(t.id, new_tag).unwrap();
     assert_eq!(store.task_by_id(t.id).unwrap().tags, before_tags);
 }
+
+#[test]
+fn add_dependency_cycle_reports_endpoints() {
+    let (_f, store) = fixture();
+    let mut tasks = store.list_tasks().unwrap().into_iter();
+    let a = tasks.next().unwrap();
+    let b = tasks.next().unwrap();
+    // a is blocked by b; trying to make b blocked by a forms the cycle.
+    store.add_dependency(a.id, b.id).unwrap();
+    let err = store
+        .add_dependency(b.id, a.id)
+        .expect_err("should refuse cycle");
+    match err {
+        rondo_core::error::Error::CycleDetected(x, y) => {
+            assert_eq!(x, b.id);
+            assert_eq!(y, a.id);
+        }
+        other => panic!("expected CycleDetected, got {other:?}"),
+    }
+}
+
+// ----- A4: per-kind round-trips for the new payload-bearing UndoKinds ----
+
+#[test]
+fn add_dep_undo_via_remove() {
+    let (_f, store) = fixture();
+    let mut tasks = store.list_tasks().unwrap().into_iter();
+    let a = tasks.next().unwrap();
+    let b = tasks.next().unwrap();
+    store.add_dependency(a.id, b.id).unwrap();
+    let after = store.task_by_id(a.id).unwrap();
+    assert!(after.blocked_by_ids.contains(&b.id));
+    store.remove_dependency(a.id, b.id).unwrap();
+    let after2 = store.task_by_id(a.id).unwrap();
+    assert!(!after2.blocked_by_ids.contains(&b.id));
+}
+
+#[test]
+fn remove_dep_undo_via_add() {
+    let (_f, store) = fixture();
+    let mut tasks = store.list_tasks().unwrap().into_iter();
+    let a = tasks.next().unwrap();
+    let b = tasks.next().unwrap();
+    store.add_dependency(a.id, b.id).unwrap();
+    store.remove_dependency(a.id, b.id).unwrap();
+    store.add_dependency(a.id, b.id).unwrap();
+    assert!(store
+        .task_by_id(a.id)
+        .unwrap()
+        .blocked_by_ids
+        .contains(&b.id));
+}
+
+#[test]
+fn delete_subtask_undo_via_restore() {
+    let (_f, store) = fixture();
+    let t = store.list_tasks().unwrap().into_iter().next().unwrap();
+    let (sid, _) = store.add_subtask(t.id, "victim").unwrap();
+    let sub = store
+        .task_by_id(t.id)
+        .unwrap()
+        .subtasks
+        .iter()
+        .find(|s| s.id == sid)
+        .unwrap()
+        .clone();
+    store.delete_subtask(sid).unwrap();
+    assert!(!store
+        .task_by_id(t.id)
+        .unwrap()
+        .subtasks
+        .iter()
+        .any(|s| s.id == sid));
+    store.restore_subtask(&sub).unwrap();
+    let restored = store
+        .task_by_id(t.id)
+        .unwrap()
+        .subtasks
+        .into_iter()
+        .find(|s| s.id == sid)
+        .unwrap();
+    assert_eq!(restored.title, "victim");
+    assert_eq!(restored.id, sid);
+}
+
+#[test]
+fn explicit_subtask_toggle_undo() {
+    let (_f, store) = fixture();
+    let t = store.list_tasks().unwrap().into_iter().next().unwrap();
+    let (sid, _) = store.add_subtask(t.id, "togglee").unwrap();
+    let before = store
+        .task_by_id(t.id)
+        .unwrap()
+        .subtasks
+        .iter()
+        .find(|s| s.id == sid)
+        .unwrap()
+        .completed;
+    store.toggle_subtask(sid).unwrap();
+    store.set_subtask_completed(sid, before).unwrap();
+    let after = store
+        .task_by_id(t.id)
+        .unwrap()
+        .subtasks
+        .iter()
+        .find(|s| s.id == sid)
+        .unwrap()
+        .completed;
+    assert_eq!(after, before);
+}
+
+#[test]
+fn add_note_undo_via_delete() {
+    let (_f, store) = fixture();
+    let t = store.list_tasks().unwrap().into_iter().next().unwrap();
+    let nid = store.add_task_note(t.id, "ephemeral note").unwrap();
+    assert!(store
+        .task_by_id(t.id)
+        .unwrap()
+        .notes
+        .iter()
+        .any(|n| n.id == nid));
+    store.delete_task_note(nid).unwrap();
+    assert!(!store
+        .task_by_id(t.id)
+        .unwrap()
+        .notes
+        .iter()
+        .any(|n| n.id == nid));
+}
+
+#[test]
+fn update_note_undo_restores_body() {
+    let (_f, store) = fixture();
+    let t = store.list_tasks().unwrap().into_iter().next().unwrap();
+    let nid = store.add_task_note(t.id, "original").unwrap();
+    store.update_task_note(nid, "changed").unwrap();
+    store.update_task_note(nid, "original").unwrap();
+    let body = store
+        .task_by_id(t.id)
+        .unwrap()
+        .notes
+        .into_iter()
+        .find(|n| n.id == nid)
+        .unwrap()
+        .body;
+    assert_eq!(body, "original");
+}
+
+#[test]
+fn delete_note_undo_via_restore() {
+    let (_f, store) = fixture();
+    let t = store.list_tasks().unwrap().into_iter().next().unwrap();
+    let nid = store.add_task_note(t.id, "saved note").unwrap();
+    let captured = store
+        .task_by_id(t.id)
+        .unwrap()
+        .notes
+        .into_iter()
+        .find(|n| n.id == nid)
+        .unwrap();
+    store.delete_task_note(nid).unwrap();
+    store.restore_task_note(&captured).unwrap();
+    let restored = store
+        .task_by_id(t.id)
+        .unwrap()
+        .notes
+        .into_iter()
+        .find(|n| n.id == nid)
+        .unwrap();
+    assert_eq!(restored.body, "saved note");
+    assert_eq!(restored.id, nid);
+}
+
+#[test]
+fn journal_delete_entry_undo_via_restore() {
+    let (_f, store) = fixture();
+    let note = store.create_or_get_today_note().unwrap();
+    let eid = store.add_journal_entry(note.id, "diary line").unwrap();
+    let captured = store
+        .entries_for_note(note.id)
+        .unwrap()
+        .into_iter()
+        .find(|e| e.id == eid)
+        .unwrap();
+    store.delete_entry(eid).unwrap();
+    store.restore_journal_entry(&captured).unwrap();
+    let entries = store.entries_for_note(note.id).unwrap();
+    assert!(entries
+        .iter()
+        .any(|e| e.id == eid && e.body == "diary line"));
+}
+
+#[test]
+fn journal_delete_day_undo_via_restore() {
+    let (_f, store) = fixture();
+    let note = store.create_or_get_today_note().unwrap();
+    store.add_journal_entry(note.id, "line 1").unwrap();
+    store.add_journal_entry(note.id, "line 2").unwrap();
+    let entries = store.entries_for_note(note.id).unwrap();
+    let total_before = entries.len();
+    store.delete_note(note.id).unwrap();
+    store.restore_journal_day(&note, &entries).unwrap();
+    let restored = store.entries_for_note(note.id).unwrap();
+    assert_eq!(restored.len(), total_before);
+    assert!(restored.iter().any(|e| e.body == "line 1"));
+    assert!(restored.iter().any(|e| e.body == "line 2"));
+}
+
+#[test]
+fn remove_tag_undo_via_add() {
+    let (_f, store) = fixture();
+    let t = store.list_tasks().unwrap().into_iter().next().unwrap();
+    store.add_tag(t.id, "scratch").unwrap();
+    assert!(store
+        .task_by_id(t.id)
+        .unwrap()
+        .tags
+        .iter()
+        .any(|tag| tag == "scratch"));
+    store.remove_tag(t.id, "scratch").unwrap();
+    assert!(!store
+        .task_by_id(t.id)
+        .unwrap()
+        .tags
+        .iter()
+        .any(|tag| tag == "scratch"));
+    // Undo a `RemoveTag` re-adds the same tag (UndoKind::RemoveTag inverse).
+    store.add_tag(t.id, "scratch").unwrap();
+    assert!(store
+        .task_by_id(t.id)
+        .unwrap()
+        .tags
+        .iter()
+        .any(|tag| tag == "scratch"));
+}
+
+#[test]
+fn legacy_toggle_subtask_undo_via_toggle() {
+    // Legacy `UndoKind::ToggleSubtask` path: store.toggle_subtask flips
+    // the completion bit and returns a snapshot whose `kind` carries the
+    // legacy variant. Undoing it means calling toggle again, which
+    // restores the original state.
+    let (_f, store) = fixture();
+    let t = store.list_tasks().unwrap().into_iter().next().unwrap();
+    let (sid, _) = store.add_subtask(t.id, "legacy-flip").unwrap();
+    let before = store
+        .task_by_id(t.id)
+        .unwrap()
+        .subtasks
+        .iter()
+        .find(|s| s.id == sid)
+        .unwrap()
+        .completed;
+    let (new_state, snap) = store.toggle_subtask(sid).unwrap();
+    assert_eq!(new_state, !before);
+    assert!(matches!(
+        snap.kind,
+        rondo_core::domain::task::UndoKind::ToggleSubtask
+    ));
+    // Apply the inverse via a second toggle.
+    store.toggle_subtask(sid).unwrap();
+    let after = store
+        .task_by_id(t.id)
+        .unwrap()
+        .subtasks
+        .iter()
+        .find(|s| s.id == sid)
+        .unwrap()
+        .completed;
+    assert_eq!(after, before);
+}
+
+#[test]
+fn delete_task_undo_restores_subtree() {
+    let (_f, store) = fixture();
+    let (id, _) = store.create_task(NewTask::quick("parent")).unwrap();
+    let (sub_id, _) = store.add_subtask(id, "child 1").unwrap();
+    let (sub_id_2, _) = store.add_subtask(id, "child 2").unwrap();
+    store.toggle_subtask(sub_id_2).unwrap();
+    let note_id = store.add_task_note(id, "note body").unwrap();
+    store.add_tag(id, "alpha").unwrap();
+    store.add_tag(id, "beta").unwrap();
+    let (blocker_id, _) = store.create_task(NewTask::quick("blocker")).unwrap();
+    store.add_dependency(id, blocker_id).unwrap();
+
+    let before = store.task_by_id(id).unwrap();
+    let snap = store.delete_task(id).unwrap();
+    assert!(store.task_by_id(id).is_err());
+
+    let restored = snap.task_before.as_ref().expect("snapshot has task");
+    store.restore_task(restored).unwrap();
+
+    let after = store.task_by_id(id).unwrap();
+    assert_eq!(after.id, before.id);
+    assert_eq!(after.title, "parent");
+    assert!(after
+        .subtasks
+        .iter()
+        .any(|s| s.id == sub_id && s.title == "child 1"));
+    assert!(after
+        .subtasks
+        .iter()
+        .any(|s| s.id == sub_id_2 && s.completed));
+    assert!(after
+        .notes
+        .iter()
+        .any(|n| n.id == note_id && n.body == "note body"));
+    assert!(after.tags.iter().any(|t| t == "alpha"));
+    assert!(after.tags.iter().any(|t| t == "beta"));
+    assert!(after.blocked_by_ids.contains(&blocker_id));
+}

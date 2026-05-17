@@ -25,6 +25,9 @@ struct Cli {
     /// Open the DB read-only (disables CRUD; default is read-write).
     #[arg(long, global = true)]
     read_only: bool,
+    /// Override theme: dark|light|high-contrast (or `hc`).
+    #[arg(long, global = true)]
+    theme: Option<String>,
     /// Emit JSON to stdout where applicable (CLI subcommands only)
     #[arg(long, global = true)]
     json: bool,
@@ -41,7 +44,18 @@ fn main() -> Result<()> {
     let cli_args = Cli::parse();
     let db_path = cli_args.db.clone().unwrap_or_else(default_db_path);
     let writable = !cli_args.read_only;
-    if writable {
+    // `completion` is a pure stdout emitter — it must not open or seed the
+    // DB. Handle it before `ensure_seeded` so a stale-but-present DB on
+    // CI runners can't fail shell-completion generation.
+    if let Some(cli::Command::Completion { shell }) = cli_args.command {
+        let mut command = Cli::command();
+        cli::emit_completion(shell, &mut command);
+        return Ok(());
+    }
+    // Seed only when the chosen command actually needs the DB. Skips
+    // `plugins …`, which is also DB-free.
+    let needs_db = cli_args.command.as_ref().map(cli::needs_db).unwrap_or(true);
+    if writable && needs_db {
         match rondo_core::store::seed::ensure_seeded(&db_path) {
             Ok(true) => tracing::info!("seeded new DB at {}", db_path.display()),
             Ok(false) => {}
@@ -52,11 +66,6 @@ fn main() -> Result<()> {
         }
     }
     if let Some(cmd) = cli_args.command {
-        if let cli::Command::Completion { shell } = cmd {
-            let mut command = Cli::command();
-            cli::emit_completion(shell, &mut command);
-            return Ok(());
-        }
         if cli::needs_db(&cmd) && !db_path.exists() {
             eprintln!(
                 "DB no encontrado en {}. Usa --db o setea RONDO_DB.",
@@ -118,12 +127,15 @@ fn main() -> Result<()> {
     };
     let no_color_active = a11y::no_color() || cli_args.no_color;
     let reduced = a11y::reduced_motion(cli_args.reduced_motion);
+    let cfg = rondo_core::config::Config::from_env_or_default();
     let mut app = AppState::with_writable(store, writable)?;
+    let theme_name = cli_args.theme.as_deref().unwrap_or(cfg.ui.theme.as_str());
     app.theme = if no_color_active {
         Theme::no_color()
     } else {
-        Theme::dark()
+        Theme::by_name(theme_name)
     };
+    app.lang = cfg.lang.name;
     app.fx = FxManager::new_with_options(reduced);
     register_builtin_plugins(&mut app);
     load_external_plugins(&mut app);

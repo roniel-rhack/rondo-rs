@@ -56,6 +56,10 @@ pub enum Action {
     EnterVisual,
     BulkDone,
     BulkPriority,
+    BulkDelete,
+    BulkSetStatus(rondo_core::domain::task::Status),
+    BulkSetDueDate(Option<chrono::NaiveDate>),
+    BulkAddTag(String),
     OpenQuickAdd,
     QuickAddUpdate(String),
     SubmitQuickAdd(String),
@@ -100,6 +104,10 @@ pub enum Action {
     SubmitRemoveDependency(String),
     ToggleDepOverlayMode,
     CancelDepOverlay,
+    DepPickerNext,
+    DepPickerPrev,
+    /// Submit the highlighted picker candidate (Enter in Add mode).
+    SubmitDepPickerHighlighted,
 
     PluginKeyPress(String),
     /// Bracketed-paste payload from the terminal. Routed by the app
@@ -123,6 +131,17 @@ pub enum Action {
     NoteEditorKey(crossterm::event::KeyEvent),
     SubmitNote,
     CancelNote,
+
+    RequestEditRecurrence,
+    SubmitRecurrence(rondo_core::domain::task::RecurFreq, i64),
+    CancelEditRecurrence,
+
+    RequestEditDueDate,
+    EditDueDateInput(String),
+    /// `None` clears the date; `Some(date)` sets it. Empty string in
+    /// custom-input mode falls through to a no-op + toast.
+    SubmitDueDate(Option<chrono::NaiveDate>),
+    CancelEditDueDate,
 
     Undo,
 

@@ -1,7 +1,9 @@
 use crate::app::{AppState, FlashTarget};
 use crate::focus::{DetailSection, Pane};
 use crate::theme::Theme;
-use crate::widgets::{bracket_panel::BracketPanel, due_badge, markdown, priority_badge, sparkline};
+use crate::widgets::{
+    bracket_panel::BracketPanel, due_badge, empty, markdown, priority_badge, sparkline,
+};
 use chrono::Local;
 use ratatui::{
     layout::Rect,
@@ -64,7 +66,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     push_meta(&mut lines, "creada", created_line(task, t), t);
     if let Some(due) = task.due_date {
         let mut spans: Vec<Span<'static>> = Vec::new();
-        if let Some(b) = due_badge::span(Some(due), t) {
+        if let Some(b) = due_badge::span(Some(due), app.clock.today(), t) {
             spans.push(b);
             spans.push(Span::raw("   "));
         }
@@ -137,12 +139,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
             lines.push(Line::from(spans));
         }
     } else {
-        lines.push(Line::from(vec![
-            Span::raw("    "),
-            Span::styled("(sin descripción)  ", t.muted()),
-            Span::styled("E", t.kbd()),
-            Span::styled(" para añadir", t.muted()),
-        ]));
+        lines.push(empty::line("description", "E", "to add", t));
     }
 
     // ─── SUBTASKS ───────────────────────────────────────────
@@ -164,12 +161,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         t,
     );
     if total == 0 {
-        lines.push(Line::from(vec![
-            Span::raw("  "),
-            Span::styled("(sin subtareas)  ", t.muted()),
-            Span::styled("A", t.kbd()),
-            Span::styled(" para añadir", t.muted()),
-        ]));
+        lines.push(empty::line("subtasks", "A", "to add", t));
     }
     if total > 0 {
         // Mini progress bar
@@ -277,18 +269,16 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         lines.push(Line::from(blocks));
     }
     if !has_deps {
-        lines.push(Line::from(vec![
-            Span::raw("  "),
-            Span::styled("(sin dependencias)  ", t.muted()),
-            Span::styled("B", t.kbd()),
-            Span::styled(" para añadir/quitar", t.muted()),
-        ]));
+        lines.push(empty::line("dependencies", "B", "to add/remove", t));
     }
 
     // ─── TIME LOG ───────────────────────────────────────────
-    if !task.time_logs.is_empty() {
+    lines.push(Line::raw(""));
+    if task.time_logs.is_empty() {
+        section_header(&mut lines, "tiempo", Some("vacía"), false, inner_width, t);
+        lines.push(empty::line("time-log", "p", "to start a pomodoro", t));
+    } else {
         let total_secs: i64 = task.time_logs.iter().map(|tl| tl.duration_secs).sum();
-        lines.push(Line::raw(""));
         section_header(
             &mut lines,
             "tiempo",
@@ -341,12 +331,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         t,
     );
     if task.notes.is_empty() {
-        lines.push(Line::from(vec![
-            Span::raw("  "),
-            Span::styled("(sin notas)  ", t.muted()),
-            Span::styled("a", t.kbd()),
-            Span::styled(" para añadir", t.muted()),
-        ]));
+        lines.push(empty::line("notes", "a", "to add", t));
     }
     if !task.notes.is_empty() {
         let section_active = notes_section_active;

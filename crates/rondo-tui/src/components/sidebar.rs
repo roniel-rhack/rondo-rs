@@ -154,9 +154,5 @@ fn row(
 }
 
 fn count_for(app: &AppState, filter: Filter) -> usize {
-    app.data
-        .filter_counts
-        .get(&filter)
-        .copied()
-        .unwrap_or(0)
+    app.data.filter_counts.get(&filter).copied().unwrap_or(0)
 }

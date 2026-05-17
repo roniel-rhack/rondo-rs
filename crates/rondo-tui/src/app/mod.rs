@@ -121,8 +121,7 @@ impl AppState {
     /// selection by id when possible. Sync's `data.selected_task` back
     /// to whatever row currently holds `ui.selected_task_id`.
     pub fn refresh_tasks(&mut self) {
-        self.data
-            .refresh_tasks_keeping_id(self.ui.selected_task_id);
+        self.data.refresh_tasks_keeping_id(self.ui.selected_task_id);
         if let Some(t) = self.data.tasks.get(self.data.selected_task) {
             self.ui.selected_task_id = Some(t.id);
         } else {

@@ -123,10 +123,7 @@ fn main() -> Result<()> {
     let reduced = a11y::reduced_motion(cli_args.reduced_motion);
     let cfg = rondo_core::config::Config::from_env_or_default();
     let mut app = AppState::with_writable(store, writable)?;
-    let theme_name = cli_args
-        .theme
-        .as_deref()
-        .unwrap_or(cfg.ui.theme.as_str());
+    let theme_name = cli_args.theme.as_deref().unwrap_or(cfg.ui.theme.as_str());
     app.theme = if no_color_active {
         Theme::no_color()
     } else {

@@ -2,7 +2,6 @@ use crate::app::ui_state::SortOrder;
 use crate::app::{AppState, FlashTarget};
 use crate::strings::{t as tr, StringKey};
 use crate::theme::Theme;
-use rondo_core::config::Lang;
 use crate::widgets::{
     bracket_panel::BracketPanel, due_badge, priority_badge, priority_spine, ring,
 };
@@ -13,6 +12,7 @@ use ratatui::{
     widgets::{List, ListItem, Paragraph, Widget},
     Frame,
 };
+use rondo_core::config::Lang;
 use rondo_core::domain::task::{Status, Task};
 
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
@@ -102,13 +102,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let end = (scroll + area_height.max(1)).min(visible.len());
     let slice = &visible[scroll..end];
 
-    let items = render_items(
-        app,
-        slice,
-        layout[1].width,
-        search_query.as_deref(),
-        scroll,
-    );
+    let items = render_items(app, slice, layout[1].width, search_query.as_deref(), scroll);
     // No REVERSED highlight — bg changes are theme-fragile. The accent ▌ gutter
     // already marks the cursor row. Use a slice-local ListState so ratatui's
     // own offset math doesn't compound with our pre-slicing.

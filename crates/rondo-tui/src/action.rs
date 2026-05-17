@@ -97,6 +97,24 @@ pub enum Action {
 
     PluginKeyPress(String),
 
+    RequestEditDescription,
+    DescriptionEditorKey(crossterm::event::KeyEvent),
+    SubmitEditDescription,
+    CancelEditDescription,
+
+    RequestEditFocusedSubtask,
+    EditSubtaskInput(String),
+    SubmitEditSubtask(String),
+    CancelEditSubtask,
+    RequestDeleteFocusedSubtask,
+
+    RequestAddNote,
+    RequestEditFocusedNote,
+    RequestDeleteFocusedNote,
+    NoteEditorKey(crossterm::event::KeyEvent),
+    SubmitNote,
+    CancelNote,
+
     Undo,
 
     Error(String),

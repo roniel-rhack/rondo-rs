@@ -78,6 +78,42 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
         let h = area.height.saturating_sub(4);
         components::plugin_page::draw(app, f, centered(w, h, area));
     }
+    if app.modals.description_editor_open {
+        let w = (area.width.saturating_sub(8)).min(110);
+        let h = area.height.saturating_sub(4);
+        components::multiline_editor::draw(
+            app,
+            f,
+            centered(w, h, area),
+            components::multiline_editor::TextAreaAccess::Description,
+            components::multiline_editor::Config {
+                title: " ✎ edit description ",
+                hint_extra: Some("# **md** _it_  soportado"),
+            },
+        );
+    }
+    if app.modals.note_editor_open {
+        let w = (area.width.saturating_sub(8)).min(110);
+        let h = area.height.saturating_sub(4);
+        let title = if app.modals.note_editing_id.is_some() {
+            " ✎ edit note "
+        } else {
+            " + note "
+        };
+        components::multiline_editor::draw(
+            app,
+            f,
+            centered(w, h, area),
+            components::multiline_editor::TextAreaAccess::Note,
+            components::multiline_editor::Config {
+                title,
+                hint_extra: Some("# **md** _it_  soportado"),
+            },
+        );
+    }
+    if app.modals.edit_subtask_open {
+        components::edit_subtask::draw(app, f, centered(70, 6, area));
+    }
 
     // Run live effects after all widgets have painted; effects mutate cells in
     // place to produce fades/sweeps/dissolves.

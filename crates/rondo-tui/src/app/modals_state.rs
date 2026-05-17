@@ -46,6 +46,18 @@ pub struct ModalsState {
     /// If `Some(id)`, render the named plugin's last `Show` response
     /// full-screen as a page overlay. Set via `:<plugin>` commands.
     pub plugin_page: Option<String>,
+    pub description_editor_open: bool,
+    pub description_textarea: tui_textarea::TextArea<'static>,
+    pub description_task_id: Option<i64>,
+    pub edit_subtask_open: bool,
+    pub edit_subtask_buf: String,
+    pub edit_subtask_id: Option<i64>,
+    pub note_editor_open: bool,
+    pub note_textarea: tui_textarea::TextArea<'static>,
+    /// `Some(id)` = editing an existing note; `None` = adding a new note
+    /// to `note_task_id`.
+    pub note_editing_id: Option<i64>,
+    pub note_task_id: Option<i64>,
 }
 
 impl Default for ModalsState {
@@ -79,6 +91,16 @@ impl Default for ModalsState {
             dep_overlay_mode: DepOverlayMode::Add,
             plugins_overlay_open: false,
             plugin_page: None,
+            description_editor_open: false,
+            description_textarea: tui_textarea::TextArea::default(),
+            description_task_id: None,
+            edit_subtask_open: false,
+            edit_subtask_buf: String::new(),
+            edit_subtask_id: None,
+            note_editor_open: false,
+            note_textarea: tui_textarea::TextArea::default(),
+            note_editing_id: None,
+            note_task_id: None,
         }
     }
 }
@@ -100,6 +122,9 @@ impl ModalsState {
             || self.dep_overlay_open
             || self.plugins_overlay_open
             || self.plugin_page.is_some()
+            || self.description_editor_open
+            || self.edit_subtask_open
+            || self.note_editor_open
     }
 
     /// Pure modal mutations that don't need cross-substate access.
@@ -164,6 +189,10 @@ impl ModalsState {
             }
             Action::EditTitleInput(s) => {
                 self.edit_title_buf = s;
+                None
+            }
+            Action::EditSubtaskInput(s) => {
+                self.edit_subtask_buf = s;
                 None
             }
             Action::AddSubtaskInput(s) => {

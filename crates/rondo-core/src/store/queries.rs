@@ -75,6 +75,18 @@ pub const UPDATE_SUBTASK_COMPLETED: &str = "UPDATE subtasks SET completed = ?1 W
 
 pub const DELETE_SUBTASK: &str = "DELETE FROM subtasks WHERE id = ?1";
 
+pub const UPDATE_SUBTASK_TITLE: &str = "UPDATE subtasks SET title = ?1 WHERE id = ?2";
+
+pub const SUBTASK_FULL_LOOKUP: &str =
+    "SELECT task_id, title, completed, position FROM subtasks WHERE id = ?1";
+
+pub const INSERT_TASK_NOTE: &str =
+    "INSERT INTO task_notes (task_id, body, created_at) VALUES (?1, ?2, ?3)";
+
+pub const UPDATE_TASK_NOTE: &str = "UPDATE task_notes SET body = ?1 WHERE id = ?2";
+
+pub const DELETE_TASK_NOTE: &str = "DELETE FROM task_notes WHERE id = ?1";
+
 pub const INSERT_TAG: &str = "INSERT INTO tags (task_id, name) VALUES (?1, ?2)";
 pub const DELETE_TAG: &str = "DELETE FROM tags WHERE task_id = ?1 AND name = ?2";
 

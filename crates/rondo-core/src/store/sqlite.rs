@@ -211,6 +211,34 @@ impl SqliteStore {
         Ok(())
     }
 
+    pub fn update_subtask_title(&self, id: i64, title: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(super::queries::UPDATE_SUBTASK_TITLE, params![title, id])?;
+        Ok(())
+    }
+
+    pub fn add_task_note(&self, task_id: i64, body: &str) -> Result<i64> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().to_rfc3339();
+        conn.execute(
+            super::queries::INSERT_TASK_NOTE,
+            params![task_id, body, &now],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    pub fn update_task_note(&self, id: i64, body: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(super::queries::UPDATE_TASK_NOTE, params![body, id])?;
+        Ok(())
+    }
+
+    pub fn delete_task_note(&self, id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(super::queries::DELETE_TASK_NOTE, params![id])?;
+        Ok(())
+    }
+
     pub fn toggle_subtask(&self, id: i64) -> Result<(bool, UndoSnapshot)> {
         let task_id: i64;
         let new_completed: i64;

@@ -39,6 +39,15 @@ pub fn map(ev: Event, app: &AppState) -> Option<Action> {
     if app.modals.plugin_page.is_some() {
         return plugin_page_key(ev);
     }
+    if app.modals.description_editor_open {
+        return description_editor_key(ev);
+    }
+    if app.modals.edit_subtask_open {
+        return edit_subtask_key(ev, app);
+    }
+    if app.modals.note_editor_open {
+        return note_editor_key(ev);
+    }
     if app.ui.leader_goto {
         if let Event::Key(k) = ev {
             if let KeyCode::Char(c) = k.code {
@@ -231,6 +240,57 @@ fn quick_actions_key(ev: Event, _app: &AppState) -> Option<Action> {
     Some(action)
 }
 
+fn description_editor_key(ev: Event) -> Option<Action> {
+    let Event::Key(k) = ev else {
+        return None;
+    };
+    let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
+    match k.code {
+        KeyCode::Esc => return Some(Action::CancelEditDescription),
+        KeyCode::Char('s') if ctrl => return Some(Action::SubmitEditDescription),
+        _ => {}
+    }
+    Some(Action::DescriptionEditorKey(k))
+}
+
+fn edit_subtask_key(ev: Event, app: &AppState) -> Option<Action> {
+    let Event::Key(k) = ev else {
+        return None;
+    };
+    let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
+    Some(match k.code {
+        KeyCode::Esc => Action::CancelEditSubtask,
+        KeyCode::Enter => Action::SubmitEditSubtask(app.modals.edit_subtask_buf.clone()),
+        KeyCode::Char('s') if ctrl => {
+            Action::SubmitEditSubtask(app.modals.edit_subtask_buf.clone())
+        }
+        KeyCode::Backspace => Action::EditSubtaskInput({
+            let mut s = app.modals.edit_subtask_buf.clone();
+            s.pop();
+            s
+        }),
+        KeyCode::Char(c) => Action::EditSubtaskInput({
+            let mut s = app.modals.edit_subtask_buf.clone();
+            s.push(c);
+            s
+        }),
+        _ => return None,
+    })
+}
+
+fn note_editor_key(ev: Event) -> Option<Action> {
+    let Event::Key(k) = ev else {
+        return None;
+    };
+    let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
+    match k.code {
+        KeyCode::Esc => return Some(Action::CancelNote),
+        KeyCode::Char('s') if ctrl => return Some(Action::SubmitNote),
+        _ => {}
+    }
+    Some(Action::NoteEditorKey(k))
+}
+
 fn plugin_page_key(ev: Event) -> Option<Action> {
     let Event::Key(k) = ev else {
         return None;
@@ -322,10 +382,20 @@ fn quick_add_key(ev: Event, app: &AppState) -> Option<Action> {
 }
 
 fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
+    use crate::focus::{DetailSection, Pane};
     let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
     let in_visual = app.ui.mode == crate::focus::Mode::Visual;
     let in_sidebar = app.ui.focus.pane == crate::focus::Pane::Sidebar;
     let on_journal = app.ui.page == Page::Journal;
+    let in_detail = app.ui.focus.pane == Pane::Detail;
+    let detail_section = if in_detail {
+        Some(app.ui.focus.section)
+    } else {
+        None
+    };
+    let in_subtasks = detail_section == Some(DetailSection::Subtasks);
+    let in_notes = detail_section == Some(DetailSection::Notes);
+    let in_header = detail_section == Some(DetailSection::Header);
     Some(match k.code {
         KeyCode::Enter if in_sidebar => Action::ApplySidebarSelection,
         KeyCode::Char('q') if !ctrl => Action::Quit,
@@ -351,12 +421,20 @@ fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
         KeyCode::BackTab => Action::PrevSection,
         KeyCode::Char(' ') if !on_journal => Action::ToggleSelected,
         KeyCode::Char('v') if !on_journal => Action::EnterVisual,
+        KeyCode::Char('a') if on_journal => Action::JournalStartEntry,
+        KeyCode::Char('a') if in_notes => Action::RequestAddNote,
         KeyCode::Char('a') if !on_journal => Action::OpenQuickAdd,
         KeyCode::Char('d') if on_journal && !in_visual => Action::JournalDeleteEntry,
         KeyCode::Char('d') if in_visual => Action::BulkDone,
+        KeyCode::Char('d') if in_subtasks => Action::RequestDeleteFocusedSubtask,
+        KeyCode::Char('d') if in_notes => Action::RequestDeleteFocusedNote,
         KeyCode::Char('d') if !in_visual && !in_sidebar => Action::RequestDeleteTask,
         KeyCode::Char('e') if on_journal => Action::JournalEditFocusedEntry,
+        KeyCode::Char('e') if in_subtasks => Action::RequestEditFocusedSubtask,
+        KeyCode::Char('e') if in_notes => Action::RequestEditFocusedNote,
+        KeyCode::Char('e') if in_header => Action::RequestEditTitle,
         KeyCode::Char('e') if !in_sidebar => Action::RequestEditTitle,
+        KeyCode::Char('E') if !on_journal && !in_sidebar => Action::RequestEditDescription,
         KeyCode::Char('P') if in_visual => Action::BulkPriority,
         KeyCode::Char('A') if on_journal => Action::JournalStartEntry,
         KeyCode::Char('A') if !in_visual && !in_sidebar => Action::RequestAddSubtask,

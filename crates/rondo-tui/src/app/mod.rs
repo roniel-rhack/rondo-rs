@@ -538,6 +538,211 @@ impl AppState {
             Action::ToggleDepOverlayMode => {
                 // handled inside ModalsState::update already
             }
+            Action::RequestEditDescription => {
+                if !self.writable {
+                    self.toast("description: read-only (start with --write)");
+                } else if let Some(task) = self.data.selected_task() {
+                    let body = task.description.clone().unwrap_or_default();
+                    self.modals.description_textarea = tui_textarea::TextArea::new(
+                        body.split('\n').map(|s| s.to_string()).collect(),
+                    );
+                    self.modals.description_task_id = Some(task.id);
+                    self.modals.description_editor_open = true;
+                    self.ui.mode = Mode::Insert;
+                }
+            }
+            Action::DescriptionEditorKey(k) => {
+                self.modals
+                    .description_textarea
+                    .input(tui_textarea::Input::from(crossterm::event::Event::Key(k)));
+            }
+            Action::SubmitEditDescription => {
+                let body = self.modals.description_textarea.lines().join("\n");
+                let task_id = self.modals.description_task_id;
+                self.modals.description_editor_open = false;
+                self.modals.description_textarea = tui_textarea::TextArea::default();
+                self.modals.description_task_id = None;
+                self.ui.mode = Mode::Normal;
+                if let Some(id) = task_id {
+                    let patch = rondo_core::domain::task::TaskPatch {
+                        description: Some(if body.is_empty() { None } else { Some(body) }),
+                        ..Default::default()
+                    };
+                    match self.data.store.update_task(id, patch) {
+                        Ok(snap) => {
+                            self.undo.push(snap);
+                            self.data.refresh_tasks();
+                            self.toast("description updated");
+                        }
+                        Err(e) => self.toast(format!("update failed: {}", e)),
+                    }
+                }
+            }
+            Action::CancelEditDescription => {
+                self.modals.description_editor_open = false;
+                self.modals.description_textarea = tui_textarea::TextArea::default();
+                self.modals.description_task_id = None;
+                self.ui.mode = Mode::Normal;
+            }
+
+            Action::RequestEditFocusedSubtask => {
+                if !self.writable {
+                    self.toast("subtask: read-only (start with --write)");
+                } else if let Some(task) = self.data.selected_task() {
+                    if let Some(sub) = task.subtasks.get(self.ui.focus.section_item) {
+                        self.modals.edit_subtask_buf = sub.title.clone();
+                        self.modals.edit_subtask_id = Some(sub.id);
+                        self.modals.edit_subtask_open = true;
+                        self.ui.mode = Mode::Insert;
+                    }
+                }
+            }
+            Action::SubmitEditSubtask(new_title) => {
+                let trimmed = new_title.trim().to_string();
+                let sub_id = self.modals.edit_subtask_id;
+                self.modals.edit_subtask_open = false;
+                self.modals.edit_subtask_buf.clear();
+                self.modals.edit_subtask_id = None;
+                self.ui.mode = Mode::Normal;
+                if !trimmed.is_empty() {
+                    if let Some(id) = sub_id {
+                        match self.data.store.update_subtask_title(id, &trimmed) {
+                            Ok(_) => {
+                                self.data.refresh_tasks();
+                                self.toast("subtask renamed");
+                            }
+                            Err(e) => self.toast(format!("rename failed: {}", e)),
+                        }
+                    }
+                }
+            }
+            Action::CancelEditSubtask => {
+                self.modals.edit_subtask_open = false;
+                self.modals.edit_subtask_buf.clear();
+                self.modals.edit_subtask_id = None;
+                self.ui.mode = Mode::Normal;
+            }
+            Action::RequestDeleteFocusedSubtask => {
+                if !self.writable {
+                    self.toast("subtask: read-only");
+                } else if let Some(task) = self.data.selected_task() {
+                    if let Some(sub) = task.subtasks.get(self.ui.focus.section_item) {
+                        let sub_id = sub.id;
+                        match self.data.store.delete_subtask(sub_id) {
+                            Ok(_) => {
+                                self.data.refresh_tasks();
+                                let total = self
+                                    .data
+                                    .selected_task()
+                                    .map(|t| t.subtasks.len())
+                                    .unwrap_or(0);
+                                if self.ui.focus.section_item >= total && total > 0 {
+                                    self.ui.focus.section_item = total - 1;
+                                }
+                                self.toast(format!("deleted subtask #{}", sub_id));
+                            }
+                            Err(e) => self.toast(format!("delete failed: {}", e)),
+                        }
+                    }
+                }
+            }
+
+            Action::RequestAddNote => {
+                if !self.writable {
+                    self.toast("note: read-only");
+                } else if let Some(id) = self.data.selected_task_id() {
+                    self.modals.note_textarea = tui_textarea::TextArea::default();
+                    self.modals.note_editing_id = None;
+                    self.modals.note_task_id = Some(id);
+                    self.modals.note_editor_open = true;
+                    self.ui.mode = Mode::Insert;
+                }
+            }
+            Action::RequestEditFocusedNote => {
+                if !self.writable {
+                    self.toast("note: read-only");
+                } else if let Some(task) = self.data.selected_task() {
+                    if let Some(note) = task.notes.get(self.ui.focus.section_item) {
+                        self.modals.note_textarea = tui_textarea::TextArea::new(
+                            note.body.split('\n').map(|s| s.to_string()).collect(),
+                        );
+                        self.modals.note_editing_id = Some(note.id);
+                        self.modals.note_task_id = Some(task.id);
+                        self.modals.note_editor_open = true;
+                        self.ui.mode = Mode::Insert;
+                    }
+                }
+            }
+            Action::RequestDeleteFocusedNote => {
+                if !self.writable {
+                    self.toast("note: read-only");
+                } else if let Some(task) = self.data.selected_task() {
+                    if let Some(note) = task.notes.get(self.ui.focus.section_item) {
+                        let note_id = note.id;
+                        match self.data.store.delete_task_note(note_id) {
+                            Ok(_) => {
+                                self.data.refresh_tasks();
+                                let total = self
+                                    .data
+                                    .selected_task()
+                                    .map(|t| t.notes.len())
+                                    .unwrap_or(0);
+                                if self.ui.focus.section_item >= total && total > 0 {
+                                    self.ui.focus.section_item = total - 1;
+                                }
+                                self.toast(format!("deleted note #{}", note_id));
+                            }
+                            Err(e) => self.toast(format!("delete failed: {}", e)),
+                        }
+                    }
+                }
+            }
+            Action::NoteEditorKey(k) => {
+                self.modals
+                    .note_textarea
+                    .input(tui_textarea::Input::from(crossterm::event::Event::Key(k)));
+            }
+            Action::SubmitNote => {
+                let body = self.modals.note_textarea.lines().join("\n");
+                let editing = self.modals.note_editing_id;
+                let task_id = self.modals.note_task_id;
+                self.modals.note_editor_open = false;
+                self.modals.note_textarea = tui_textarea::TextArea::default();
+                self.modals.note_editing_id = None;
+                self.modals.note_task_id = None;
+                self.ui.mode = Mode::Normal;
+                if body.trim().is_empty() {
+                    return;
+                }
+                let result = match (editing, task_id) {
+                    (Some(id), _) => self
+                        .data
+                        .store
+                        .update_task_note(id, &body)
+                        .map(|_| "note updated".to_string()),
+                    (None, Some(tid)) => self
+                        .data
+                        .store
+                        .add_task_note(tid, &body)
+                        .map(|_| "note added".to_string()),
+                    _ => return,
+                };
+                match result {
+                    Ok(msg) => {
+                        self.data.refresh_tasks();
+                        self.toast(msg);
+                    }
+                    Err(e) => self.toast(format!("note failed: {}", e)),
+                }
+            }
+            Action::CancelNote => {
+                self.modals.note_editor_open = false;
+                self.modals.note_textarea = tui_textarea::TextArea::default();
+                self.modals.note_editing_id = None;
+                self.modals.note_task_id = None;
+                self.ui.mode = Mode::Normal;
+            }
+
             Action::PluginKeyPress(key) => {
                 if let Some(id) = self.modals.plugin_page.clone() {
                     let ctx = rondo_plugin_api::PluginContext::new(&id);
@@ -574,7 +779,23 @@ impl AppState {
                 }
             }
             Action::EscapeContext => {
-                if self.modals.plugin_page.is_some() {
+                if self.modals.description_editor_open {
+                    self.modals.description_editor_open = false;
+                    self.modals.description_textarea = tui_textarea::TextArea::default();
+                    self.modals.description_task_id = None;
+                    self.ui.mode = Mode::Normal;
+                } else if self.modals.edit_subtask_open {
+                    self.modals.edit_subtask_open = false;
+                    self.modals.edit_subtask_buf.clear();
+                    self.modals.edit_subtask_id = None;
+                    self.ui.mode = Mode::Normal;
+                } else if self.modals.note_editor_open {
+                    self.modals.note_editor_open = false;
+                    self.modals.note_textarea = tui_textarea::TextArea::default();
+                    self.modals.note_editing_id = None;
+                    self.modals.note_task_id = None;
+                    self.ui.mode = Mode::Normal;
+                } else if self.modals.plugin_page.is_some() {
                     // Notify plugin its page is hiding.
                     if let Some(id) = self.modals.plugin_page.take() {
                         let ctx = rondo_plugin_api::PluginContext::new(&id);

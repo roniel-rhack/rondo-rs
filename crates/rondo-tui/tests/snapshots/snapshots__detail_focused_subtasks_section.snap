@@ -33,4 +33,4 @@ expression: s
 "│   ○    2  Pendient ││   16   17   18   19   20   21  ││                                  ││         ⌬                │"
 "│   !    0  Vencidas ││                                ││                                  ││                          │"
 "└────────────────────┘└────────────────────────────────┘└──────────────────────────────────┘└──────────────────────────┘"
-" [NOR]  [A → + subtarea] [space → check] [Tab → next sect] [h → list] [f<l> → filtro]  · ? more                         "
+" [NOR]  [A → + subtarea] [e → rename] [d → delete] [space → check] [Tab → next sect]  · ? more                          "

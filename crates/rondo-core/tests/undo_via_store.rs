@@ -316,3 +316,43 @@ fn journal_delete_day_undo_via_restore() {
     assert!(restored.iter().any(|e| e.body == "line 1"));
     assert!(restored.iter().any(|e| e.body == "line 2"));
 }
+
+#[test]
+fn delete_task_undo_restores_subtree() {
+    let (_f, store) = fixture();
+    let (id, _) = store.create_task(NewTask::quick("parent")).unwrap();
+    let (sub_id, _) = store.add_subtask(id, "child 1").unwrap();
+    let (sub_id_2, _) = store.add_subtask(id, "child 2").unwrap();
+    store.toggle_subtask(sub_id_2).unwrap();
+    let note_id = store.add_task_note(id, "note body").unwrap();
+    store.add_tag(id, "alpha").unwrap();
+    store.add_tag(id, "beta").unwrap();
+    let (blocker_id, _) = store.create_task(NewTask::quick("blocker")).unwrap();
+    store.add_dependency(id, blocker_id).unwrap();
+
+    let before = store.task_by_id(id).unwrap();
+    let snap = store.delete_task(id).unwrap();
+    assert!(store.task_by_id(id).is_err());
+
+    let restored = snap.task_before.as_ref().expect("snapshot has task");
+    store.restore_task(restored).unwrap();
+
+    let after = store.task_by_id(id).unwrap();
+    assert_eq!(after.id, before.id);
+    assert_eq!(after.title, "parent");
+    assert!(after
+        .subtasks
+        .iter()
+        .any(|s| s.id == sub_id && s.title == "child 1"));
+    assert!(after
+        .subtasks
+        .iter()
+        .any(|s| s.id == sub_id_2 && s.completed));
+    assert!(after
+        .notes
+        .iter()
+        .any(|n| n.id == note_id && n.body == "note body"));
+    assert!(after.tags.iter().any(|t| t == "alpha"));
+    assert!(after.tags.iter().any(|t| t == "beta"));
+    assert!(after.blocked_by_ids.contains(&blocker_id));
+}

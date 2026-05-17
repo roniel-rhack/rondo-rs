@@ -148,6 +148,19 @@ pub const RESTORE_TASK_NOTE: &str =
 pub const RESTORE_SUBTASK: &str =
     "INSERT OR REPLACE INTO subtasks (id, task_id, title, completed, position) VALUES (?1, ?2, ?3, ?4, ?5)";
 
+/// Re-insert a task row on undo (after a delete), preserving its original id.
+pub const RESTORE_TASK: &str = r#"
+INSERT OR REPLACE INTO tasks
+    (id, title, description, status, priority, due_date, created_at, recur_freq, recur_interval, metadata)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+"#;
+
+/// Re-insert a time log on undo, preserving its original id.
+pub const RESTORE_TIME_LOG: &str = r#"
+INSERT OR REPLACE INTO time_logs (id, task_id, duration, note, logged_at)
+VALUES (?1, ?2, ?3, ?4, ?5)
+"#;
+
 /// Force-set a subtask's completed state to a specific value (for explicit
 /// toggle undo where we know the previous state and don't want diff-based
 /// flipping).

@@ -1,4 +1,5 @@
 pub mod data_state;
+pub mod handlers;
 pub mod modals_state;
 pub mod ui_state;
 pub mod undo;
@@ -118,8 +119,7 @@ impl AppState {
     /// selection by id when possible. Sync's `data.selected_task` back
     /// to whatever row currently holds `ui.selected_task_id`.
     pub fn refresh_tasks(&mut self) {
-        self.data
-            .refresh_tasks_keeping_id(self.ui.selected_task_id);
+        self.data.refresh_tasks_keeping_id(self.ui.selected_task_id);
         if let Some(t) = self.data.tasks.get(self.data.selected_task) {
             self.ui.selected_task_id = Some(t.id);
         } else {
@@ -141,12 +141,28 @@ impl AppState {
         }
 
         // Route to substate handlers first; they own the pure mutations.
+        // `DataState` is a pure read surface for handlers — it has no
+        // `update()`; data mutations always flow through the store via
+        // the extracted handlers below.
         let mut follow_up = self.ui.update(action.clone());
         if follow_up.is_none() {
             follow_up = self.modals.update(action.clone());
         }
-        if follow_up.is_none() {
-            follow_up = self.data.update(action.clone());
+
+        // Extracted domain handlers. Each `handle()` returns true if it
+        // consumed the action; the main match below is skipped in that
+        // case (still running the follow-up tail).
+        if handlers::journal::handle(self, &action)
+            || handlers::pomodoro::handle(self, &action)
+            || handlers::task::handle(self, &action)
+            || handlers::subtask::handle(self, &action)
+            || handlers::dep::handle(self, &action)
+            || handlers::note::handle(self, &action)
+        {
+            if let Some(next) = follow_up.take() {
+                self.update(next);
+            }
+            return;
         }
 
         // Cross-cutting actions handled here (need access to multiple substates,
@@ -292,531 +308,27 @@ impl AppState {
                 }
             }
             Action::OpenQuickAdd => {
-                self.modals.quick_add_open = true;
-                self.modals.quick_add_buf.clear();
+                self.modals.open_quick_add();
                 self.ui.mode = Mode::Insert;
             }
             Action::SubmitQuickAdd(raw) => self.submit_quick_add(raw),
-            Action::TogglePomodoro | Action::OpenPomodoro => {
-                let was_open = self.modals.pomodoro_open;
-                self.modals.pomodoro_open = !was_open || matches!(action, Action::OpenPomodoro);
-                if self.modals.pomodoro_open && self.modals.pomodoro_started.is_none() {
-                    self.modals.pomodoro_started = Some(Instant::now());
-                    self.persist_pomodoro_start();
-                }
-                if !self.modals.pomodoro_open {
-                    self.finalize_pomodoro_close();
-                }
-                if self.modals.pomodoro_open && !was_open && self.ui.last_pomodoro_rect.width > 0 {
-                    let eff = crate::fx::presets::pomodoro_open(self.theme.accent);
-                    self.fx.spawn(
-                        crate::fx::EffectId::PomodoroOpen,
-                        eff,
-                        self.ui.last_pomodoro_rect,
-                    );
-                }
-            }
-            Action::ClosePomodoro => {
-                self.modals.pomodoro_open = false;
-                self.finalize_pomodoro_close();
-            }
+            // TogglePomodoro/OpenPomodoro/ClosePomodoro handled in
+            // `handlers::pomodoro` (dispatched above).
             Action::SubmitCommand(cmd) => self.handle_command(cmd),
-            Action::JournalStartEntry => {
-                if self.ui.page == Page::Journal {
-                    self.modals.journal_editor_open = true;
-                    self.modals.journal_editor_buf.clear();
-                    self.modals.journal_textarea = tui_textarea::TextArea::default();
-                    self.modals.journal_editor_entry_id = None;
-                    self.ui.mode = Mode::Insert;
-                }
-            }
-            Action::JournalEditFocusedEntry => {
-                if self.ui.page == Page::Journal && !self.data.journal_entries.is_empty() {
-                    let idx = self
-                        .data
-                        .selected_journal_entry
-                        .min(self.data.journal_entries.len() - 1);
-                    let entry = &self.data.journal_entries[idx];
-                    self.modals.journal_editor_buf = entry.body.clone();
-                    self.modals.journal_textarea = tui_textarea::TextArea::new(
-                        entry.body.split('\n').map(|s| s.to_string()).collect(),
-                    );
-                    self.modals.journal_editor_entry_id = Some(entry.id);
-                    self.modals.journal_editor_open = true;
-                    self.ui.mode = Mode::Insert;
-                }
-            }
-            Action::JournalEditorKey(k) => {
-                let input = tui_textarea::Input::from(crossterm::event::Event::Key(k));
-                self.modals.journal_textarea.input(input);
-                self.modals.journal_editor_buf = self.modals.journal_textarea.lines().join("\n");
-            }
-            Action::JournalNextEntry => {
-                let n = self.data.journal_entries.len();
-                if n > 0 {
-                    self.data.selected_journal_entry =
-                        (self.data.selected_journal_entry + 1).min(n - 1);
-                }
-            }
-            Action::JournalPrevEntry => {
-                if self.data.selected_journal_entry > 0 {
-                    self.data.selected_journal_entry -= 1;
-                }
-            }
-            Action::JournalSubmitEntry => self.submit_journal_entry(),
-            Action::JournalCancelEntry => {
-                self.modals.journal_editor_open = false;
-                self.modals.journal_editor_buf.clear();
-                self.modals.journal_textarea = tui_textarea::TextArea::default();
-                self.modals.journal_editor_entry_id = None;
-                self.ui.mode = Mode::Normal;
-            }
-            Action::JournalDeleteDay => {
-                self.delete_focused_journal_day();
-            }
-            Action::JournalToggleHidden => {
-                self.data.journal_show_hidden = !self.data.journal_show_hidden;
-                self.data.refresh_journal_notes();
-                let label = if self.data.journal_show_hidden {
-                    "showing hidden"
-                } else {
-                    "hiding hidden"
-                };
-                self.toast(format!("journal: {}", label));
-            }
-            Action::JournalGotoTop => {
-                if self.ui.page == Page::Journal && !self.data.journal_notes.is_empty() {
-                    self.data.selected_journal = 0;
-                    self.data.journal_list_state.select(Some(0));
-                    self.data.reload_journal_entries();
-                }
-            }
-            Action::JournalGotoBottom => {
-                if self.ui.page == Page::Journal && !self.data.journal_notes.is_empty() {
-                    let last = self.data.journal_notes.len() - 1;
-                    self.data.selected_journal = last;
-                    self.data.journal_list_state.select(Some(last));
-                    self.data.reload_journal_entries();
-                }
-            }
-            Action::JournalDeleteEntry => {
-                self.delete_focused_journal_entry();
-            }
-            Action::JournalNextDay => self.move_journal_day(1),
-            Action::JournalPrevDay => self.move_journal_day(-1),
+            // Journal* actions handled in `handlers::journal` (dispatched above).
             Action::SetSortOrder(order) => {
                 self.ui.sort_order = order;
-                self.modals.sort_overlay_open = false;
+                self.modals.close_sort_overlay();
                 self.toast(format!("sort: {}", order.label()));
             }
-            Action::RequestDeleteTask => {
-                if !self.writable {
-                    self.toast(ro_msg("delete"));
-                } else if self.data.selected_task_id().is_some() {
-                    self.modals.confirm_delete_open = true;
-                }
-            }
-            Action::ConfirmDeleteTask => {
-                self.modals.confirm_delete_open = false;
-                if let Some(id) = self.data.selected_task_id() {
-                    match self.data.store.delete_task(id) {
-                        Ok(snap) => {
-                            self.undo.push(snap);
-                            self.refresh_tasks();
-                            self.toast("task deleted");
-                        }
-                        Err(e) => self.toast(format!("delete failed: {}", e)),
-                    }
-                }
-            }
-            Action::CancelDelete => self.modals.confirm_delete_open = false,
-            Action::RequestEditTitle => {
-                if !self.writable {
-                    self.toast(ro_msg("edit"));
-                } else if let Some(t) = self.data.selected_task() {
-                    self.modals.edit_title_buf = t.title.clone();
-                    self.modals.edit_title_open = true;
-                    self.ui.mode = Mode::Insert;
-                }
-            }
-            Action::SubmitEditTitle(new_title) => {
-                let trimmed = new_title.trim().to_string();
-                if !trimmed.is_empty() {
-                    if let Some(id) = self.data.selected_task_id() {
-                        let patch = rondo_core::domain::task::TaskPatch {
-                            title: Some(trimmed),
-                            ..Default::default()
-                        };
-                        match self.data.store.update_task(id, patch) {
-                            Ok(snap) => {
-                                self.undo.push(snap);
-                                self.refresh_tasks();
-                                self.toast("title updated");
-                            }
-                            Err(e) => self.toast(format!("update failed: {}", e)),
-                        }
-                    }
-                }
-                self.modals.edit_title_open = false;
-                self.modals.edit_title_buf.clear();
-                self.ui.mode = Mode::Normal;
-            }
-            Action::CancelEditTitle => {
-                self.modals.edit_title_open = false;
-                self.modals.edit_title_buf.clear();
-                self.ui.mode = Mode::Normal;
-            }
-            Action::RequestAddSubtask => {
-                if !self.writable {
-                    self.toast(ro_msg("subtask"));
-                } else if self.data.selected_task_id().is_some() {
-                    self.modals.add_subtask_buf.clear();
-                    self.modals.add_subtask_open = true;
-                    self.ui.mode = Mode::Insert;
-                }
-            }
-            Action::SubmitAddSubtask(title) => {
-                let trimmed = title.trim().to_string();
-                if !trimmed.is_empty() {
-                    if let Some(task_id) = self.data.selected_task_id() {
-                        match self.data.store.add_subtask(task_id, &trimmed) {
-                            Ok((_id, snap)) => {
-                                self.undo.push(snap);
-                                self.refresh_tasks();
-                                self.toast("subtask added");
-                            }
-                            Err(e) => self.toast(format!("subtask failed: {}", e)),
-                        }
-                    }
-                }
-                self.modals.add_subtask_open = false;
-                self.modals.add_subtask_buf.clear();
-                self.ui.mode = Mode::Normal;
-            }
-            Action::CancelAddSubtask => {
-                self.modals.add_subtask_open = false;
-                self.modals.add_subtask_buf.clear();
-                self.ui.mode = Mode::Normal;
-            }
-            Action::RequestAddDependency => {
-                if !self.writable {
-                    self.toast(ro_msg("dep"));
-                } else if self.data.selected_task_id().is_some() {
-                    self.modals.dep_overlay_buf.clear();
-                    self.modals.dep_overlay_open = true;
-                    self.modals.dep_overlay_mode = crate::app::modals_state::DepOverlayMode::Add;
-                    self.ui.mode = Mode::Insert;
-                }
-            }
-            Action::SubmitAddDependency(buf) => {
-                let parsed = buf.trim().parse::<i64>();
-                match (parsed, self.data.selected_task_id()) {
-                    (Ok(blocker), Some(task_id)) if blocker > 0 && blocker != task_id => {
-                        match self.data.store.add_dependency(task_id, blocker) {
-                            Ok(()) => {
-                                self.undo
-                                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
-                                        rondo_core::domain::task::UndoKind::AddDep {
-                                            task_id,
-                                            blocker_id: blocker,
-                                        },
-                                    ));
-                                self.refresh_tasks();
-                                self.toast(format!("dep added: #{} blocks #{}", blocker, task_id));
-                            }
-                            Err(rondo_core::error::Error::CycleDetected(a, b)) => {
-                                self.toast(format!("can't add: would create cycle #{a} → #{b}"));
-                            }
-                            Err(e) => self.toast(format!("dep add failed: {}", e)),
-                        }
-                    }
-                    (Ok(_), _) => self.toast("dep: invalid id"),
-                    (Err(_), _) => self.toast("dep: enter a numeric task id"),
-                }
-                self.modals.dep_overlay_open = false;
-                self.modals.dep_overlay_buf.clear();
-                self.ui.mode = Mode::Normal;
-            }
-            Action::SubmitRemoveDependency(buf) => {
-                let parsed = buf.trim().parse::<i64>();
-                match (parsed, self.data.selected_task_id()) {
-                    (Ok(blocker), Some(task_id)) => {
-                        match self.data.store.remove_dependency(task_id, blocker) {
-                            Ok(()) => {
-                                self.undo
-                                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
-                                        rondo_core::domain::task::UndoKind::RemoveDep {
-                                            task_id,
-                                            blocker_id: blocker,
-                                        },
-                                    ));
-                                self.refresh_tasks();
-                                self.toast(format!("dep removed: #{}", blocker));
-                            }
-                            Err(e) => self.toast(format!("dep remove failed: {}", e)),
-                        }
-                    }
-                    _ => self.toast("dep: enter a numeric task id"),
-                }
-                self.modals.dep_overlay_open = false;
-                self.modals.dep_overlay_buf.clear();
-                self.ui.mode = Mode::Normal;
-            }
-            Action::CancelDepOverlay => {
-                self.modals.dep_overlay_open = false;
-                self.modals.dep_overlay_buf.clear();
-                self.ui.mode = Mode::Normal;
-            }
-            Action::ToggleDepOverlayMode => {
-                // handled inside ModalsState::update already
-            }
-            Action::RequestEditDescription => {
-                if !self.writable {
-                    self.toast(ro_msg("description"));
-                } else if let Some(task) = self.data.selected_task() {
-                    let body = task.description.clone().unwrap_or_default();
-                    self.modals.description_textarea = tui_textarea::TextArea::new(
-                        body.split('\n').map(|s| s.to_string()).collect(),
-                    );
-                    self.modals.description_task_id = Some(task.id);
-                    self.modals.description_editor_open = true;
-                    self.ui.mode = Mode::Insert;
-                }
-            }
-            Action::DescriptionEditorKey(k) => {
-                self.modals
-                    .description_textarea
-                    .input(tui_textarea::Input::from(crossterm::event::Event::Key(k)));
-            }
-            Action::SubmitEditDescription => {
-                let body = self.modals.description_textarea.lines().join("\n");
-                let task_id = self.modals.description_task_id;
-                self.modals.description_editor_open = false;
-                self.modals.description_textarea = tui_textarea::TextArea::default();
-                self.modals.description_task_id = None;
-                self.ui.mode = Mode::Normal;
-                if let Some(id) = task_id {
-                    let patch = rondo_core::domain::task::TaskPatch {
-                        description: Some(if body.is_empty() { None } else { Some(body) }),
-                        ..Default::default()
-                    };
-                    match self.data.store.update_task(id, patch) {
-                        Ok(snap) => {
-                            self.undo.push(snap);
-                            self.refresh_tasks();
-                            self.toast("description updated");
-                        }
-                        Err(e) => self.toast(format!("update failed: {}", e)),
-                    }
-                }
-            }
-            Action::CancelEditDescription => {
-                self.modals.description_editor_open = false;
-                self.modals.description_textarea = tui_textarea::TextArea::default();
-                self.modals.description_task_id = None;
-                self.ui.mode = Mode::Normal;
-            }
+            // Task delete + edit title handled in `handlers::task`.
+            // Subtask add handled in `handlers::subtask`.
+            // Dependency add/remove/cancel handled in `handlers::dep`.
+            // Edit-description handled in `handlers::task`.
 
-            Action::RequestEditFocusedSubtask => {
-                if !self.writable {
-                    self.toast(ro_msg("subtask"));
-                } else if let Some(task) = self.data.selected_task() {
-                    if let Some(sub) = task.subtasks.get(self.ui.focus.section_item) {
-                        self.modals.edit_subtask_buf = sub.title.clone();
-                        self.modals.edit_subtask_id = Some(sub.id);
-                        self.modals.edit_subtask_open = true;
-                        self.ui.mode = Mode::Insert;
-                    }
-                }
-            }
-            Action::SubmitEditSubtask(new_title) => {
-                let trimmed = new_title.trim().to_string();
-                let sub_id = self.modals.edit_subtask_id;
-                self.modals.edit_subtask_open = false;
-                self.modals.edit_subtask_buf.clear();
-                self.modals.edit_subtask_id = None;
-                self.ui.mode = Mode::Normal;
-                if !trimmed.is_empty() {
-                    if let Some(id) = sub_id {
-                        match self.data.store.update_subtask_title(id, &trimmed) {
-                            Ok(_) => {
-                                self.refresh_tasks();
-                                self.toast("subtask renamed");
-                            }
-                            Err(e) => self.toast(format!("rename failed: {}", e)),
-                        }
-                    }
-                }
-            }
-            Action::CancelEditSubtask => {
-                self.modals.edit_subtask_open = false;
-                self.modals.edit_subtask_buf.clear();
-                self.modals.edit_subtask_id = None;
-                self.ui.mode = Mode::Normal;
-            }
-            Action::RequestDeleteFocusedSubtask => {
-                if !self.writable {
-                    self.toast("subtask: read-only");
-                } else if let Some(task) = self.data.selected_task() {
-                    if let Some(sub) = task.subtasks.get(self.ui.focus.section_item) {
-                        let sub_clone = sub.clone();
-                        let sub_id = sub.id;
-                        let task_id = task.id;
-                        match self.data.store.delete_subtask(sub_id) {
-                            Ok(_) => {
-                                self.undo
-                                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
-                                        rondo_core::domain::task::UndoKind::DeleteSubtask {
-                                            task_id,
-                                            subtask: sub_clone,
-                                        },
-                                    ));
-                                self.refresh_tasks();
-                                let total = self
-                                    .data
-                                    .selected_task()
-                                    .map(|t| t.subtasks.len())
-                                    .unwrap_or(0);
-                                if self.ui.focus.section_item >= total && total > 0 {
-                                    self.ui.focus.section_item = total - 1;
-                                }
-                                self.toast(format!("deleted subtask #{}", sub_id));
-                            }
-                            Err(e) => self.toast(format!("delete failed: {}", e)),
-                        }
-                    }
-                }
-            }
+            // Subtask edit/delete handled in `handlers::subtask`.
 
-            Action::RequestAddNote => {
-                if !self.writable {
-                    self.toast("note: read-only");
-                } else if let Some(id) = self.data.selected_task_id() {
-                    self.modals.note_textarea = tui_textarea::TextArea::default();
-                    self.modals.note_editing_id = None;
-                    self.modals.note_task_id = Some(id);
-                    self.modals.note_editor_open = true;
-                    self.ui.mode = Mode::Insert;
-                }
-            }
-            Action::RequestEditFocusedNote => {
-                if !self.writable {
-                    self.toast("note: read-only");
-                } else if let Some(task) = self.data.selected_task() {
-                    if let Some(note) = task.notes.get(self.ui.focus.section_item) {
-                        self.modals.note_textarea = tui_textarea::TextArea::new(
-                            note.body.split('\n').map(|s| s.to_string()).collect(),
-                        );
-                        self.modals.note_editing_id = Some(note.id);
-                        self.modals.note_task_id = Some(task.id);
-                        self.modals.note_editor_open = true;
-                        self.ui.mode = Mode::Insert;
-                    }
-                }
-            }
-            Action::RequestDeleteFocusedNote => {
-                if !self.writable {
-                    self.toast("note: read-only");
-                } else if let Some(task) = self.data.selected_task() {
-                    if let Some(note) = task.notes.get(self.ui.focus.section_item) {
-                        let note_clone = note.clone();
-                        let task_id = task.id;
-                        let note_id = note.id;
-                        match self.data.store.delete_task_note(note_id) {
-                            Ok(_) => {
-                                self.undo
-                                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
-                                        rondo_core::domain::task::UndoKind::DeleteNote {
-                                            task_id,
-                                            note: note_clone,
-                                        },
-                                    ));
-                                self.refresh_tasks();
-                                let total = self
-                                    .data
-                                    .selected_task()
-                                    .map(|t| t.notes.len())
-                                    .unwrap_or(0);
-                                if self.ui.focus.section_item >= total && total > 0 {
-                                    self.ui.focus.section_item = total - 1;
-                                }
-                                self.toast(format!("deleted note #{}", note_id));
-                            }
-                            Err(e) => self.toast(format!("delete failed: {}", e)),
-                        }
-                    }
-                }
-            }
-            Action::NoteEditorKey(k) => {
-                self.modals
-                    .note_textarea
-                    .input(tui_textarea::Input::from(crossterm::event::Event::Key(k)));
-            }
-            Action::SubmitNote => {
-                let body = self.modals.note_textarea.lines().join("\n");
-                let editing = self.modals.note_editing_id;
-                let task_id = self.modals.note_task_id;
-                self.modals.note_editor_open = false;
-                self.modals.note_textarea = tui_textarea::TextArea::default();
-                self.modals.note_editing_id = None;
-                self.modals.note_task_id = None;
-                self.ui.mode = Mode::Normal;
-                if body.trim().is_empty() {
-                    return;
-                }
-                match (editing, task_id) {
-                    (Some(note_id), Some(tid)) => {
-                        // Capture the before-body so undo can restore exactly
-                        // what was there before this edit.
-                        let before_body = self
-                            .data
-                            .selected_task()
-                            .and_then(|t| t.notes.iter().find(|n| n.id == note_id))
-                            .map(|n| n.body.clone());
-                        match self.data.store.update_task_note(note_id, &body) {
-                            Ok(_) => {
-                                if let Some(before) = before_body {
-                                    self.undo.push(
-                                        rondo_core::domain::task::UndoSnapshot::from_kind(
-                                            rondo_core::domain::task::UndoKind::UpdateNote {
-                                                task_id: tid,
-                                                note_id,
-                                                before,
-                                            },
-                                        ),
-                                    );
-                                }
-                                self.refresh_tasks();
-                                self.toast("note updated");
-                            }
-                            Err(e) => self.toast(format!("note failed: {}", e)),
-                        }
-                    }
-                    (None, Some(tid)) => match self.data.store.add_task_note(tid, &body) {
-                        Ok(note_id) => {
-                            self.undo
-                                .push(rondo_core::domain::task::UndoSnapshot::from_kind(
-                                    rondo_core::domain::task::UndoKind::AddNote {
-                                        task_id: tid,
-                                        note_id,
-                                    },
-                                ));
-                            self.refresh_tasks();
-                            self.toast("note added");
-                        }
-                        Err(e) => self.toast(format!("note failed: {}", e)),
-                    },
-                    _ => {}
-                }
-            }
-            Action::CancelNote => {
-                self.modals.note_editor_open = false;
-                self.modals.note_textarea = tui_textarea::TextArea::default();
-                self.modals.note_editing_id = None;
-                self.modals.note_task_id = None;
-                self.ui.mode = Mode::Normal;
-            }
-
+            // Note add/edit/delete/submit handled in `handlers::note`.
             Action::Paste(text) => {
                 // Multiline textareas accept paste as-is.
                 if self.modals.description_editor_open {
@@ -825,8 +337,6 @@ impl AppState {
                     self.modals.note_textarea.insert_str(&text);
                 } else if self.modals.journal_editor_open {
                     self.modals.journal_textarea.insert_str(&text);
-                    self.modals.journal_editor_buf =
-                        self.modals.journal_textarea.lines().join("\n");
                 } else {
                     // Single-line surfaces: keep the first line only and
                     // strip trailing newlines so the modal doesn't break.
@@ -899,73 +409,52 @@ impl AppState {
                 }
             }
             Action::EscapeContext => {
-                if self.modals.description_editor_open {
-                    self.modals.description_editor_open = false;
-                    self.modals.description_textarea = tui_textarea::TextArea::default();
-                    self.modals.description_task_id = None;
-                    self.ui.mode = Mode::Normal;
-                } else if self.modals.edit_subtask_open {
-                    self.modals.edit_subtask_open = false;
-                    self.modals.edit_subtask_buf.clear();
-                    self.modals.edit_subtask_id = None;
-                    self.ui.mode = Mode::Normal;
-                } else if self.modals.note_editor_open {
-                    self.modals.note_editor_open = false;
-                    self.modals.note_textarea = tui_textarea::TextArea::default();
-                    self.modals.note_editing_id = None;
-                    self.modals.note_task_id = None;
-                    self.ui.mode = Mode::Normal;
-                } else if self.modals.plugin_page.is_some() {
-                    // Notify plugin its page is hiding.
-                    if let Some(id) = self.modals.plugin_page.take() {
-                        let ctx = rondo_plugin_api::PluginContext::new(&id);
-                        if let Some(p) = self.plugins.get_mut(&id) {
-                            let _ = p.handle(rondo_plugin_api::PluginAction::Hide, &ctx);
-                        }
-                    }
-                } else if self.modals.plugins_overlay_open {
-                    self.modals.plugins_overlay_open = false;
-                } else if self.modals.help_open {
-                    self.modals.help_open = false;
-                } else if self.modals.confirm_delete_open {
-                    self.modals.confirm_delete_open = false;
-                } else if self.modals.edit_title_open {
-                    self.modals.edit_title_open = false;
-                    self.modals.edit_title_buf.clear();
-                    self.ui.mode = Mode::Normal;
-                } else if self.modals.add_subtask_open {
-                    self.modals.add_subtask_open = false;
-                    self.modals.add_subtask_buf.clear();
-                    self.ui.mode = Mode::Normal;
-                } else if self.modals.dep_overlay_open {
-                    self.modals.dep_overlay_open = false;
-                    self.modals.dep_overlay_buf.clear();
-                    self.ui.mode = Mode::Normal;
-                } else if self.modals.sort_overlay_open {
-                    self.modals.sort_overlay_open = false;
-                } else if self.modals.quick_actions_open {
-                    self.modals.quick_actions_open = false;
-                } else if self.modals.journal_editor_open {
-                    self.modals.journal_editor_open = false;
-                    self.modals.journal_editor_buf.clear();
-                    self.ui.mode = Mode::Normal;
-                } else if self.modals.quick_add_open {
-                    self.modals.quick_add_open = false;
-                    self.modals.quick_add_buf.clear();
-                    self.ui.mode = Mode::Normal;
-                } else if self.modals.command_palette_open {
-                    self.modals.command_palette_open = false;
-                } else if self.modals.search_open {
-                    self.modals.search_open = false;
-                    self.modals.search_buf.clear();
-                } else if self.ui.mode == Mode::Visual {
+                use crate::app::modals_state::ModalLayer;
+                let top = self.modals.top_modal();
+                // Visual mode wins over a bare pomodoro overlay (preserves
+                // pre-ModalLayer ordering).
+                if matches!(top, None | Some(ModalLayer::Pomodoro)) && self.ui.mode == Mode::Visual
+                {
                     self.ui.mode = Mode::Normal;
                     self.ui.selection.clear();
-                } else if self.modals.pomodoro_open {
-                    self.modals.pomodoro_open = false;
-                    self.finalize_pomodoro_close();
-                } else if self.status_msg.is_some() {
-                    self.status_msg = None;
+                } else {
+                    match top {
+                        Some(ModalLayer::PluginPage) => {
+                            // Notify plugin BEFORE the field is cleared.
+                            if let Some(id) = self.modals.plugin_page.take() {
+                                let ctx = rondo_plugin_api::PluginContext::new(&id);
+                                if let Some(p) = self.plugins.get_mut(&id) {
+                                    let _ = p.handle(rondo_plugin_api::PluginAction::Hide, &ctx);
+                                }
+                            }
+                        }
+                        Some(layer) => {
+                            let needs_normal_mode = matches!(
+                                layer,
+                                ModalLayer::DescriptionEditor
+                                    | ModalLayer::EditSubtask
+                                    | ModalLayer::NoteEditor
+                                    | ModalLayer::EditTitle
+                                    | ModalLayer::AddSubtask
+                                    | ModalLayer::DepOverlay
+                                    | ModalLayer::JournalEditor
+                                    | ModalLayer::QuickAdd
+                            );
+                            let was_pomodoro = matches!(layer, ModalLayer::Pomodoro);
+                            self.modals.close_top_modal();
+                            if needs_normal_mode {
+                                self.ui.mode = Mode::Normal;
+                            }
+                            if was_pomodoro {
+                                self.finalize_pomodoro_close();
+                            }
+                        }
+                        None => {
+                            if self.status_msg.is_some() {
+                                self.status_msg = None;
+                            }
+                        }
+                    }
                 }
             }
             _ => {}
@@ -980,16 +469,14 @@ impl AppState {
     /// Apply the inverse of a captured mutation. Called from the `Undo`
     /// action handler; never pushes onto the undo stack itself.
     ///
-    /// Known limitation: `Delete` undo re-creates the row via
-    /// `create_task`, which produces a **new** id. Subtasks, tags
-    /// beyond the initial set, time logs, and notes attached to the
-    /// original are NOT restored — only the core task plus initial
-    /// tags from `NewTask`. Dependency edges are also lost.
+    /// `Delete` undo restores the full sub-tree (subtasks, tags, time
+    /// logs, notes, dep edges) with the original ids via
+    /// `SqliteStore::restore_task`.
     fn apply_undo(
         &mut self,
         snap: rondo_core::domain::task::UndoSnapshot,
     ) -> rondo_core::Result<()> {
-        use rondo_core::domain::task::{NewTask, TaskPatch, UndoKind};
+        use rondo_core::domain::task::{TaskPatch, UndoKind};
         let kind = snap.kind.clone();
         match kind {
             UndoKind::Create => {
@@ -1013,17 +500,11 @@ impl AppState {
             }
             UndoKind::Delete => {
                 if let Some(before) = snap.task_before {
-                    let new = NewTask {
-                        title: before.title.clone(),
-                        description: before.description.clone(),
-                        status: before.status,
-                        priority: before.priority,
-                        due_date: before.due_date,
-                        recur_freq: before.recur_freq,
-                        recur_interval: before.recur_interval,
-                        tags: before.tags.clone(),
-                    };
-                    self.data.store.create_task(new)?;
+                    // Use `restore_task` so the original id, subtasks,
+                    // tags, time-logs, notes, and dependency edges are
+                    // all reinstated — `create_task` would mint a new id
+                    // and drop everything but the bare task row.
+                    self.data.store.restore_task(&before)?;
                 }
             }
             UndoKind::SetStatus => {
@@ -1224,7 +705,7 @@ impl AppState {
         }
     }
 
-    fn move_journal_day(&mut self, delta: i32) {
+    pub(crate) fn move_journal_day(&mut self, delta: i32) {
         if self.data.journal_notes.is_empty() {
             return;
         }
@@ -1419,10 +900,9 @@ impl AppState {
     }
 
     fn submit_quick_add(&mut self, raw: String) {
-        self.modals.quick_add_open = false;
+        self.modals.close_quick_add();
         self.ui.mode = Mode::Normal;
         let parsed = parse_quick_add(&raw);
-        self.modals.quick_add_buf.clear();
         if parsed.title.is_empty() {
             return;
         }
@@ -1460,12 +940,10 @@ impl AppState {
         }
     }
 
-    fn submit_journal_entry(&mut self) {
+    pub(crate) fn submit_journal_entry(&mut self) {
         let body = self.modals.journal_textarea.lines().join("\n");
         let editing_id = self.modals.journal_editor_entry_id.take();
-        self.modals.journal_editor_open = false;
-        self.modals.journal_editor_buf.clear();
-        self.modals.journal_textarea = tui_textarea::TextArea::default();
+        self.modals.close_journal_editor();
         self.ui.mode = Mode::Normal;
         if body.trim().is_empty() {
             return;
@@ -1498,7 +976,7 @@ impl AppState {
         }
     }
 
-    fn delete_focused_journal_day(&mut self) {
+    pub(crate) fn delete_focused_journal_day(&mut self) {
         if self.data.journal_notes.is_empty() {
             return;
         }
@@ -1540,7 +1018,7 @@ impl AppState {
         }
     }
 
-    fn delete_focused_journal_entry(&mut self) {
+    pub(crate) fn delete_focused_journal_entry(&mut self) {
         if self.data.journal_entries.is_empty() {
             return;
         }
@@ -1611,7 +1089,7 @@ impl AppState {
 
     /// Insert a `focus_sessions` row for the just-opened pomodoro. No-op when
     /// the store is read-only; logs a debug line instead.
-    fn persist_pomodoro_start(&mut self) {
+    pub(crate) fn persist_pomodoro_start(&mut self) {
         if !self.writable {
             tracing::debug!("pomodoro: read-only store, skipping focus_sessions insert");
             return;
@@ -1633,7 +1111,7 @@ impl AppState {
 
     /// On modal close, mark the session completed iff the timer reached 100%.
     /// Always clears in-memory pomodoro state (started_at, session_id).
-    fn finalize_pomodoro_close(&mut self) {
+    pub(crate) fn finalize_pomodoro_close(&mut self) {
         let reached_total = match self.modals.pomodoro_started {
             Some(started) => started.elapsed() >= self.modals.pomodoro_total,
             None => false,
@@ -1738,7 +1216,7 @@ fn action_dismisses_quick_actions(a: &Action) -> bool {
 /// Build the toast string shown when an action is rejected because the store was
 /// opened read-only. The binary has no `--write` flag; the only way to mutate is
 /// to relaunch without `--read-only`.
-fn ro_msg(action: &str) -> String {
+pub(crate) fn ro_msg(action: &str) -> String {
     format!("{action}: read-only mode (restart without --read-only)")
 }
 

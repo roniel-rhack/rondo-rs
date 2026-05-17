@@ -213,6 +213,14 @@ fn quick_actions_overlay() {
 }
 
 #[test]
+fn lang_picker_overlay() {
+    let s = snapshot("lang_picker_overlay", 120, 32, |a| {
+        a.modals.open_lang_picker("en");
+    });
+    assert_snapshot!(s);
+}
+
+#[test]
 fn quick_add_overlay() {
     let s = snapshot("quick_add_overlay", 120, 32, |a| {
         a.modals.quick_add_open = true;

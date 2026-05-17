@@ -64,7 +64,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     push_meta(&mut lines, "creada", created_line(task, t), t);
     if let Some(due) = task.due_date {
         let mut spans: Vec<Span<'static>> = Vec::new();
-        if let Some(b) = due_badge::span(Some(due), t) {
+        if let Some(b) = due_badge::span(Some(due), app.clock.today(), t) {
             spans.push(b);
             spans.push(Span::raw("   "));
         }

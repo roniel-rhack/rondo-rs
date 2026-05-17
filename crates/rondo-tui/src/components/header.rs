@@ -1,6 +1,6 @@
 use crate::app::AppState;
 use crate::strings::{t as tr, StringKey};
-use chrono::Local;
+use chrono::{Local, TimeZone};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
@@ -59,9 +59,12 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
 fn telemetry(app: &AppState) -> Vec<Span<'static>> {
     let t = &app.theme;
-    let now = Local::now();
-    let time = now.format("%H:%M:%S").to_string();
-    let today = now.date_naive();
+    // `now()` is UTC; rendering uses the local timezone for the wall-clock
+    // strip, while `today()` already lives in the user's local tz.
+    let now_utc = app.clock.now();
+    let now_local = Local.from_utc_datetime(&now_utc.naive_utc());
+    let time = now_local.format("%H:%M:%S").to_string();
+    let today = app.clock.today();
     let mut due_today = 0usize;
     let mut done_today = 0usize;
     let mut total_active = 0usize;

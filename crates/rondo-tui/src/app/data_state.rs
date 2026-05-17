@@ -1,5 +1,5 @@
+use crate::clock::Clock;
 use crate::filter::{Filter, SIDEBAR_ITEMS};
-use chrono::Local;
 use ratatui::widgets::ListState;
 use rondo_core::domain::{
     journal::{Entry, Note},
@@ -34,11 +34,15 @@ pub struct DataState {
     /// nucleo's internal scratch buffers across frames instead of
     /// allocating a fresh `Matcher` per render.
     pub search_engine: std::cell::RefCell<crate::search::SearchEngine>,
+    /// Shared clock used by `refresh_filter_counts` so filter buckets are
+    /// computed against a deterministic `today` in tests.
+    clock: Arc<dyn Clock>,
 }
 
 impl DataState {
     pub fn new(
         store: Arc<rondo_core::store::sqlite::SqliteStore>,
+        clock: Arc<dyn Clock>,
     ) -> color_eyre::eyre::Result<Self> {
         let tasks = store.list_tasks()?;
         let journal_notes = store.list_journal_notes()?;
@@ -70,6 +74,7 @@ impl DataState {
             filter_counts: HashMap::new(),
             task_haystacks: Vec::new(),
             search_engine: std::cell::RefCell::new(crate::search::SearchEngine::new()),
+            clock,
         };
         state.refresh_filter_counts();
         state.rebuild_haystacks();
@@ -92,7 +97,7 @@ impl DataState {
     /// Recompute the per-filter cache. Cheap: a single linear pass over
     /// `tasks` checking each `Filter` variant, sharing a `today` value.
     pub fn refresh_filter_counts(&mut self) {
-        let today = Local::now().date_naive();
+        let today = self.clock.today();
         let mut counts: HashMap<Filter, usize> = HashMap::with_capacity(SIDEBAR_ITEMS.len());
         for &f in SIDEBAR_ITEMS {
             counts.insert(f, 0);

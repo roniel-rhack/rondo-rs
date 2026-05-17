@@ -318,6 +318,70 @@ fn journal_delete_day_undo_via_restore() {
 }
 
 #[test]
+fn remove_tag_undo_via_add() {
+    let (_f, store) = fixture();
+    let t = store.list_tasks().unwrap().into_iter().next().unwrap();
+    store.add_tag(t.id, "scratch").unwrap();
+    assert!(store
+        .task_by_id(t.id)
+        .unwrap()
+        .tags
+        .iter()
+        .any(|tag| tag == "scratch"));
+    store.remove_tag(t.id, "scratch").unwrap();
+    assert!(!store
+        .task_by_id(t.id)
+        .unwrap()
+        .tags
+        .iter()
+        .any(|tag| tag == "scratch"));
+    // Undo a `RemoveTag` re-adds the same tag (UndoKind::RemoveTag inverse).
+    store.add_tag(t.id, "scratch").unwrap();
+    assert!(store
+        .task_by_id(t.id)
+        .unwrap()
+        .tags
+        .iter()
+        .any(|tag| tag == "scratch"));
+}
+
+#[test]
+fn legacy_toggle_subtask_undo_via_toggle() {
+    // Legacy `UndoKind::ToggleSubtask` path: store.toggle_subtask flips
+    // the completion bit and returns a snapshot whose `kind` carries the
+    // legacy variant. Undoing it means calling toggle again, which
+    // restores the original state.
+    let (_f, store) = fixture();
+    let t = store.list_tasks().unwrap().into_iter().next().unwrap();
+    let (sid, _) = store.add_subtask(t.id, "legacy-flip").unwrap();
+    let before = store
+        .task_by_id(t.id)
+        .unwrap()
+        .subtasks
+        .iter()
+        .find(|s| s.id == sid)
+        .unwrap()
+        .completed;
+    let (new_state, snap) = store.toggle_subtask(sid).unwrap();
+    assert_eq!(new_state, !before);
+    assert!(matches!(
+        snap.kind,
+        rondo_core::domain::task::UndoKind::ToggleSubtask
+    ));
+    // Apply the inverse via a second toggle.
+    store.toggle_subtask(sid).unwrap();
+    let after = store
+        .task_by_id(t.id)
+        .unwrap()
+        .subtasks
+        .iter()
+        .find(|s| s.id == sid)
+        .unwrap()
+        .completed;
+    assert_eq!(after, before);
+}
+
+#[test]
 fn delete_task_undo_restores_subtree() {
     let (_f, store) = fixture();
     let (id, _) = store.create_task(NewTask::quick("parent")).unwrap();

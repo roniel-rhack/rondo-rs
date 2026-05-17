@@ -252,7 +252,7 @@ fn build_row_lines(
         Span::raw("  "),
     ];
     primary.extend(title_spans);
-    if let Some(b) = due_badge::span(task.due_date, t) {
+    if let Some(b) = due_badge::span(task.due_date, app.clock.today(), t) {
         primary.push(Span::raw("   "));
         primary.push(b);
     }

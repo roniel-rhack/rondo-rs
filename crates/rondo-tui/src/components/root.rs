@@ -78,6 +78,11 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
         let h = area.height.saturating_sub(4);
         components::plugin_page::draw(app, f, centered(w, h, area));
     }
+    if app.modals.plugin_overlay.is_some() {
+        let w = (area.width.saturating_sub(8)).min(80);
+        let h = (area.height.saturating_sub(4)).min(20);
+        components::plugin_overlay::draw(app, f, centered(w, h, area));
+    }
     if app.modals.description_editor_open {
         let w = (area.width.saturating_sub(8)).min(110);
         let h = area.height.saturating_sub(4);

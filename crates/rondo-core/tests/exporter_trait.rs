@@ -80,10 +80,7 @@ fn custom_exporter_can_register() {
         fn mime(&self) -> &str {
             "application/yaml"
         }
-        fn export(
-            &self,
-            _tasks: &[Task],
-        ) -> Result<String, rondo_core::export::ExportError> {
+        fn export(&self, _tasks: &[Task]) -> Result<String, rondo_core::export::ExportError> {
             Ok("tasks: []\n".to_string())
         }
     }

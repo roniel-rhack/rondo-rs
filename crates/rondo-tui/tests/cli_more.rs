@@ -43,7 +43,6 @@ fn delete_with_write_succeeds() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        
         .arg("delete")
         .arg("3");
     cmd.assert().success();
@@ -85,7 +84,6 @@ fn journal_add_with_write_succeeds() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        
         .arg("journal")
         .arg("add")
         .arg("note body");
@@ -115,7 +113,6 @@ fn focus_start_with_write() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        
         .arg("focus")
         .arg("start");
     cmd.assert().success();
@@ -184,7 +181,6 @@ fn batch_processes_ndjson() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        
         .arg("batch")
         .write_stdin(
             "{\"op\":\"add\",\"title\":\"From batch\"}\n{\"op\":\"add\",\"title\":\"Another\"}\n",
@@ -203,7 +199,6 @@ fn batch_json_summary() {
         .env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        
         .arg("--json")
         .arg("batch")
         .write_stdin("{\"op\":\"add\",\"title\":\"X\"}\n{\"op\":\"unknown\"}\n")
@@ -239,7 +234,6 @@ fn dep_add_creates_dependency() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        
         .arg("dep")
         .arg("add")
         .arg("1")
@@ -255,7 +249,6 @@ fn dep_remove_idempotent() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        
         .arg("dep")
         .arg("remove")
         .arg("1")
@@ -271,7 +264,6 @@ fn tag_add_works() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        
         .arg("tag")
         .arg("add")
         .arg("1")
@@ -288,7 +280,6 @@ fn tag_remove_works() {
         .env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        
         .arg("tag")
         .arg("add")
         .arg("1")
@@ -300,7 +291,6 @@ fn tag_remove_works() {
         .env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        
         .arg("tag")
         .arg("remove")
         .arg("1")

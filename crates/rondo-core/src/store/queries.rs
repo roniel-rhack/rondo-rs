@@ -134,8 +134,7 @@ pub const DELETE_JOURNAL_ENTRY: &str = "DELETE FROM journal_entries WHERE id = ?
 
 pub const DELETE_JOURNAL_NOTE: &str = "DELETE FROM journal_notes WHERE id = ?1";
 
-pub const UPDATE_JOURNAL_ENTRY_BODY: &str =
-    "UPDATE journal_entries SET body = ?1 WHERE id = ?2";
+pub const UPDATE_JOURNAL_ENTRY_BODY: &str = "UPDATE journal_entries SET body = ?1 WHERE id = ?2";
 
 pub const NOTE_ID_FOR_ENTRY: &str = "SELECT note_id FROM journal_entries WHERE id = ?1";
 
@@ -153,5 +152,4 @@ ON CONFLICT (plugin_id, key) DO UPDATE SET value = excluded.value, updated_at = 
 
 pub const KV_DELETE: &str = "DELETE FROM plugin_kv WHERE plugin_id = ?1 AND key = ?2";
 
-pub const KV_LIST_FOR_PLUGIN: &str =
-    "SELECT key FROM plugin_kv WHERE plugin_id = ?1 ORDER BY key";
+pub const KV_LIST_FOR_PLUGIN: &str = "SELECT key FROM plugin_kv WHERE plugin_id = ?1 ORDER BY key";

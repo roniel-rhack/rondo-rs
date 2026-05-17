@@ -69,7 +69,10 @@ capabilities = ["OverlayView"]
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("installed `hello`"));
-    assert!(plugin_dir_in(home.path()).join("hello").join("plugin.toml").exists());
+    assert!(plugin_dir_in(home.path())
+        .join("hello")
+        .join("plugin.toml")
+        .exists());
 
     // list
     let mut cmd = Command::cargo_bin("rondo-tui").unwrap();

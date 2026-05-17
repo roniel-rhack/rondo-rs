@@ -22,6 +22,11 @@ pub struct AppState {
     pub modals: ModalsState,
     pub fx: crate::fx::FxManager,
     pub plugins: PluginRegistry,
+    /// External WASM plugins loaded from `~/.rondo-rs/plugins/`. Empty until
+    /// `main::load_external_plugins` runs at startup. Lives alongside the
+    /// in-process `PluginRegistry`; the two are queried together by
+    /// `handle_command` and the command palette.
+    pub external: rondo_plugin_host::PluginHost,
     pub theme: Theme,
     pub should_quit: bool,
     pub status_msg: Option<String>,
@@ -44,13 +49,16 @@ impl AppState {
         plugins.register(Box::new(
             crate::plugins::builtin::dep_graph::DepGraphPlugin::new(Arc::clone(&store)),
         ));
-        plugins.register(Box::new(crate::plugins::builtin::analytics::AnalyticsPlugin));
+        plugins.register(Box::new(
+            crate::plugins::builtin::analytics::AnalyticsPlugin,
+        ));
         Ok(Self {
             data: DataState::new(store)?,
             ui: UiState::default(),
             modals: ModalsState::default(),
             fx: crate::fx::FxManager::new(),
             plugins,
+            external: rondo_plugin_host::PluginHost::new(),
             theme: Theme::dark(),
             should_quit: false,
             status_msg: None,
@@ -190,10 +198,11 @@ impl AppState {
                         let mut ok = 0usize;
                         let mut err: Option<String> = None;
                         for id in &ids {
-                            match self.data.store.set_status(
-                                *id,
-                                rondo_core::domain::task::Status::Done,
-                            ) {
+                            match self
+                                .data
+                                .store
+                                .set_status(*id, rondo_core::domain::task::Status::Done)
+                            {
                                 Ok(snap) => {
                                     self.undo.push(snap);
                                     ok += 1;
@@ -488,8 +497,7 @@ impl AppState {
                 } else if self.data.selected_task_id().is_some() {
                     self.modals.dep_overlay_buf.clear();
                     self.modals.dep_overlay_open = true;
-                    self.modals.dep_overlay_mode =
-                        crate::app::modals_state::DepOverlayMode::Add;
+                    self.modals.dep_overlay_mode = crate::app::modals_state::DepOverlayMode::Add;
                     self.ui.mode = Mode::Insert;
                 }
             }
@@ -786,10 +794,8 @@ impl AppState {
                 if let Some(id) = self.modals.plugin_page.clone() {
                     let ctx = rondo_plugin_api::PluginContext::new(&id);
                     if let Some(plugin) = self.plugins.get_mut(&id) {
-                        let _ = plugin.handle(
-                            rondo_plugin_api::PluginAction::KeyPress { key },
-                            &ctx,
-                        );
+                        let _ =
+                            plugin.handle(rondo_plugin_api::PluginAction::KeyPress { key }, &ctx);
                     }
                 }
             }
@@ -834,6 +840,19 @@ impl AppState {
                     self.modals.note_editing_id = None;
                     self.modals.note_task_id = None;
                     self.ui.mode = Mode::Normal;
+                } else if self.modals.plugin_overlay.is_some() {
+                    if let Some((id, _)) = self.modals.plugin_overlay.take() {
+                        if self.plugins.get_mut(&id).is_some() {
+                            let ctx = rondo_plugin_api::PluginContext::new(&id);
+                            if let Some(p) = self.plugins.get_mut(&id) {
+                                let _ = p.handle(rondo_plugin_api::PluginAction::Hide, &ctx);
+                            }
+                        } else {
+                            let _ = self
+                                .external
+                                .dispatch_one(&id, &rondo_plugin_api::PluginAction::Hide);
+                        }
+                    }
                 } else if self.modals.plugin_page.is_some() {
                     // Notify plugin its page is hiding.
                     if let Some(id) = self.modals.plugin_page.take() {
@@ -904,7 +923,10 @@ impl AppState {
     /// beyond the initial set, time logs, and notes attached to the
     /// original are NOT restored — only the core task plus initial
     /// tags from `NewTask`. Dependency edges are also lost.
-    fn apply_undo(&mut self, snap: rondo_core::domain::task::UndoSnapshot) -> rondo_core::Result<()> {
+    fn apply_undo(
+        &mut self,
+        snap: rondo_core::domain::task::UndoSnapshot,
+    ) -> rondo_core::Result<()> {
         use rondo_core::domain::task::{NewTask, TaskPatch, UndoKind};
         match snap.kind {
             UndoKind::Create => {
@@ -1355,7 +1377,28 @@ impl AppState {
 
     fn handle_command(&mut self, cmd: String) {
         self.modals.command_palette_open = false;
-        match cmd.trim() {
+        let trimmed = cmd.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+        let resolved = match self.resolve_command_prefix(trimmed) {
+            CommandResolution::Exact(s) | CommandResolution::UniquePrefix(s) => s,
+            CommandResolution::Ambiguous(matches) => {
+                self.status_msg = Some(format!(
+                    "ambiguous: {} (matches: {})",
+                    trimmed,
+                    matches.join(", ")
+                ));
+                return;
+            }
+            CommandResolution::None => {
+                if !self.try_invoke_plugin_command(trimmed) {
+                    self.status_msg = Some(format!("unknown: {}", trimmed));
+                }
+                return;
+            }
+        };
+        match resolved.as_str() {
             "tasks" => self.ui.page = Page::Tasks,
             "journal" => self.ui.page = Page::Journal,
             "pomodoro" => {
@@ -1373,8 +1416,152 @@ impl AppState {
             "deps" | "dep-graph" => self.open_plugin_page("builtin.dep-graph"),
             "analytics" => self.open_plugin_page("builtin.analytics"),
             "quit" => self.should_quit = true,
-            "" => {}
-            other => self.status_msg = Some(format!("unknown: {}", other)),
+            other => {
+                if !self.try_invoke_plugin_command(other) {
+                    self.status_msg = Some(format!("unknown: {}", other));
+                }
+            }
+        }
+    }
+
+    /// Enumerate every command name the palette knows about: hardcoded
+    /// builtins plus every plugin's `[cli].name` and `id` (in-process and
+    /// external). Used by `resolve_command_prefix` to expand a typed prefix
+    /// to a unique canonical command name.
+    fn known_command_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = [
+            "tasks",
+            "journal",
+            "pomodoro",
+            "plugins",
+            "help",
+            "calendar",
+            "focus",
+            "focus-page",
+            "deps",
+            "dep-graph",
+            "analytics",
+            "quit",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        for m in self.plugins.iter_manifests() {
+            if let Some(cli) = m.cli.as_ref() {
+                names.push(cli.name.clone());
+            }
+            names.push(m.id.clone());
+        }
+        for m in self.external.manifests() {
+            if let Some(n) = m.command_name() {
+                names.push(n.to_string());
+            }
+            names.push(m.id.clone());
+        }
+        names.sort();
+        names.dedup();
+        names
+    }
+
+    /// Map a typed string to a canonical command. Exact match wins; if no
+    /// exact match exists, a prefix that uniquely identifies one command is
+    /// promoted. Multiple prefix matches → `Ambiguous`; zero → `None`.
+    fn resolve_command_prefix(&self, input: &str) -> CommandResolution {
+        let all = self.known_command_names();
+        if all.iter().any(|n| n == input) {
+            return CommandResolution::Exact(input.to_string());
+        }
+        let matches: Vec<String> = all
+            .into_iter()
+            .filter(|n| n.starts_with(input))
+            .collect();
+        match matches.len() {
+            0 => CommandResolution::None,
+            1 => CommandResolution::UniquePrefix(matches.into_iter().next().unwrap()),
+            _ => CommandResolution::Ambiguous(matches),
+        }
+    }
+
+    /// Resolve `cmd` against in-process + external plugins, dispatch
+    /// `PluginAction::Show`, and route the returned `ViewSpec` to the
+    /// appropriate modal slot. Returns `true` when a plugin handled the
+    /// command (so the caller can suppress the "unknown" toast).
+    fn try_invoke_plugin_command(&mut self, cmd: &str) -> bool {
+        // 1) In-process registry — match by manifest id, or by [cli].name.
+        let in_proc_id = self
+            .plugins
+            .iter_manifests()
+            .find(|m| m.id == cmd || m.cli.as_ref().map(|c| c.name.as_str()) == Some(cmd))
+            .map(|m| m.id.clone());
+        if let Some(id) = in_proc_id {
+            self.invoke_in_process_plugin(&id);
+            return true;
+        }
+        // 2) External WASM host.
+        if let Some(id) = self.external.resolve_command(cmd) {
+            self.invoke_external_plugin(&id);
+            return true;
+        }
+        false
+    }
+
+    fn invoke_in_process_plugin(&mut self, id: &str) {
+        let ctx = rondo_plugin_api::PluginContext::new(id);
+        let Some(r) = self
+            .plugins
+            .get_mut(id)
+            .map(|p| p.handle(rondo_plugin_api::PluginAction::Show, &ctx))
+        else {
+            self.toast(format!("plugin not registered: {}", id));
+            return;
+        };
+        let notify_msg = r.follow_up.iter().find_map(|fa| match fa {
+            rondo_plugin_api::PluginAction::Notify { message, .. } => Some(message.clone()),
+            _ => None,
+        });
+        self.route_show_view(id, r.view, notify_msg);
+    }
+
+    fn invoke_external_plugin(&mut self, id: &str) {
+        let result = self
+            .external
+            .dispatch_one(id, &rondo_plugin_api::PluginAction::Show);
+        let Some(r) = result else {
+            self.toast(format!("plugin `{}` failed (see logs)", id));
+            return;
+        };
+        let view = r.view;
+        // Surface any Notify follow-up as a toast so background plugins
+        // (e.g. sync-localdir's `:sync-now`) confirm execution.
+        let notify_msg = r.follow_up.iter().find_map(|fa| match fa {
+            rondo_plugin_api::PluginAction::Notify { message, .. } => Some(message.clone()),
+            _ => None,
+        });
+        self.route_show_view(id, view, notify_msg);
+    }
+
+    /// Route a `Show` response into the right modal slot based on
+    /// `ViewKind`. Overlay → `plugin_overlay`, Page → reuse the existing
+    /// full-screen `plugin_page` path, no view → toast (either the
+    /// plugin's `Notify` message or a generic "invoked" confirmation).
+    fn route_show_view(
+        &mut self,
+        id: &str,
+        view: Option<rondo_plugin_api::ViewSpec>,
+        notify_msg: Option<String>,
+    ) {
+        match view {
+            Some(v) if v.kind == rondo_plugin_api::ViewKind::Overlay => {
+                self.modals.plugin_overlay = Some((id.to_string(), v));
+            }
+            Some(v) if v.kind == rondo_plugin_api::ViewKind::Page => {
+                self.modals.plugin_page = Some(id.to_string());
+                let _ = v;
+            }
+            _ => {
+                let msg = notify_msg.unwrap_or_else(|| format!("plugin `{}` invoked", id));
+                self.toast(msg);
+            }
         }
     }
 
@@ -1483,7 +1670,27 @@ impl AppState {
                 let _ = p.handle(PluginAction::Tick { delta_ms: 100 }, &ctx);
             }
         }
+        // Also tick external WASM plugins so TickHandler implementations
+        // (e.g. sync-localdir's 5-minute scheduler, quote rotation timers)
+        // actually advance.
+        if !self.external.is_empty() {
+            let _ = self
+                .external
+                .dispatch(&PluginAction::Tick { delta_ms: 100 });
+        }
     }
+}
+
+/// Outcome of resolving a typed palette string against the known command
+/// set. `Exact` and `UniquePrefix` are both actionable; the latter exists
+/// only so that future UI (e.g. a status hint "expanded → analytics") can
+/// tell the user what was matched.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CommandResolution {
+    Exact(String),
+    UniquePrefix(String),
+    Ambiguous(Vec<String>),
+    None,
 }
 
 #[derive(Debug, Default)]

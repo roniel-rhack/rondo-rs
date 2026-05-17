@@ -289,9 +289,12 @@ Without that grant the plugin loads with `enabled: false` and shows up in
 
 Three sample plugins live in `examples/plugins/`:
 
-- `quote-of-the-day` — OverlayView + TickHandler demo (real `.wasm` checked in)
+- `quote-of-the-day` — OverlayView + TickHandler + CommandContributor demo
+  (real `.wasm` checked in; invoke from the palette with `:quote-of-the-day`
+  — or any unique prefix like `:quo`)
 - `exporter-org-mode` — Exporter capability scaffold
-- `sync-localdir` — Syncer capability scaffold
+- `sync-localdir` — Syncer + CommandContributor scaffold (`:sync-now`
+  forces a sync attempt)
 
 ## Filesystem layout
 

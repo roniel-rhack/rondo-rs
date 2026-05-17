@@ -16,9 +16,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         .border_style(Style::default().fg(t.accent))
         .title(Span::styled(
             " sort by ",
-            Style::default()
-                .fg(t.accent)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
         ));
     let inner = block.inner(area);
     f.render_widget(block, area);

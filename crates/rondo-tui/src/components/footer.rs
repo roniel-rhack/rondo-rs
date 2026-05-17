@@ -46,12 +46,17 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         spans.push(Span::styled(msg.clone(), Style::default().fg(t.warn)));
         spans.push(Span::raw("  "));
     }
-    spans.push(Span::styled("· ", t.muted()));
-    spans.push(Span::styled("?", t.kbd()));
-    spans.push(Span::styled(
-        format!(" {} ", tr(app.lang, StringKey::FooterMore)),
-        t.muted(),
-    ));
+    // E15: always-on `? help` hint. Rendered regardless of modal/page context
+    // so users discover the help overlay from any state. Suppressed only when
+    // the help overlay itself is already open.
+    if !app.modals.help_open {
+        spans.push(Span::styled("· ", t.muted()));
+        spans.push(Span::styled("?", t.kbd()));
+        spans.push(Span::styled(
+            format!(" {} ", tr(app.lang, StringKey::FooterHelpHint)),
+            t.muted(),
+        ));
+    }
 
     f.render_widget(Paragraph::new(Line::from(spans)), area);
 }

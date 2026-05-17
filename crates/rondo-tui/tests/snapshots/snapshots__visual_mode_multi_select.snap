@@ -33,4 +33,4 @@ expression: s
 "│   ○    2  Pendient ││   17   18   19   20   21   22  ││                                  ││         ⌬                │"
 "│   !    0  Vencidas ││                                ││                                  ││                          │"
 "└────────────────────┘└────────────────────────────────┘└──────────────────────────────────┘└──────────────────────────┘"
-" [VIS·2]  [j/k → extend] [d → bulk done] [P → bulk prio] [Esc → cancel] [: → cmd]  · ? más                              "
+" [VIS·2]  [j/k → extend] [d → bulk done] [P → bulk prio] [Esc → cancel] [: → cmd]  · ? ayuda                            "

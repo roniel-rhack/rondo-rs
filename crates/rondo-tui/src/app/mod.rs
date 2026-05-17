@@ -1158,11 +1158,44 @@ impl AppState {
 
     /// Space-bar action: meaning depends on focus context.
     fn handle_space(&mut self) {
-        if self.ui.focus.pane != Pane::Detail {
-            return;
+        match self.ui.focus.pane {
+            Pane::Detail if self.ui.focus.section == DetailSection::Subtasks => {
+                self.toggle_focused_subtask();
+            }
+            Pane::List if self.ui.page == Page::Tasks => {
+                self.cycle_focused_task_status();
+            }
+            _ => {}
         }
-        if self.ui.focus.section == DetailSection::Subtasks {
-            self.toggle_focused_subtask();
+    }
+
+    /// Cycle the currently-selected task's status Pending → InProgress → Done →
+    /// Pending. Persists when `writable`; otherwise mutates the in-memory copy
+    /// and toasts so the user still sees the cycle visually.
+    fn cycle_focused_task_status(&mut self) {
+        let (task_id, current) = match self.data.tasks.get(self.data.selected_task) {
+            Some(t) => (t.id, t.status),
+            None => return,
+        };
+        let next = current.next();
+        if self.writable {
+            match self.data.store.set_status(task_id, next) {
+                Ok(snap) => {
+                    self.undo.push(snap);
+                    self.data.refresh_tasks();
+                    self.ui.flash = Some((FlashTarget::Task(task_id), Instant::now()));
+                    self.toast(format!("task #{} → {}", task_id, next.label()));
+                }
+                Err(e) => self.toast(format!("status change failed: {}", e)),
+            }
+        } else if let Some(t) = self.data.tasks.get_mut(self.data.selected_task) {
+            t.status = next;
+            self.ui.flash = Some((FlashTarget::Task(task_id), Instant::now()));
+            self.toast(format!(
+                "task #{} → {} (read-only, in-memory)",
+                task_id,
+                next.label()
+            ));
         }
     }
 

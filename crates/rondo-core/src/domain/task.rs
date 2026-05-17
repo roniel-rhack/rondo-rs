@@ -25,6 +25,14 @@ impl Status {
             _ => Self::Pending,
         }
     }
+    /// Cycle Pending → InProgress → Done → Pending.
+    pub fn next(self) -> Self {
+        match self {
+            Self::Pending => Self::InProgress,
+            Self::InProgress => Self::Done,
+            Self::Done => Self::Pending,
+        }
+    }
     pub fn label(self) -> &'static str {
         match self {
             Self::Pending => "Pending",

@@ -12,6 +12,7 @@ pub enum Filter {
     Urgent,
     HighPriority,
     Overdue,
+    InProgress,
     Completed,
     All,
 }
@@ -27,6 +28,7 @@ impl Filter {
             Self::Urgent => "URGENTES",
             Self::HighPriority => "ALTA PRIO",
             Self::Overdue => "VENCIDAS",
+            Self::InProgress => "EN PROGRESO",
             Self::Completed => "COMPLETADAS",
             Self::All => "TODAS",
         }
@@ -42,6 +44,7 @@ impl Filter {
             Self::Urgent => 'u',
             Self::HighPriority => 'H',
             Self::Overdue => 'o',
+            Self::InProgress => 'P',
             Self::Completed => 'c',
             Self::All => 'A',
         }
@@ -57,6 +60,7 @@ impl Filter {
             Self::Urgent => "!",
             Self::HighPriority => "↑",
             Self::Overdue => "⌧",
+            Self::InProgress => "◐",
             Self::Completed => "✓",
             Self::All => "◇",
         }
@@ -82,6 +86,7 @@ impl Filter {
             Self::Overdue => {
                 task.status != Status::Done && task.due_date.is_some_and(|d| d < today)
             }
+            Self::InProgress => task.status == Status::InProgress,
             Self::Completed => task.status == Status::Done,
             Self::All => true,
         }
@@ -97,6 +102,7 @@ pub const SIDEBAR_ITEMS: &[Filter] = &[
     Filter::Urgent,
     Filter::HighPriority,
     Filter::Overdue,
+    Filter::InProgress,
     Filter::NoTag,
     Filter::Completed,
 ];

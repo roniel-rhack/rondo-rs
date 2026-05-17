@@ -132,16 +132,16 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
         ],
         Pane::List => vec![
             ("a", "add"),
+            ("space", "status"),
             ("A", "+ subtarea"),
             ("B", "+ dep"),
             ("v", "select"),
-            ("f<l>", "filtro"),
         ],
         Pane::Detail => match app.ui.focus.section {
             DetailSection::Header => vec![
                 ("e", "edit title"),
                 ("E", "edit description"),
-                ("space", "toggle done"),
+                ("space", "cycle status"),
                 ("1/2/3/4", "section jump"),
                 ("Tab", "next sect"),
             ],

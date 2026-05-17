@@ -61,24 +61,19 @@ fn telemetry(app: &AppState) -> Vec<Span<'static>> {
     let now = Local::now();
     let time = now.format("%H:%M:%S").to_string();
     let today = now.date_naive();
-    let due_today = app
-        .data
-        .tasks
-        .iter()
-        .filter(|x| x.due_date == Some(today) && x.status != Status::Done)
-        .count();
-    let done_today = app
-        .data
-        .tasks
-        .iter()
-        .filter(|x| x.status == Status::Done)
-        .count();
-    let total_active = app
-        .data
-        .tasks
-        .iter()
-        .filter(|x| x.status != Status::Done)
-        .count();
+    let mut due_today = 0usize;
+    let mut done_today = 0usize;
+    let mut total_active = 0usize;
+    for x in &app.data.tasks {
+        if x.status == Status::Done {
+            done_today += 1;
+        } else {
+            total_active += 1;
+            if x.due_date == Some(today) {
+                due_today += 1;
+            }
+        }
+    }
     let pomodoro = if app.modals.pomodoro_open {
         "⏵ P1"
     } else {

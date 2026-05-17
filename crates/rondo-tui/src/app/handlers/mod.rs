@@ -14,5 +14,6 @@ pub mod due_date;
 pub mod journal;
 pub mod note;
 pub mod pomodoro;
+pub mod recurrence;
 pub mod subtask;
 pub mod task;

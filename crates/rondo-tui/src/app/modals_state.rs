@@ -34,6 +34,7 @@ pub enum ModalLayer {
     EditSubtask = 16,
     NoteEditor = 17,
     EditDueDate = 18,
+    EditRecurrence = 19,
 }
 
 /// Modal/overlay UI state and associated buffers.
@@ -91,6 +92,7 @@ pub struct ModalsState {
     pub edit_due_date_buf: String,
     /// `true` once the user pressed `c` to start typing a custom date.
     pub edit_due_date_custom_mode: bool,
+    pub edit_recurrence_open: bool,
 }
 
 impl Default for ModalsState {
@@ -137,6 +139,7 @@ impl Default for ModalsState {
             edit_due_date_open: false,
             edit_due_date_buf: String::new(),
             edit_due_date_custom_mode: false,
+            edit_recurrence_open: false,
         }
     }
 }
@@ -149,6 +152,9 @@ impl ModalsState {
     /// the topmost open layer, and Escape closes it before lower ones.
     pub fn top_modal(&self) -> Option<ModalLayer> {
         // Check from highest to lowest priority.
+        if self.edit_recurrence_open {
+            return Some(ModalLayer::EditRecurrence);
+        }
         if self.edit_due_date_open {
             return Some(ModalLayer::EditDueDate);
         }
@@ -324,6 +330,14 @@ impl ModalsState {
         self.description_task_id = None;
     }
 
+    pub fn open_edit_recurrence(&mut self) {
+        self.edit_recurrence_open = true;
+    }
+
+    pub fn close_edit_recurrence(&mut self) {
+        self.edit_recurrence_open = false;
+    }
+
     pub fn open_edit_due_date(&mut self) {
         self.edit_due_date_open = true;
         self.edit_due_date_buf.clear();
@@ -381,6 +395,9 @@ impl ModalsState {
     pub fn close_top_modal(&mut self) -> Option<ModalLayer> {
         let layer = self.top_modal()?;
         match layer {
+            ModalLayer::EditRecurrence => {
+                self.edit_recurrence_open = false;
+            }
             ModalLayer::EditDueDate => {
                 self.edit_due_date_open = false;
                 self.edit_due_date_buf.clear();
@@ -477,6 +494,7 @@ impl ModalsState {
             || self.edit_subtask_open
             || self.note_editor_open
             || self.edit_due_date_open
+            || self.edit_recurrence_open
     }
 
     /// Pure modal mutations that don't need cross-substate access.

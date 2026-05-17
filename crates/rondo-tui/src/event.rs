@@ -15,6 +15,7 @@ pub fn map(ev: Event, app: &AppState) -> Option<Action> {
     // global bindings remain active while a pomodoro is running.
     if let Some(layer) = app.modals.top_modal() {
         match layer {
+            ModalLayer::EditRecurrence => return edit_recurrence_key(ev),
             ModalLayer::EditDueDate => return edit_due_date_key(ev, app),
             ModalLayer::NoteEditor => return note_editor_key(ev),
             ModalLayer::EditSubtask => return edit_subtask_key(ev, app),
@@ -358,6 +359,22 @@ fn dep_overlay_key(ev: Event, app: &AppState) -> Option<Action> {
     })
 }
 
+fn edit_recurrence_key(ev: Event) -> Option<Action> {
+    use rondo_core::domain::task::RecurFreq;
+    let Event::Key(k) = ev else {
+        return None;
+    };
+    Some(match k.code {
+        KeyCode::Esc => Action::CancelEditRecurrence,
+        KeyCode::Char('d') => Action::SubmitRecurrence(RecurFreq::Daily, 1),
+        KeyCode::Char('w') => Action::SubmitRecurrence(RecurFreq::Weekly, 1),
+        KeyCode::Char('m') => Action::SubmitRecurrence(RecurFreq::Monthly, 1),
+        KeyCode::Char('y') => Action::SubmitRecurrence(RecurFreq::Yearly, 1),
+        KeyCode::Char('x') => Action::SubmitRecurrence(RecurFreq::None, 0),
+        _ => return None,
+    })
+}
+
 fn edit_due_date_key(ev: Event, app: &AppState) -> Option<Action> {
     use chrono::{Duration, Local, NaiveDate};
     let Event::Key(k) = ev else {
@@ -449,6 +466,9 @@ fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
         KeyCode::Char('D') if on_journal => Action::JournalDeleteEntry,
         KeyCode::Char('D') if !on_journal && !in_sidebar && !in_visual => {
             Action::RequestEditDueDate
+        }
+        KeyCode::Char('R') if !on_journal && !in_sidebar && !in_visual => {
+            Action::RequestEditRecurrence
         }
         KeyCode::Char('X') if on_journal => Action::JournalDeleteDay,
         KeyCode::Char('J') if on_journal => Action::JournalNextDay,

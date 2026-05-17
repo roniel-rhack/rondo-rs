@@ -128,6 +128,10 @@ pub enum Action {
     SubmitNote,
     CancelNote,
 
+    RequestEditRecurrence,
+    SubmitRecurrence(rondo_core::domain::task::RecurFreq, i64),
+    CancelEditRecurrence,
+
     RequestEditDueDate,
     EditDueDateInput(String),
     /// `None` clears the date; `Some(date)` sets it. Empty string in

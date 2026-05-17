@@ -117,6 +117,9 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
     if app.modals.edit_due_date_open {
         components::edit_due_date::draw(app, f, centered(60, 14, area));
     }
+    if app.modals.edit_recurrence_open {
+        components::edit_recurrence::draw(app, f, centered(60, 12, area));
+    }
 
     // Run live effects after all widgets have painted; effects mutate cells in
     // place to produce fades/sweeps/dissolves.

@@ -142,12 +142,12 @@ impl AppState {
         }
 
         // Route to substate handlers first; they own the pure mutations.
+        // `DataState` is a pure read surface for handlers — it has no
+        // `update()`; data mutations always flow through the store via
+        // the extracted handlers below.
         let mut follow_up = self.ui.update(action.clone());
         if follow_up.is_none() {
             follow_up = self.modals.update(action.clone());
-        }
-        if follow_up.is_none() {
-            follow_up = self.data.update(action.clone());
         }
 
         // Extracted domain handlers. Each `handle()` returns true if it

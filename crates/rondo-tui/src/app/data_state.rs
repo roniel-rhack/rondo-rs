@@ -1,4 +1,3 @@
-use crate::action::{Action, Page};
 use crate::filter::{Filter, SIDEBAR_ITEMS};
 use chrono::Local;
 use ratatui::widgets::ListState;
@@ -227,16 +226,4 @@ impl DataState {
         }
     }
 
-    /// Pure data-mutation handler. Returns optional follow-up for the dispatcher.
-    /// Most data changes are driven by other substates (which need cursor + focus
-    /// info) so this handler stays small for now.
-    pub fn update(&mut self, action: Action) -> Option<Action> {
-        match action {
-            Action::TogglePage(p) if p == Page::Tasks || p == Page::Journal => {
-                // Page is owned by UiState; this is a no-op at the data layer.
-                None
-            }
-            _ => None,
-        }
-    }
 }

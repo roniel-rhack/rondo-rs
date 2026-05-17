@@ -1242,7 +1242,7 @@ impl AppState {
             priority: parsed
                 .priority
                 .unwrap_or(rondo_core::domain::task::Priority::Low),
-            due_date: None,
+            due_date: parsed.due.as_deref().and_then(parse_due),
             recur_freq: rondo_core::domain::task::RecurFreq::None,
             recur_interval: 0,
             tags: parsed.tags.clone(),
@@ -1518,6 +1518,21 @@ fn action_dismisses_quick_actions(a: &Action) -> bool {
     )
 }
 
+/// Parse a `due:` token value into a `NaiveDate`.
+///
+/// Accepts the natural-language aliases `today`/`hoy`, `tmrw`/`tomorrow`/`mañana`,
+/// `next-week`/`semana`, or an ISO `YYYY-MM-DD` date.
+pub fn parse_due(raw: &str) -> Option<chrono::NaiveDate> {
+    use chrono::{Duration, Local, NaiveDate};
+    let today = Local::now().date_naive();
+    match raw.trim().to_lowercase().as_str() {
+        "today" | "hoy" => Some(today),
+        "tmrw" | "tomorrow" | "mañana" => today.checked_add_signed(Duration::days(1)),
+        "next-week" | "semana" => today.checked_add_signed(Duration::days(7)),
+        other => NaiveDate::parse_from_str(other, "%Y-%m-%d").ok(),
+    }
+}
+
 /// Parse quick-add syntax: `title with words #tag1 #tag2 !p3 due:tmrw`.
 pub fn parse_quick_add(raw: &str) -> QuickAddInput {
     let mut out = QuickAddInput::default();
@@ -1566,5 +1581,23 @@ mod tests {
         assert!(p.tags.is_empty());
         assert!(p.priority.is_none());
         assert!(p.due.is_none());
+    }
+
+    #[test]
+    fn quick_add_sets_due_date_for_known_tokens() {
+        use chrono::{Duration, Local};
+        let today = Local::now().date_naive();
+        assert_eq!(parse_due("today"), Some(today));
+        assert_eq!(parse_due("hoy"), Some(today));
+        assert_eq!(parse_due("tmrw"), Some(today + Duration::days(1)));
+        assert_eq!(parse_due("tomorrow"), Some(today + Duration::days(1)));
+        assert_eq!(parse_due("mañana"), Some(today + Duration::days(1)));
+        assert_eq!(parse_due("next-week"), Some(today + Duration::days(7)));
+        assert_eq!(parse_due("semana"), Some(today + Duration::days(7)));
+        assert_eq!(
+            parse_due("2026-12-31"),
+            chrono::NaiveDate::from_ymd_opt(2026, 12, 31)
+        );
+        assert_eq!(parse_due("not-a-date"), None);
     }
 }

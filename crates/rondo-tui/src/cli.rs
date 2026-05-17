@@ -51,6 +51,11 @@ pub enum Command {
         #[command(subcommand)]
         action: PluginsAction,
     },
+    /// Manage UI language packs installed under ~/.rondo-rs/lang/
+    Lang {
+        #[command(subcommand)]
+        action: LangAction,
+    },
     /// Delete a task by id
     Delete { id: i64 },
     /// Journal operations
@@ -125,6 +130,36 @@ pub enum TagAction {
 }
 
 #[derive(clap::Subcommand, Debug)]
+pub enum LangAction {
+    /// Generate a translator-ready TOML file at `--out`, seeded with the
+    /// English baseline. Translator overwrites values in place; install
+    /// with `lang install <out>`.
+    Scaffold {
+        /// Pack code (e.g. `es`, `pt-br`). Matches `[a-z][a-z0-9_-]*`.
+        code: String,
+        /// Human-readable label shown in the `:lang` picker.
+        #[arg(long)]
+        name: String,
+        /// Output path for the scaffold TOML.
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Copy a translated pack into `~/.rondo-rs/lang/<code>.toml`.
+    Install {
+        path: PathBuf,
+        /// Overwrite an existing pack with the same code.
+        #[arg(long)]
+        force: bool,
+    },
+    /// List installed packs (built-in `en` is always available).
+    List,
+    /// Delete an installed pack (refuses `en`).
+    Remove { code: String },
+    /// Print the active pack code and its resolved file path.
+    Current,
+}
+
+#[derive(clap::Subcommand, Debug)]
 pub enum PluginsAction {
     /// List all installed plugins
     List,
@@ -139,7 +174,10 @@ pub enum PluginsAction {
 /// Subcommands that do not need a SQLite database. Used by `main.rs` to skip
 /// the DB-existence check when only metadata work is requested.
 pub fn needs_db(cmd: &Command) -> bool {
-    !matches!(cmd, Command::Plugins { .. } | Command::Completion { .. })
+    !matches!(
+        cmd,
+        Command::Plugins { .. } | Command::Completion { .. } | Command::Lang { .. }
+    )
 }
 
 /// Shared CLI options used by every subcommand.
@@ -156,6 +194,7 @@ pub fn run(cmd: Command, opts: &CliOpts, db_path: &Path) -> Result<()> {
         Command::Due { id, date, clear } => cli_due(db_path, opts, id, &date, clear),
         Command::Export { format } => cli_export(db_path, opts, &format),
         Command::Plugins { action } => cli_plugins(opts, action),
+        Command::Lang { action } => cli_lang(opts, action),
         Command::Delete { id } => cli_delete(db_path, opts, id),
         Command::Journal { action } => cli_journal(db_path, opts, action),
         Command::Focus { action } => cli_focus(db_path, opts, action),
@@ -933,6 +972,192 @@ fn cli_tag(db_path: &Path, opts: &CliOpts, action: TagAction) -> Result<()> {
 pub fn emit_completion(shell: clap_complete::Shell, cmd: &mut clap::Command) {
     let name = cmd.get_name().to_string();
     clap_complete::generate(shell, cmd, name, &mut std::io::stdout());
+}
+
+// ---------------------------------------------------------------------------
+// lang subcommands
+// ---------------------------------------------------------------------------
+
+fn cli_lang(opts: &CliOpts, action: LangAction) -> Result<()> {
+    let dir = rondo_core::i18n::default_lang_dir();
+    match action {
+        LangAction::Scaffold { code, name, out } => lang_scaffold(&code, &name, &out),
+        LangAction::Install { path, force } => lang_install(&dir, &path, force),
+        LangAction::List => lang_list(&dir, opts.json),
+        LangAction::Remove { code } => lang_remove(&dir, &code),
+        LangAction::Current => lang_current(opts.json),
+    }
+}
+
+fn lang_scaffold(code: &str, name: &str, out: &Path) -> Result<()> {
+    if !rondo_core::i18n::is_valid_code(code) {
+        return Err(eyre!("invalid code `{code}` (must match [a-z][a-z0-9_-]*)"));
+    }
+    // The baked English baseline IS the scaffold. Replace the `[meta]` block
+    // with the caller's code/name; values stay in English so the translator
+    // overwrites in place.
+    let baseline = rondo_core::i18n::EN_TOML;
+    let body = rewrite_meta_for_scaffold(baseline, code, name);
+    if let Some(parent) = out.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(out, body)?;
+    println!("scaffolded {code} pack at {}", out.display());
+    Ok(())
+}
+
+/// Replace the `[meta]` block at the head of a parsed pack with one carrying
+/// the caller-supplied `code` and `name`. Body of the file (everything from
+/// the first `[strings]` line onwards) is copied verbatim.
+fn rewrite_meta_for_scaffold(en_toml: &str, code: &str, name: &str) -> String {
+    let split = en_toml.find("\n[strings]").unwrap_or(en_toml.len());
+    let tail = &en_toml[split..];
+    let mut out = String::new();
+    out.push_str("# TODO: translate values below. Keep `{name}` placeholders intact.\n");
+    out.push_str("[meta]\n");
+    out.push_str(&format!("code = \"{code}\"\n"));
+    out.push_str(&format!("name = \"{}\"\n", name.replace('"', "\\\"")));
+    out.push_str("author = \"\"\n");
+    out.push_str("version = \"0.1.0\"\n");
+    out.push_str("fallback = \"en\"\n");
+    out.push_str(tail);
+    if !out.ends_with('\n') {
+        out.push('\n');
+    }
+    out
+}
+
+fn lang_install(dir: &Path, src: &Path, force: bool) -> Result<()> {
+    if !src.exists() {
+        return Err(eyre!("source path does not exist: {}", src.display()));
+    }
+    let raw = std::fs::read_to_string(src).map_err(|e| eyre!("read {}: {}", src.display(), e))?;
+    let pack = rondo_core::i18n::parse_pack(&raw)
+        .map_err(|e| eyre!("invalid pack at {}: {}", src.display(), e))?;
+    std::fs::create_dir_all(dir)?;
+    let dst = dir.join(format!("{}.toml", pack.code));
+    if dst.exists() && !force {
+        return Err(eyre!(
+            "pack `{}` already installed at {} — pass --force to overwrite",
+            pack.code,
+            dst.display()
+        ));
+    }
+    if pack.code == "en" {
+        return Err(eyre!(
+            "refusing to install a pack with code `en`: that slot is the baked-in English baseline"
+        ));
+    }
+    std::fs::copy(src, &dst)?;
+    println!("installed {} pack at {}", pack.code, dst.display());
+    Ok(())
+}
+
+fn lang_list(dir: &Path, json: bool) -> Result<()> {
+    let mut packs: Vec<(String, String, String, PathBuf)> = Vec::new();
+    // Built-in English is always present and reported first so users see it
+    // in `lang list` even on a fresh install with no external packs.
+    packs.push((
+        "en".to_string(),
+        "English".to_string(),
+        "built-in".to_string(),
+        PathBuf::from("<built-in>"),
+    ));
+    if dir.exists() {
+        for entry in std::fs::read_dir(dir)?.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) != Some("toml") {
+                continue;
+            }
+            let raw = match std::fs::read_to_string(&path) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("warn: skipping {}: {}", path.display(), e);
+                    continue;
+                }
+            };
+            match rondo_core::i18n::parse_pack(&raw) {
+                Ok(p) => packs.push((p.code, p.name, "0.1.0".to_string(), path)),
+                Err(e) => eprintln!("warn: invalid pack at {}: {}", path.display(), e),
+            }
+        }
+    }
+    if json {
+        let arr: Vec<serde_json::Value> = packs
+            .iter()
+            .map(|(code, name, version, path)| {
+                serde_json::json!({
+                    "code": code,
+                    "name": name,
+                    "version": version,
+                    "path": path.display().to_string(),
+                })
+            })
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&arr)?);
+        return Ok(());
+    }
+    if packs.len() == 1 {
+        println!("(no external packs installed in {})", dir.display());
+        println!("built-in: en  English");
+        return Ok(());
+    }
+    println!("{:<10}  {:<20}  PATH", "CODE", "NAME");
+    for (code, name, _ver, path) in &packs {
+        println!(
+            "{:<10}  {:<20}  {}",
+            truncate(code, 10),
+            truncate(name, 20),
+            path.display()
+        );
+    }
+    Ok(())
+}
+
+fn lang_remove(dir: &Path, code: &str) -> Result<()> {
+    if code == "en" {
+        return Err(eyre!("refusing to remove built-in language `en`"));
+    }
+    if !rondo_core::i18n::is_valid_code(code) {
+        return Err(eyre!("invalid code `{code}`"));
+    }
+    let target = dir.join(format!("{code}.toml"));
+    if !target.exists() {
+        println!("({code} not installed; nothing to remove)");
+        return Ok(());
+    }
+    std::fs::remove_file(&target)?;
+    println!("removed {code} pack at {}", target.display());
+    Ok(())
+}
+
+fn lang_current(json: bool) -> Result<()> {
+    let cfg = rondo_core::config::Config::from_env_or_default();
+    let code = cfg.ui.language.clone();
+    let (source, path) = if code == "en" {
+        ("built-in".to_string(), PathBuf::from("<built-in>"))
+    } else {
+        let p = rondo_core::i18n::pack_path(&code);
+        if p.exists() {
+            ("installed".to_string(), p)
+        } else {
+            ("missing".to_string(), p)
+        }
+    };
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "code": code,
+                "source": source,
+                "path": path.display().to_string(),
+            }))?
+        );
+    } else {
+        println!("active language: {code} ({source})");
+        println!("path: {}", path.display());
+    }
+    Ok(())
 }
 
 fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {

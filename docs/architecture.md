@@ -124,6 +124,31 @@ clamped to 64 ms so a slow frame can't fast-forward an animation, and
 `last_tick` resets on transitions from empty→non-empty so the first frame
 after idle isn't a giant jump.
 
+## Language packs (i18n)
+
+External, user-installable TOML packs under `~/.rondo-rs/lang/<code>.toml`.
+English is baked into the binary at `crates/rondo-core/src/i18n/en.toml`
+(pulled via `include_str!`) and is the single source of truth for every
+key — translators copy it via `lang scaffold` and overwrite values in
+place.
+
+| Piece | Where |
+|---|---|
+| Runtime + `t()` / `tf()` helpers | `crates/rondo-core/src/i18n/mod.rs` |
+| Baked baseline | `crates/rondo-core/src/i18n/en.toml` |
+| Active pack handle | `arc_swap::ArcSwap<Translations>` in `i18n::ACTIVE` |
+| Selection persisted | `[ui].language` in `~/.rondo-rs/config.toml` |
+| CLI surface | `rondo-tui lang scaffold|install|list|remove|current` |
+| TUI palette | `:lang` opens `components::lang_picker` |
+
+`t(key)` resolves against the active pack first, then the baked baseline,
+then falls back to the key verbatim with `tracing::warn!`. The
+`:lang` modal calls `i18n::set_active` and `Config::save` together so the
+next render frame uses the new pack and the choice survives restart.
+
+Tests pin the active pack to English via `i18n::force_for_tests()` so
+snapshots remain locale-stable regardless of host config.
+
 ## Reference projects (visual inspiration)
 
 binsider · openapi-tui · slumber · mdfried · plus the NEXUS-TASK mockup

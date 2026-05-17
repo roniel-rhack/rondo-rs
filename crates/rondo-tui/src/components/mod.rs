@@ -11,6 +11,7 @@ pub mod footer;
 pub mod header;
 pub mod help;
 pub mod journal;
+pub mod lang_picker;
 pub mod multiline_editor;
 pub mod plugin_overlay;
 pub mod plugin_page;

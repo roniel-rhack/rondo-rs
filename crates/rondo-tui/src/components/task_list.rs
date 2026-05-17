@@ -1,5 +1,6 @@
 use crate::app::ui_state::SortOrder;
 use crate::app::{AppState, FlashTarget};
+use crate::strings::Lang;
 use crate::strings::{t as tr, StringKey};
 use crate::theme::Theme;
 use crate::widgets::{
@@ -12,7 +13,6 @@ use ratatui::{
     widgets::{List, ListItem, Paragraph, Widget},
     Frame,
 };
-use rondo_core::config::Lang;
 use rondo_core::domain::task::{Status, Task};
 
 pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {

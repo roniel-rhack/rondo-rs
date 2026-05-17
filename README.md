@@ -116,7 +116,30 @@ rondo-tui plugins list
 rondo-tui plugins info my-plugin
 rondo-tui plugins install ./path/to/my-plugin
 rondo-tui plugins remove my-plugin
+rondo-tui lang scaffold es --name "Español" --out es.toml
+rondo-tui lang install es.toml
+rondo-tui lang list
+rondo-tui lang current
+rondo-tui lang remove es
 ```
+
+## Languages
+
+English is built in; every other language is a TOML pack you generate,
+translate, and install:
+
+```bash
+# 1. Generate a translator-ready file (values seeded with English text).
+rondo-tui lang scaffold es --name "Español" --out es.toml
+# 2. Edit `es.toml` — keep `{name}` placeholders intact.
+# 3. Install into ~/.rondo-rs/lang/
+rondo-tui lang install es.toml
+# 4. From inside the TUI: type `:lang`, pick the row, Enter.
+#    The choice is persisted in `~/.rondo-rs/config.toml` ([ui].language).
+```
+
+Pack codes must match `[a-z][a-z0-9_-]*` (e.g. `es`, `pt-br`, `zh_hans`).
+Built-in English cannot be removed.
 
 Global flags: `--db <PATH>`, `--read-only`, `--json`, `--no-color`,
 `--reduced-motion`.

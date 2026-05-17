@@ -35,6 +35,17 @@ pub enum ModalLayer {
     NoteEditor = 17,
     EditDueDate = 18,
     EditRecurrence = 19,
+    LangPicker = 20,
+}
+
+/// One row in the `:lang` picker modal. Built-in `en` is always the first
+/// entry and has `path = None`; external packs are scanned from
+/// `~/.rondo-rs/lang/*.toml`.
+#[derive(Debug, Clone)]
+pub struct LangPickerEntry {
+    pub code: String,
+    pub name: String,
+    pub path: Option<std::path::PathBuf>,
 }
 
 /// Modal/overlay UI state and associated buffers.
@@ -98,6 +109,9 @@ pub struct ModalsState {
     /// `true` once the user pressed `c` to start typing a custom date.
     pub edit_due_date_custom_mode: bool,
     pub edit_recurrence_open: bool,
+    pub lang_picker_open: bool,
+    pub lang_picker_entries: Vec<LangPickerEntry>,
+    pub lang_picker_cursor: usize,
 }
 
 impl Default for ModalsState {
@@ -146,6 +160,9 @@ impl Default for ModalsState {
             edit_due_date_buf: String::new(),
             edit_due_date_custom_mode: false,
             edit_recurrence_open: false,
+            lang_picker_open: false,
+            lang_picker_entries: Vec::new(),
+            lang_picker_cursor: 0,
         }
     }
 }
@@ -158,6 +175,9 @@ impl ModalsState {
     /// the topmost open layer, and Escape closes it before lower ones.
     pub fn top_modal(&self) -> Option<ModalLayer> {
         // Check from highest to lowest priority.
+        if self.lang_picker_open {
+            return Some(ModalLayer::LangPicker);
+        }
         if self.edit_recurrence_open {
             return Some(ModalLayer::EditRecurrence);
         }
@@ -401,6 +421,11 @@ impl ModalsState {
     pub fn close_top_modal(&mut self) -> Option<ModalLayer> {
         let layer = self.top_modal()?;
         match layer {
+            ModalLayer::LangPicker => {
+                self.lang_picker_open = false;
+                self.lang_picker_entries.clear();
+                self.lang_picker_cursor = 0;
+            }
             ModalLayer::EditRecurrence => {
                 self.edit_recurrence_open = false;
             }
@@ -502,6 +527,65 @@ impl ModalsState {
             || self.note_editor_open
             || self.edit_due_date_open
             || self.edit_recurrence_open
+            || self.lang_picker_open
+    }
+
+    /// Open the `:lang` picker, populating its entries from
+    /// `~/.rondo-rs/lang/*.toml`. Built-in English is always entry 0.
+    /// `active_code` selects which row starts highlighted.
+    pub fn open_lang_picker(&mut self, active_code: &str) {
+        let mut entries: Vec<LangPickerEntry> = Vec::new();
+        entries.push(LangPickerEntry {
+            code: "en".to_string(),
+            name: "English".to_string(),
+            path: None,
+        });
+        let dir = rondo_core::i18n::default_lang_dir();
+        if let Ok(rd) = std::fs::read_dir(&dir) {
+            let mut scanned: Vec<LangPickerEntry> = rd
+                .flatten()
+                .filter_map(|e| {
+                    let path = e.path();
+                    if path.extension().and_then(|s| s.to_str()) != Some("toml") {
+                        return None;
+                    }
+                    let raw = std::fs::read_to_string(&path).ok()?;
+                    let pack = rondo_core::i18n::parse_pack(&raw).ok()?;
+                    if pack.code == "en" {
+                        return None;
+                    }
+                    Some(LangPickerEntry {
+                        code: pack.code,
+                        name: pack.name,
+                        path: Some(path),
+                    })
+                })
+                .collect();
+            scanned.sort_by(|a, b| a.code.cmp(&b.code));
+            entries.extend(scanned);
+        }
+        self.lang_picker_cursor = entries
+            .iter()
+            .position(|e| e.code == active_code)
+            .unwrap_or(0);
+        self.lang_picker_entries = entries;
+        self.lang_picker_open = true;
+    }
+
+    pub fn close_lang_picker(&mut self) {
+        self.lang_picker_open = false;
+        self.lang_picker_entries.clear();
+        self.lang_picker_cursor = 0;
+    }
+
+    pub fn lang_picker_move(&mut self, delta: i32) {
+        if self.lang_picker_entries.is_empty() {
+            return;
+        }
+        let len = self.lang_picker_entries.len() as i32;
+        let cur = self.lang_picker_cursor as i32;
+        let next = ((cur + delta).rem_euclid(len)) as usize;
+        self.lang_picker_cursor = next;
     }
 
     /// Pure modal mutations that don't need cross-substate access.

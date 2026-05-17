@@ -1,13 +1,33 @@
-//! Phase 1 i18n: user-visible string table keyed by `StringKey`.
+//! Legacy in-memory string table keyed by `StringKey`.
 //!
-//! The TUI is mostly Spanish today; this module starts the consolidation by
-//! pulling the strings that appear in the header / sidebar / footer / task
-//! list into one place. Components look up by `t(app.lang, KEY)`.
-//!
-//! Phase 2 (footer hints, toasts) lands when Workstream B finishes splitting
-//! `app/mod.rs` — touching the toast call sites belongs to that PR.
+//! This module predates the file-based language-pack system in
+//! `rondo_core::i18n` and is kept as a compatibility shim while the existing
+//! header / sidebar / footer / task-list call sites are migrated to
+//! `rondo_core::i18n::t()` in follow-up PRs. New strings must NOT be added
+//! here — extend `crates/rondo-core/src/i18n/en.toml` and reference the key
+//! from `i18n::t()` / `i18n::tf()` instead.
 
-pub use rondo_core::config::Lang;
+/// Legacy two-language switch. New code should ignore this and call
+/// `rondo_core::i18n::t()` directly; this enum survives only so the existing
+/// `tr(app.lang, key)` call sites compile until they are migrated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Lang {
+    Es,
+    #[default]
+    En,
+}
+
+impl Lang {
+    /// Map a free-form language code (as stored in `[ui].language`) to the
+    /// two legacy variants. Unknown codes fall back to English so the legacy
+    /// table stays usable for non-Spanish packs.
+    pub fn from_code(code: &str) -> Self {
+        match code {
+            "es" => Lang::Es,
+            _ => Lang::En,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum StringKey {

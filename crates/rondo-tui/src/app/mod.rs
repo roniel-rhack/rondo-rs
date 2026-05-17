@@ -29,8 +29,10 @@ pub struct AppState {
     /// alongside `plugins` by the command palette and `handle_command`.
     pub external: rondo_plugin_host::PluginHost,
     pub theme: Theme,
-    /// Active UI language (Phase 1: header/sidebar/footer/task_list strings).
-    pub lang: rondo_core::config::Lang,
+    /// Active UI language for the legacy `strings.rs` table. New strings go
+    /// through `rondo_core::i18n::t()` and ignore this field. Populated from
+    /// `cfg.ui.language` at startup.
+    pub lang: crate::strings::Lang,
     pub should_quit: bool,
     pub status_msg: Option<String>,
     /// True when the underlying store was opened RW (so we can persist mutations).
@@ -76,7 +78,7 @@ impl AppState {
             plugins,
             external: rondo_plugin_host::PluginHost::new(),
             theme: Theme::dark(),
-            lang: rondo_core::config::Lang::default(),
+            lang: crate::strings::Lang::default(),
             should_quit: false,
             status_msg: None,
             writable,
@@ -350,6 +352,11 @@ impl AppState {
             // TogglePomodoro/OpenPomodoro/ClosePomodoro handled in
             // `handlers::pomodoro` (dispatched above).
             Action::SubmitCommand(cmd) => self.handle_command(cmd),
+            Action::OpenLangPicker => self.open_lang_picker(),
+            Action::CloseLangPicker => self.modals.close_lang_picker(),
+            Action::LangPickerMoveUp => self.modals.lang_picker_move(-1),
+            Action::LangPickerMoveDown => self.modals.lang_picker_move(1),
+            Action::LangPickerApply => self.apply_lang_picker(),
             // Journal* actions handled in `handlers::journal` (dispatched above).
             Action::SetSortOrder(order) => {
                 self.ui.sort_order = order;
@@ -1143,6 +1150,7 @@ impl AppState {
                 }
             }
             "plugins" => self.modals.plugins_overlay_open = true,
+            "lang" => self.open_lang_picker(),
             "help" => self.modals.help_open = true,
             "calendar" => self.open_plugin_page("builtin.calendar"),
             "focus" | "focus-page" => self.open_plugin_page("builtin.focus-page"),
@@ -1174,6 +1182,7 @@ impl AppState {
             "deps",
             "dep-graph",
             "analytics",
+            "lang",
             "quit",
         ]
         .iter()
@@ -1311,6 +1320,70 @@ impl AppState {
                 self.toast(format!("group: unknown '{}'", bad));
             }
         }
+    }
+
+    fn open_lang_picker(&mut self) {
+        let active = rondo_core::i18n::active_code();
+        self.modals.open_lang_picker(&active);
+    }
+
+    /// Persist the picked pack code into `config.toml`, swap the active
+    /// `Translations`, sync the legacy `app.lang` field, and toast the result.
+    /// Surface failures via `toast` rather than panicking — losing the swap
+    /// must never lock the user out of the UI.
+    fn apply_lang_picker(&mut self) {
+        let entry = match self
+            .modals
+            .lang_picker_entries
+            .get(self.modals.lang_picker_cursor)
+            .cloned()
+        {
+            Some(e) => e,
+            None => {
+                self.modals.close_lang_picker();
+                return;
+            }
+        };
+        let new_pack = if entry.code == "en" {
+            rondo_core::i18n::builtin_en()
+        } else {
+            let path = entry
+                .path
+                .clone()
+                .unwrap_or_else(|| rondo_core::i18n::pack_path(&entry.code));
+            match rondo_core::i18n::load_pack(&path) {
+                Ok(p) => p,
+                Err(e) => {
+                    self.toast(rondo_core::i18n::tf(
+                        "toast.lang.load_failed",
+                        &[("code", &entry.code), ("error", &e.to_string())],
+                    ));
+                    self.modals.close_lang_picker();
+                    return;
+                }
+            }
+        };
+        rondo_core::i18n::set_active(new_pack);
+        self.lang = crate::strings::Lang::from_code(&entry.code);
+
+        // Persist into config.toml so the choice survives restart.
+        let mut cfg = rondo_core::config::Config::from_env_or_default();
+        cfg.ui.language = entry.code.clone();
+        let cfg_path = std::env::var("RONDO_CONFIG")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| rondo_core::config::Config::default_path());
+        if let Err(e) = cfg.save(&cfg_path) {
+            self.toast(rondo_core::i18n::tf(
+                "toast.lang.save_failed",
+                &[("error", &e.to_string())],
+            ));
+        } else {
+            self.toast(rondo_core::i18n::tf(
+                "toast.lang.switched",
+                &[("code", &entry.code)],
+            ));
+        }
+        self.modals.close_lang_picker();
     }
 
     fn open_plugin_page(&mut self, id: &str) {

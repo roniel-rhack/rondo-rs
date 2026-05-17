@@ -25,22 +25,29 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let filter_label = app.data.active_filter.label().to_lowercase();
     let sort_label = app.ui.sort_order.label();
     let tasks_word = tr(app.lang, StringKey::TasksCount);
+    let group_suffix = app
+        .ui
+        .group_by
+        .map(|g| format!(" · group: {}", g.label()))
+        .unwrap_or_default();
     let title = if app.modals.search_open && !app.modals.search_buf.trim().is_empty() {
         format!(
-            "{} · {} {} · {} · /{}",
+            "{} · {} {} · {}{} · /{}",
             filter_label,
             visible.len(),
             tasks_word,
             sort_label,
+            group_suffix,
             app.modals.search_buf
         )
     } else {
         format!(
-            "{} · {} {} · {}",
+            "{} · {} {} · {}{}",
             filter_label,
             visible.len(),
             tasks_word,
-            sort_label
+            sort_label,
+            group_suffix
         )
     };
     let panel = BracketPanel::new(&title, t).active(app.ui.focus.pane == crate::focus::Pane::List);
@@ -102,14 +109,50 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let end = (scroll + area_height.max(1)).min(visible.len());
     let slice = &visible[scroll..end];
 
-    let items = render_items(app, slice, layout[1].width, search_query.as_deref(), scroll);
+    let (items, header_offset) = if let Some(by) = app.ui.group_by {
+        let buckets =
+            crate::sort::group_sorted_indices(&app.data.tasks, &visible, app.clock.today(), by);
+        let items = render_grouped_items(
+            app,
+            &buckets,
+            layout[1].width,
+            search_query.as_deref(),
+            scroll,
+            end,
+        );
+        // Header rows that appear before the first visible task push the
+        // selection row down by N lines.
+        let mut headers_before_sel = 0usize;
+        if let Some(sel) = app.data.task_list_state.selected() {
+            let mut seen_tasks = 0usize;
+            for bucket in &buckets {
+                if seen_tasks >= scroll && seen_tasks + bucket.indices.len() > sel {
+                    if seen_tasks <= sel {
+                        headers_before_sel += 1;
+                    }
+                    break;
+                }
+                if seen_tasks >= scroll {
+                    headers_before_sel += 1;
+                }
+                seen_tasks += bucket.indices.len();
+            }
+        }
+        (items, headers_before_sel)
+    } else {
+        (
+            render_items(app, slice, layout[1].width, search_query.as_deref(), scroll),
+            0,
+        )
+    };
+
     // No REVERSED highlight — bg changes are theme-fragile. The accent ▌ gutter
     // already marks the cursor row. Use a slice-local ListState so ratatui's
     // own offset math doesn't compound with our pre-slicing.
     let mut local_state = ratatui::widgets::ListState::default();
     if let Some(sel) = app.data.task_list_state.selected() {
         if sel >= scroll && sel < scroll + slice.len() {
-            local_state.select(Some(sel - scroll));
+            local_state.select(Some(sel - scroll + header_offset));
         }
     }
     let list = List::new(items);
@@ -188,6 +231,63 @@ fn render_items(
         .into_iter()
         .map(|r| ListItem::new(r.lines))
         .collect()
+}
+
+/// Render items when a grouping is active. Walks `buckets` in order and
+/// emits one styled header line per bucket plus the task rows that fall
+/// inside the [`scroll`, `end`) viewport window expressed in task indices.
+fn render_grouped_items(
+    app: &AppState,
+    buckets: &[crate::sort::GroupedBucket],
+    width: u16,
+    query: Option<&str>,
+    scroll: usize,
+    end: usize,
+) -> Vec<ListItem<'static>> {
+    let t = &app.theme;
+    let mut items: Vec<ListItem<'static>> = Vec::new();
+    let mut task_pos = 0usize;
+    for bucket in buckets {
+        let bucket_end = task_pos + bucket.indices.len();
+        // Skip buckets entirely above the viewport.
+        if bucket_end <= scroll {
+            task_pos = bucket_end;
+            continue;
+        }
+        // Stop once we are past the viewport.
+        if task_pos >= end {
+            break;
+        }
+        items.push(ListItem::new(group_header_line(&bucket.label, width, t)));
+        let start = task_pos.max(scroll);
+        let stop = bucket_end.min(end);
+        let local_start = start - task_pos;
+        let local_stop = stop - task_pos;
+        let slice = &bucket.indices[local_start..local_stop];
+        let rows = build_rows(app, slice, width, query);
+        for row in rows {
+            items.push(ListItem::new(row.lines));
+        }
+        task_pos = bucket_end;
+    }
+    items
+}
+
+/// `── URGENT ───────────────────────────────` group header.
+fn group_header_line(label: &str, width: u16, t: &Theme) -> Line<'static> {
+    let prefix = "── ";
+    let label_owned = label.to_string();
+    let used = prefix.chars().count() + label_owned.chars().count() + 1;
+    let dashes = (width as usize).saturating_sub(used + 2);
+    Line::from(vec![
+        Span::styled(prefix, Style::default().fg(t.border_inactive)),
+        Span::styled(
+            label_owned,
+            Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(" "),
+        Span::styled("─".repeat(dashes), Style::default().fg(t.border_inactive)),
+    ])
 }
 
 #[allow(clippy::too_many_arguments)]

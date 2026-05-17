@@ -96,6 +96,10 @@ static ALL: &[Suggestion] = &[
         desc: "switch theme: theme dark|light|high-contrast",
     },
     Suggestion {
+        cmd: "group",
+        desc: "group task list: group priority|status|due|none",
+    },
+    Suggestion {
         cmd: "help",
         desc: "open key-bindings reference",
     },

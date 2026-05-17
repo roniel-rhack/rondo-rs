@@ -96,15 +96,15 @@ pub const DELETE_DEPENDENCY: &str =
     "DELETE FROM task_dependencies WHERE task_id = ?1 AND blocked_by = ?2";
 
 pub const INSERT_FOCUS_SESSION: &str = r#"
-INSERT INTO focus_sessions (task_id, kind, started_at, duration_secs)
-VALUES (?1, ?2, ?3, ?4)
+INSERT INTO focus_sessions (task_id, kind, started_at, duration_secs, phase, cycle_idx)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6)
 "#;
 
 pub const COMPLETE_FOCUS_SESSION: &str =
     "UPDATE focus_sessions SET completed_at = ?1 WHERE id = ?2";
 
 pub const LIST_FOCUS_SESSIONS: &str = r#"
-SELECT id, task_id, kind, started_at, completed_at, duration_secs
+SELECT id, task_id, kind, started_at, completed_at, duration_secs, phase, cycle_idx
 FROM focus_sessions
 ORDER BY started_at DESC
 LIMIT 1000

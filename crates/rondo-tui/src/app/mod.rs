@@ -1622,6 +1622,8 @@ impl AppState {
             task_id,
             rondo_core::domain::focus::SessionKind::Work,
             total,
+            // E4: cycle index — wired to PomodoroConfig.cycles_per_long after B refactor.
+            1,
         ) {
             Ok(id) => {
                 self.modals.pomodoro_session_id = Some(id);

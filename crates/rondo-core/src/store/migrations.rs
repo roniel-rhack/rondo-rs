@@ -1,6 +1,6 @@
 use rusqlite::Connection;
 
-pub const CURRENT_VERSION: u32 = 3;
+pub const CURRENT_VERSION: u32 = 4;
 
 #[derive(Debug, thiserror::Error)]
 pub enum MigrationError {
@@ -33,6 +33,9 @@ pub fn migrate(conn: &Connection) -> Result<u32, MigrationError> {
     }
     if from < 3 {
         migrate_to_v3(conn)?;
+    }
+    if from < 4 {
+        migrate_to_v4(conn)?;
     }
     set_user_version(conn, CURRENT_VERSION)?;
     Ok(CURRENT_VERSION)
@@ -84,6 +87,25 @@ fn migrate_to_v3(conn: &Connection) -> Result<(), MigrationError> {
         CREATE INDEX IF NOT EXISTS idx_plugin_kv_plugin ON plugin_kv(plugin_id);
         "#,
     )?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// v3 → v4: extend `focus_sessions` with pomodoro cycle bookkeeping.
+/// `phase` mirrors `SessionKind` (0=Work, 1=ShortBreak, 2=LongBreak) and
+/// `cycle_idx` is the 1-based position within the cycles_per_long window.
+/// Both default to 0 for legacy rows so existing data round-trips without
+/// loss.
+fn migrate_to_v4(conn: &Connection) -> Result<(), MigrationError> {
+    let tx = conn.unchecked_transaction()?;
+    if !column_exists(&tx, "focus_sessions", "phase")? {
+        tx.execute_batch("ALTER TABLE focus_sessions ADD COLUMN phase INTEGER NOT NULL DEFAULT 0")?;
+    }
+    if !column_exists(&tx, "focus_sessions", "cycle_idx")? {
+        tx.execute_batch(
+            "ALTER TABLE focus_sessions ADD COLUMN cycle_idx INTEGER NOT NULL DEFAULT 0",
+        )?;
+    }
     tx.commit()?;
     Ok(())
 }

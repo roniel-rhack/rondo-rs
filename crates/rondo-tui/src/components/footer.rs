@@ -25,8 +25,9 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     spans.push(Span::styled(
         mode_label,
         Style::default()
-            .fg(mode_color(mode, t))
-            .add_modifier(Modifier::BOLD | Modifier::REVERSED),
+            .fg(t.bg)
+            .bg(mode_color(mode, t))
+            .add_modifier(Modifier::BOLD),
     ));
     spans.push(Span::raw("  "));
 

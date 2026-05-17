@@ -137,6 +137,23 @@ impl PluginHost {
         self.plugins.values().map(|lp| &lp.manifest).collect()
     }
 
+    /// Iterate every loaded plugin's manifest. Stable shape for callers that
+    /// want to enumerate without copying.
+    pub fn manifests(&self) -> impl Iterator<Item = &FsManifest> {
+        self.plugins.values().map(|lp| &lp.manifest)
+    }
+
+    /// Look up a manifest by the `cli.name` it declares. Returns the
+    /// resolved plugin id (manifest.id) so the caller can dispatch.
+    pub fn resolve_command(&self, cmd: &str) -> Option<String> {
+        for lp in self.plugins.values() {
+            if lp.manifest.command_name() == Some(cmd) || lp.manifest.id == cmd {
+                return Some(lp.manifest.id.clone());
+            }
+        }
+        None
+    }
+
     pub fn get(&self, id: &str) -> Option<&LoadedPlugin> {
         self.plugins.get(id)
     }
@@ -171,6 +188,50 @@ impl PluginHost {
     /// plugin to emit KV follow-ups).
     pub fn dispatch(&mut self, action: &PluginAction) -> Vec<(String, PluginResult)> {
         self.dispatch_with_store(action, None)
+    }
+
+    /// Dispatch an action to a single plugin by id. Returns `None` if the
+    /// plugin is not loaded, is disabled, or lacks a wasm body. Per-call
+    /// errors are logged and surface as `None` to keep the caller terse.
+    pub fn dispatch_one(&mut self, id: &str, action: &PluginAction) -> Option<PluginResult> {
+        self.dispatch_one_with_store(id, action, None)
+    }
+
+    /// `dispatch_one` variant that threads an optional `SqliteStore` for KV
+    /// follow-up resolution, mirroring [`Self::dispatch_with_store`].
+    pub fn dispatch_one_with_store(
+        &mut self,
+        id: &str,
+        action: &PluginAction,
+        store: Option<&rondo_core::store::sqlite::SqliteStore>,
+    ) -> Option<PluginResult> {
+        let lp = self.plugins.get_mut(id)?;
+        if !lp.enabled {
+            return None;
+        }
+        let plugin = lp.plugin.as_mut()?;
+        let action_json = match serde_json::to_string(action) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!("action serialize failed: {}", e);
+                return None;
+            }
+        };
+        let ctx_json = serde_json::to_string(&PluginContext::new(id)).unwrap_or_default();
+        let input = format!(r#"{{"action":{},"ctx":{}}}"#, action_json, ctx_json);
+        match plugin.call::<&str, &str>("handle", &input) {
+            Ok(s) => match serde_json::from_str::<PluginResult>(s) {
+                Ok(r) => Some(resolve_follow_up(id, r, store)),
+                Err(e) => {
+                    tracing::warn!("plugin {} returned invalid PluginResult: {}", id, e);
+                    None
+                }
+            },
+            Err(e) => {
+                tracing::warn!("plugin {} call failed: {}", id, e);
+                None
+            }
+        }
     }
 
     /// Same as [`Self::dispatch`] but threads an optional [`SqliteStore`]

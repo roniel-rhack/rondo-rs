@@ -233,6 +233,20 @@ in-process and trusted.
 
 | Path | Capabilities | Status |
 |---|---|---|
-| `examples/plugins/quote-of-the-day/` | OverlayView + TickHandler | real `.wasm` checked in (201 KiB), integration test loads it |
+| `examples/plugins/quote-of-the-day/` | OverlayView + TickHandler + CommandContributor | real `.wasm` checked in (201 KiB); `:quote-of-the-day` opens a quote overlay |
 | `examples/plugins/exporter-org-mode/` | Exporter | scaffold + manifest only |
-| `examples/plugins/sync-localdir/` | Syncer + TickHandler | real `.wasm` checked in (210 KiB) |
+| `examples/plugins/sync-localdir/` | Syncer + TickHandler + CommandContributor | real `.wasm` checked in (210 KiB); `:sync-now` forces a sync attempt |
+
+## Invoking external plugins from the TUI
+
+`rondo-tui plugins install <dir>` copies the plugin to
+`~/.rondo-rs/plugins/<id>/`. On the next TUI start the runtime calls
+`PluginHost::load_from_dir` automatically (see
+`crates/rondo-tui/src/main.rs::load_external_plugins`) and the plugin
+is reachable from the command palette via the `name` declared in its
+`[cli]` block. Resolution is prefix-aware: typing a unique prefix
+(e.g. `quo` for `quote-of-the-day`) is enough; ambiguous prefixes
+toast the list of candidates. The host routes the `Show` response by
+`ViewKind`: `Overlay` lands in `modals.plugin_overlay`, `Page` reuses
+`modals.plugin_page`, `view: None` produces a toast (the plugin's
+`Notify` follow-up message wins over the generic "invoked" string).

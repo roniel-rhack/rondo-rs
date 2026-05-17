@@ -20,32 +20,22 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let mut lines: Vec<Line> = Vec::new();
     lines.push(Line::from(Span::styled(
         " built-in (in-process)",
-        Style::default()
-            .fg(t.accent)
-            .add_modifier(Modifier::BOLD),
+        Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
     )));
     lines.push(Line::raw(""));
     for manifest in app.plugins.iter_manifests() {
         let id = manifest.id.clone();
         let name = manifest.name.clone();
         let version = manifest.version.clone();
-        let caps = format!(
-            "{:?}",
-            manifest.capabilities
-        );
+        let caps = format!("{:?}", manifest.capabilities);
         lines.push(Line::from(vec![
             Span::raw("  "),
             Span::styled(
                 format!("[{}]", id),
-                Style::default()
-                    .fg(t.accent)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
             ),
             Span::styled(format!("  {}", name), Style::default().fg(t.fg)),
-            Span::styled(
-                format!("  v{}", version),
-                Style::default().fg(t.fg_muted),
-            ),
+            Span::styled(format!("  v{}", version), Style::default().fg(t.fg_muted)),
         ]));
         lines.push(Line::from(vec![
             Span::raw("    "),
@@ -57,9 +47,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     lines.push(Line::raw(""));
     lines.push(Line::from(Span::styled(
         " external (WASM)",
-        Style::default()
-            .fg(t.accent)
-            .add_modifier(Modifier::BOLD),
+        Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
     )));
     lines.push(Line::raw(""));
     let plugins_dir = std::env::var("HOME")
@@ -68,42 +56,43 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         .join(".rondo-rs")
         .join("plugins");
     let mut external_count = 0usize;
-    if let Ok(entries) = std::fs::read_dir(&plugins_dir) {
-        for entry in entries.flatten() {
-            let p = entry.path();
-            if !p.is_dir() {
-                continue;
-            }
-            let manifest_path = p.join("plugin.toml");
-            if !manifest_path.exists() {
-                continue;
-            }
-            external_count += 1;
-            let raw = std::fs::read_to_string(&manifest_path).unwrap_or_default();
-            let id = raw
-                .lines()
-                .find_map(|l| l.strip_prefix("id ="))
-                .map(|s| s.trim().trim_matches('"').to_string())
-                .or_else(|| {
-                    p.file_name()
-                        .and_then(|s| s.to_str())
-                        .map(|s| s.to_string())
-                })
-                .unwrap_or_default();
+    for manifest in app.external.manifests() {
+        external_count += 1;
+        let id = manifest.id.clone();
+        let enabled = app.external.is_enabled(&id);
+        let caps = manifest
+            .capabilities
+            .iter()
+            .map(|c| format!("{:?}", c))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let id_color = if enabled { t.warn } else { t.fg_muted };
+        let status = if enabled { "enabled" } else { "DISABLED" };
+        lines.push(Line::from(vec![
+            Span::raw("  "),
+            Span::styled(
+                format!("[{}]", id),
+                Style::default().fg(id_color).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!("  v{}", manifest.version),
+                Style::default().fg(t.fg_muted),
+            ),
+            Span::styled(format!("  ({})", status), Style::default().fg(t.fg_muted)),
+        ]));
+        lines.push(Line::from(vec![
+            Span::raw("    "),
+            Span::styled("caps: ", Style::default().fg(t.fg_muted)),
+            Span::styled(caps, Style::default().fg(t.fg)),
+        ]));
+        if let Some(cmd) = manifest.command_name() {
             lines.push(Line::from(vec![
-                Span::raw("  "),
-                Span::styled(
-                    format!("[{}]", id),
-                    Style::default()
-                        .fg(t.warn)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(
-                    format!("  {}", p.display()),
-                    Style::default().fg(t.fg_muted),
-                ),
+                Span::raw("    "),
+                Span::styled("cmd:  ", Style::default().fg(t.fg_muted)),
+                Span::styled(format!(":{}", cmd), Style::default().fg(t.accent)),
             ]));
         }
+        lines.push(Line::raw(""));
     }
     if external_count == 0 {
         lines.push(Line::from(Span::styled(

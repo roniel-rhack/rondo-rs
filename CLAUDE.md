@@ -8,8 +8,10 @@ under `~/.rondo-rs/`.
 A full task manager with: tasks (CRUD, subtasks, dependencies, tags,
 time-logs, notes, recurrence), journal (per-day notes with markdown +
 multi-line tui-textarea editor), focus sessions (persisted), command
-palette, fuzzy search with highlight in list AND detail, plugin system
-(builtin in-process + external WASM via extism), 17 CLI subcommands.
+palette (with unique-prefix expansion), fuzzy search with highlight in
+list AND detail, plugin system (builtin in-process + external WASM via
+extism — auto-loaded from `~/.rondo-rs/plugins/` and invokable from
+the palette via their `[cli].name`), 17 CLI subcommands.
 
 ## Quick-start commands
 

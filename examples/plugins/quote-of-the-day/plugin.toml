@@ -2,8 +2,12 @@ id = "quote-of-the-day"
 name = "Quote of the Day"
 version = "0.1.0"
 api = "0.1"
-capabilities = ["OverlayView", "TickHandler"]
+capabilities = ["OverlayView", "TickHandler", "CommandContributor"]
 
 [wasi]
 allowed_paths = []
 allowed_hosts = []
+
+[cli]
+name = "quote-of-the-day"
+args_spec = []

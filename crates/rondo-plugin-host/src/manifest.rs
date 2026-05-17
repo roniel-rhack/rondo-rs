@@ -43,6 +43,13 @@ impl FsManifest {
         let raw = std::fs::read_to_string(path)?;
         Ok(toml::from_str(&raw)?)
     }
+
+    /// Command name exposed by this plugin via its `[cli]` block, if any.
+    /// Used by the TUI command palette to surface a `:<name>` entry and by
+    /// `handle_command` to resolve a typed command back to a plugin id.
+    pub fn command_name(&self) -> Option<&str> {
+        self.cli.as_ref().map(|c| c.name.as_str())
+    }
 }
 
 #[cfg(test)]

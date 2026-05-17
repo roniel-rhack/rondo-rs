@@ -132,6 +132,8 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
             ("i / A", "nueva entrada"),
         ];
     }
+    // Cap each branch at 5 hints. The `:` palette appears in every
+    // non-modal context so users can always escape to the command palette.
     match app.ui.focus.pane {
         Pane::Sidebar => vec![
             ("j/k", "move"),
@@ -143,24 +145,24 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
         Pane::List => vec![
             ("a", "add"),
             ("space", "status"),
-            ("A", "+ subtarea"),
-            ("B", "+ dep"),
             ("v", "select"),
+            ("B", "+ dep"),
+            (":", "cmd"),
         ],
         Pane::Detail => match app.ui.focus.section {
             DetailSection::Header => vec![
                 ("e", "edit title"),
                 ("E", "edit description"),
                 ("space", "cycle status"),
-                ("1/2/3/4", "section jump"),
                 ("Tab", "next sect"),
+                (":", "cmd"),
             ],
             DetailSection::Subtasks => vec![
                 ("A", "+ subtarea"),
                 ("e", "rename"),
                 ("d", "delete"),
                 ("space", "check"),
-                ("1/2/3/4", "section jump"),
+                (":", "cmd"),
             ],
             DetailSection::Dependencies => vec![
                 ("B", "+/- dep"),
@@ -173,8 +175,8 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
                 ("a", "+ note"),
                 ("e", "edit note"),
                 ("d", "delete note"),
-                ("1/2/3/4", "section jump"),
                 ("Tab", "next sect"),
+                (":", "cmd"),
             ],
         },
     }

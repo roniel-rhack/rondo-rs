@@ -22,7 +22,7 @@ expression: s
 "│                        │┃   Check RFC #42 for the new auth flow.                                                     ┃"
 "│                        │┃                                                                                            ┃"
 "│                        │┃                                                                                            ┃"
-"│                        │┃     · Validate OAuth scopes                                                                ┃"
+"│                        │┃   • Validate OAuth scopes                                                                  ┃"
 "└────────────────────────┘┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
 "┌─ vista general ────┐┌─ próximas 7 días ──────────────┐┌─ distribución por tag ───────────┐┌─ sincronización ─────────┐"
 "│                    ││    1    1    1    1            ││   work      ▰▰▰▱▱▱▱▱▱▱▱▱   2 (33 ││  ESTADO     Conectado    │"

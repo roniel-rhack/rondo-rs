@@ -56,8 +56,10 @@ pub enum Action {
 
     JournalStartEntry,
     JournalEntryInput(String),
+    JournalEditorKey(crossterm::event::KeyEvent),
     JournalSubmitEntry,
     JournalCancelEntry,
+    JournalDeleteDay,
     JournalToggleHidden,
     JournalGotoTop,
     JournalGotoBottom,

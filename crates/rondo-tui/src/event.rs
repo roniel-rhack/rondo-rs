@@ -121,32 +121,19 @@ fn search_key(ev: Event, app: &AppState) -> Option<Action> {
     })
 }
 
-fn journal_editor_key(ev: Event, app: &AppState) -> Option<Action> {
+fn journal_editor_key(ev: Event, _app: &AppState) -> Option<Action> {
     let Event::Key(k) = ev else {
         return None;
     };
     let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
-    Some(match k.code {
-        KeyCode::Esc => Action::JournalCancelEntry,
-        KeyCode::Char('s') if ctrl => Action::JournalSubmitEntry,
-        KeyCode::Enter if ctrl => Action::JournalSubmitEntry,
-        KeyCode::Enter => Action::JournalEntryInput({
-            let mut s = app.modals.journal_editor_buf.clone();
-            s.push('\n');
-            s
-        }),
-        KeyCode::Backspace => Action::JournalEntryInput({
-            let mut s = app.modals.journal_editor_buf.clone();
-            s.pop();
-            s
-        }),
-        KeyCode::Char(c) => Action::JournalEntryInput({
-            let mut s = app.modals.journal_editor_buf.clone();
-            s.push(c);
-            s
-        }),
-        _ => return None,
-    })
+    // Capture the global "exit" affordances first; everything else flows
+    // into the textarea so cursor navigation works as expected.
+    match k.code {
+        KeyCode::Esc => return Some(Action::JournalCancelEntry),
+        KeyCode::Char('s') if ctrl => return Some(Action::JournalSubmitEntry),
+        _ => {}
+    }
+    Some(Action::JournalEditorKey(k))
 }
 
 fn sort_overlay_key(ev: Event) -> Option<Action> {
@@ -351,6 +338,7 @@ fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
         KeyCode::Char('i') if on_journal => Action::JournalStartEntry,
         KeyCode::Char('H') if on_journal => Action::JournalToggleHidden,
         KeyCode::Char('D') if on_journal => Action::JournalDeleteEntry,
+        KeyCode::Char('X') if on_journal => Action::JournalDeleteDay,
         KeyCode::Char('J') if on_journal => Action::JournalNextDay,
         KeyCode::Char('K') if on_journal => Action::JournalPrevDay,
         KeyCode::Char('g') if on_journal => Action::JournalGotoTop,

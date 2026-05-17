@@ -26,7 +26,10 @@ pub struct ModalsState {
     pub quick_add_open: bool,
     pub quick_add_buf: String,
     pub journal_editor_open: bool,
+    /// Plain-text buffer kept in sync with the textarea for snapshot tests
+    /// and the submit path. Source of truth is `journal_textarea`.
     pub journal_editor_buf: String,
+    pub journal_textarea: tui_textarea::TextArea<'static>,
     /// If `Some(id)`, the journal editor is editing an existing entry and
     /// submit will UPDATE rather than INSERT. `None` = new entry.
     pub journal_editor_entry_id: Option<i64>,
@@ -63,6 +66,7 @@ impl Default for ModalsState {
             quick_add_buf: String::new(),
             journal_editor_open: false,
             journal_editor_buf: String::new(),
+            journal_textarea: tui_textarea::TextArea::default(),
             journal_editor_entry_id: None,
             sort_overlay_open: false,
             confirm_delete_open: false,

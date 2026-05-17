@@ -64,6 +64,7 @@ pub struct UiState {
     pub last_body_rect: Rect,
     pub last_pomodoro_rect: Rect,
     pub last_quick_add_rect: Rect,
+    pub last_journal_entries_rect: Rect,
     pub sort_order: SortOrder,
     pub journal_pane: JournalPane,
 }
@@ -84,6 +85,7 @@ impl Default for UiState {
             last_body_rect: Rect::default(),
             last_pomodoro_rect: Rect::default(),
             last_quick_add_rect: Rect::default(),
+            last_journal_entries_rect: Rect::default(),
             sort_order: SortOrder::default(),
             journal_pane: JournalPane::default(),
         }

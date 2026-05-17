@@ -110,7 +110,7 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
                 ("h/l", "días ↔ entries"),
                 ("j/k", "cambiar día"),
                 ("i", "nueva entrada"),
-                ("g/G", "primer/último"),
+                ("X", "delete day"),
                 ("H", "toggle hidden"),
             ];
         }

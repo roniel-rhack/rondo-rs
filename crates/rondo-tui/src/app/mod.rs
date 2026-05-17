@@ -309,6 +309,7 @@ impl AppState {
                 if self.ui.page == Page::Journal {
                     self.modals.journal_editor_open = true;
                     self.modals.journal_editor_buf.clear();
+                    self.modals.journal_textarea = tui_textarea::TextArea::default();
                     self.modals.journal_editor_entry_id = None;
                     self.ui.mode = Mode::Insert;
                 }
@@ -321,10 +322,18 @@ impl AppState {
                         .min(self.data.journal_entries.len() - 1);
                     let entry = &self.data.journal_entries[idx];
                     self.modals.journal_editor_buf = entry.body.clone();
+                    self.modals.journal_textarea = tui_textarea::TextArea::new(
+                        entry.body.split('\n').map(|s| s.to_string()).collect(),
+                    );
                     self.modals.journal_editor_entry_id = Some(entry.id);
                     self.modals.journal_editor_open = true;
                     self.ui.mode = Mode::Insert;
                 }
+            }
+            Action::JournalEditorKey(k) => {
+                let input = tui_textarea::Input::from(crossterm::event::Event::Key(k));
+                self.modals.journal_textarea.input(input);
+                self.modals.journal_editor_buf = self.modals.journal_textarea.lines().join("\n");
             }
             Action::JournalNextEntry => {
                 let n = self.data.journal_entries.len();
@@ -342,8 +351,12 @@ impl AppState {
             Action::JournalCancelEntry => {
                 self.modals.journal_editor_open = false;
                 self.modals.journal_editor_buf.clear();
+                self.modals.journal_textarea = tui_textarea::TextArea::default();
                 self.modals.journal_editor_entry_id = None;
                 self.ui.mode = Mode::Normal;
+            }
+            Action::JournalDeleteDay => {
+                self.delete_focused_journal_day();
             }
             Action::JournalToggleHidden => {
                 self.data.journal_show_hidden = !self.data.journal_show_hidden;
@@ -805,6 +818,7 @@ impl AppState {
             return;
         }
         let len = self.data.journal_notes.len() as i32;
+        let prev = self.data.selected_journal;
         let next = (self.data.selected_journal as i32 + delta).rem_euclid(len);
         self.data.selected_journal = next as usize;
         self.data
@@ -817,6 +831,9 @@ impl AppState {
             .entries_for_note(self.data.journal_notes[self.data.selected_journal].id)
         {
             self.data.journal_entries = e;
+        }
+        if prev != self.data.selected_journal {
+            self.spawn_journal_refresh();
         }
     }
 
@@ -933,6 +950,19 @@ impl AppState {
         }
     }
 
+    /// Coalesce + accent fade over the journal entries pane when the user
+    /// flips to a different day. Reuses the same preset as task detail.
+    fn spawn_journal_refresh(&mut self) {
+        if self.ui.last_journal_entries_rect.width > 0 {
+            let eff = crate::fx::presets::detail_refresh(self.theme.accent);
+            self.fx.spawn(
+                crate::fx::EffectId::DetailRefresh,
+                eff,
+                self.ui.last_journal_entries_rect,
+            );
+        }
+    }
+
     fn submit_quick_add(&mut self, raw: String) {
         self.modals.quick_add_open = false;
         self.ui.mode = Mode::Normal;
@@ -976,9 +1006,11 @@ impl AppState {
     }
 
     fn submit_journal_entry(&mut self) {
-        let body = std::mem::take(&mut self.modals.journal_editor_buf);
+        let body = self.modals.journal_textarea.lines().join("\n");
         let editing_id = self.modals.journal_editor_entry_id.take();
         self.modals.journal_editor_open = false;
+        self.modals.journal_editor_buf.clear();
+        self.modals.journal_textarea = tui_textarea::TextArea::default();
         self.ui.mode = Mode::Normal;
         if body.trim().is_empty() {
             return;
@@ -1008,6 +1040,33 @@ impl AppState {
                 },
                 Err(e) => self.toast(format!("save failed: {}", e)),
             },
+        }
+    }
+
+    fn delete_focused_journal_day(&mut self) {
+        if self.data.journal_notes.is_empty() {
+            return;
+        }
+        let idx = self
+            .data
+            .selected_journal
+            .min(self.data.journal_notes.len() - 1);
+        let note_id = self.data.journal_notes[idx].id;
+        match self.data.store.delete_note(note_id) {
+            Ok(_) => {
+                self.data.refresh_journal_notes();
+                if self.data.selected_journal >= self.data.journal_notes.len()
+                    && !self.data.journal_notes.is_empty()
+                {
+                    self.data.selected_journal = self.data.journal_notes.len() - 1;
+                    self.data
+                        .journal_list_state
+                        .select(Some(self.data.selected_journal));
+                }
+                self.data.reload_journal_entries();
+                self.toast(format!("deleted day #{}", note_id));
+            }
+            Err(e) => self.toast(format!("delete day failed: {}", e)),
         }
     }
 

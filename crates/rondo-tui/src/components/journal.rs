@@ -30,6 +30,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         .direction(Direction::Horizontal)
         .constraints([Constraint::Length(30), Constraint::Min(1)])
         .split(area);
+    app.ui.last_journal_entries_rect = chunks[1];
 
     let items: Vec<ListItem> = app
         .data
@@ -147,10 +148,9 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     );
 }
 
-pub fn draw_editor_overlay(app: &AppState, f: &mut Frame<'_>, area: Rect) {
+pub fn draw_editor_overlay(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
     let t = &app.theme;
     // Take most of the available height so multi-line entries stay visible.
-    // Leave 2 rows of margin and 1 hint row inside.
     let h = area.height.saturating_sub(4).max(8);
     let w = area.width.saturating_sub(4);
     let editor_rect = Rect {
@@ -170,45 +170,41 @@ pub fn draw_editor_overlay(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         .border_style(t.border_style(true))
         .title(Span::styled(title, t.accent_style()));
     let inner = block.inner(editor_rect);
-    f.render_widget(block, editor_rect);
+    f.render_widget(block.clone(), editor_rect);
 
-    let buf = &app.modals.journal_editor_buf;
-    let mut lines: Vec<Line> = Vec::new();
-    for (i, segment) in buf.split('\n').enumerate() {
-        let prefix = if i == 0 { " > " } else { "   " };
-        lines.push(Line::from(vec![
-            Span::styled(prefix, t.accent_style()),
-            Span::styled(segment.to_string(), Style::default().fg(t.fg)),
-        ]));
-    }
-    if let Some(last) = lines.last_mut() {
-        last.spans.push(Span::styled(
-            "▏",
-            Style::default().fg(t.fg).add_modifier(Modifier::SLOW_BLINK),
-        ));
-    }
-    // Auto-scroll: reserve 1 row for the hint at bottom, take the last N
-    // lines so the cursor row stays visible no matter how much was typed.
-    let visible_rows = inner.height.saturating_sub(1) as usize;
-    let body_lines = if lines.len() > visible_rows {
-        lines.split_off(lines.len() - visible_rows)
-    } else {
-        lines
-    };
-    let mut all = body_lines;
-    all.push(Line::raw(""));
-    all.push(Line::from(vec![
-        Span::styled("  ", t.muted()),
+    // Inner split: textarea + hint footer.
+    let layout = ratatui::layout::Layout::default()
+        .direction(ratatui::layout::Direction::Vertical)
+        .constraints([
+            ratatui::layout::Constraint::Min(3),
+            ratatui::layout::Constraint::Length(1),
+        ])
+        .split(inner);
+
+    // Configure textarea visuals.
+    let textarea = &mut app.modals.journal_textarea;
+    textarea.set_cursor_line_style(Style::default());
+    textarea.set_cursor_style(
+        Style::default()
+            .fg(t.bg)
+            .bg(t.accent)
+            .add_modifier(Modifier::BOLD),
+    );
+    textarea.set_line_number_style(Style::default().fg(t.fg_muted));
+    f.render_widget(&*textarea, layout[0]);
+
+    let hint = Line::from(vec![
+        Span::styled(" ", t.muted()),
         Span::styled("Ctrl+S", t.kbd()),
         Span::styled(" save · ", t.muted()),
         Span::styled("Esc", t.kbd()),
         Span::styled(" cancel · ", t.muted()),
-        Span::styled("Enter", t.kbd()),
-        Span::styled(" newline · ", t.muted()),
-        Span::styled("# **md**", t.muted()),
-        Span::styled(" supported ", t.muted()),
-    ]));
-    f.render_widget(Paragraph::new(all).wrap(Wrap { trim: false }), inner);
+        Span::styled("←↑↓→", t.kbd()),
+        Span::styled(" mover · ", t.muted()),
+        Span::styled("# **md** _it_", t.muted()),
+        Span::styled(" soportado", t.muted()),
+    ]);
+    f.render_widget(Paragraph::new(hint), layout[1]);
 }
 
 fn smart_date_label(date: NaiveDate) -> String {

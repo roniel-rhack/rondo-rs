@@ -441,6 +441,14 @@ impl SqliteStore {
         Ok(())
     }
 
+    /// Hard-delete a whole day's note. The FK on `journal_entries.note_id`
+    /// is declared `ON DELETE CASCADE` so child rows go with it.
+    pub fn delete_note(&self, note_id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(super::queries::DELETE_JOURNAL_NOTE, params![note_id])?;
+        Ok(())
+    }
+
     /// Replace the body text of an existing journal entry. Also bumps the
     /// parent note's `updated_at`. Inside a single transaction.
     pub fn update_journal_entry(&self, entry_id: i64, body: &str) -> Result<()> {

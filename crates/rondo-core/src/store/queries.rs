@@ -120,6 +120,8 @@ pub const UNHIDE_JOURNAL_NOTE: &str = "UPDATE journal_notes SET hidden = 0 WHERE
 
 pub const DELETE_JOURNAL_ENTRY: &str = "DELETE FROM journal_entries WHERE id = ?1";
 
+pub const DELETE_JOURNAL_NOTE: &str = "DELETE FROM journal_notes WHERE id = ?1";
+
 pub const UPDATE_JOURNAL_ENTRY_BODY: &str =
     "UPDATE journal_entries SET body = ?1 WHERE id = ?2";
 

@@ -31,6 +31,15 @@ fn fixed_clock() -> Arc<FixedClock> {
 }
 
 fn snapshot(_name: &str, width: u16, height: u16, mutate: impl FnOnce(&mut AppState)) -> String {
+    // Pin HOME so anything that renders `$HOME/...` (plugins overlay)
+    // produces the same string length on every machine; otherwise
+    // `/Users/<user>` vs `/home/<user>` lengths shift the trailing
+    // column padding and churn the snapshot.
+    // SAFETY: every snapshot test sets the same value; this never
+    // observes a mid-flight rewrite from a different value.
+    unsafe {
+        std::env::set_var("HOME", "/snapshot-fixture");
+    }
     let mut app = AppState::with_writable_and_clock(fixture_store(), false, fixed_clock()).unwrap();
     mutate(&mut app);
     let backend = TestBackend::new(width, height);

@@ -88,9 +88,25 @@ Powered by `tui-textarea`. Cursor navigation works fully.
 | `Esc` | cancel |
 | `←` `↑` `↓` `→` `Home` `End` | navigate |
 | `Enter` | newline |
+| (system paste, e.g. `Cmd+V`) | insert clipboard at cursor (preserves multi-line) |
 | anything else | text input |
 
 Same widget powers description editor (`E` from task detail), note editor (`a`/`e` in Notes section).
+
+## Clipboard paste
+
+Bracketed paste is enabled by `tui::init`; every input surface accepts pasted
+text:
+
+| Surface | Behavior |
+|---|---|
+| description / journal / note editors | inserted at cursor, newlines preserved |
+| quick-add / edit-title / edit-subtask | first line appended to buffer |
+| command palette / search | first line appended |
+| dep overlay | digits-only filter |
+
+Works with macOS Cmd+V via Terminal.app/iTerm2, Linux middle-click, and
+anything else that uses the terminal paste protocol.
 
 ## Multiselect / Visual mode
 

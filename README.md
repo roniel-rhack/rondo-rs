@@ -38,6 +38,9 @@ binary's `~/.todo-app/`.
   CRUD action via the store.
 - **Fuzzy search** with highlighted matches in both the task list and the
   detail panel (title, tags, description, subtasks, notes).
+- **Bracketed clipboard paste** in every input surface — multi-line text
+  goes into the description / journal / note editors at the cursor;
+  single-line surfaces take the first line.
 
 ## Install
 
@@ -140,7 +143,8 @@ See [docs/keybindings.md](docs/keybindings.md) for the complete list.
 | Tasks | `p` | pomodoro overlay |
 | Tasks | `s` | sort overlay |
 | Tasks | `f<letter>` | apply filter (i/t/p/A/u/H/o/n/c) |
-| Detail pane | `Tab` / `1` `2` `3` `4` | next section / direct jump |
+| Detail pane | `Tab` / `Shift+Tab` | cycle sections |
+| Detail pane | `1` / `2` / `3` / `4` | jump to Header / Subtasks / Deps / Notes |
 | Detail pane | section-scoped `e`, `d`, `a` | act on focused item |
 | Journal | `i` / `A` | new entry |
 | Journal | `e` | edit focused entry |

@@ -53,9 +53,6 @@ pub struct ModalsState {
     pub quick_add_open: bool,
     pub quick_add_buf: String,
     pub journal_editor_open: bool,
-    /// Plain-text buffer kept in sync with the textarea for snapshot tests
-    /// and the submit path. Source of truth is `journal_textarea`.
-    pub journal_editor_buf: String,
     pub journal_textarea: tui_textarea::TextArea<'static>,
     /// If `Some(id)`, the journal editor is editing an existing entry and
     /// submit will UPDATE rather than INSERT. `None` = new entry.
@@ -104,7 +101,6 @@ impl Default for ModalsState {
             quick_add_open: false,
             quick_add_buf: String::new(),
             journal_editor_open: false,
-            journal_editor_buf: String::new(),
             journal_textarea: tui_textarea::TextArea::default(),
             journal_editor_entry_id: None,
             sort_overlay_open: false,
@@ -249,7 +245,8 @@ impl ModalsState {
             }
             ModalLayer::JournalEditor => {
                 self.journal_editor_open = false;
-                self.journal_editor_buf.clear();
+                self.journal_textarea = tui_textarea::TextArea::default();
+                self.journal_editor_entry_id = None;
             }
             ModalLayer::QuickAdd => {
                 self.quick_add_open = false;
@@ -344,13 +341,15 @@ impl ModalsState {
                 self.quick_add_buf = s;
                 None
             }
-            Action::JournalEntryInput(s) => {
-                self.journal_editor_buf = s;
+            Action::JournalEntryInput(_s) => {
+                // Dead code path: kept for action vocabulary stability.
+                // `journal_textarea` owns the editor text now.
                 None
             }
             Action::JournalCancelEntry => {
                 self.journal_editor_open = false;
-                self.journal_editor_buf.clear();
+                self.journal_textarea = tui_textarea::TextArea::default();
+                self.journal_editor_entry_id = None;
                 None
             }
             Action::EditTitleInput(s) => {

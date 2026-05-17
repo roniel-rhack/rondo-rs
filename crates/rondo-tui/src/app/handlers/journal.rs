@@ -7,7 +7,6 @@ use crate::focus::Mode;
 pub fn start_entry(app: &mut AppState) {
     if app.ui.page == Page::Journal {
         app.modals.journal_editor_open = true;
-        app.modals.journal_editor_buf.clear();
         app.modals.journal_textarea = tui_textarea::TextArea::default();
         app.modals.journal_editor_entry_id = None;
         app.ui.mode = Mode::Insert;
@@ -21,7 +20,6 @@ pub fn edit_focused_entry(app: &mut AppState) {
             .selected_journal_entry
             .min(app.data.journal_entries.len() - 1);
         let entry = &app.data.journal_entries[idx];
-        app.modals.journal_editor_buf = entry.body.clone();
         app.modals.journal_textarea = tui_textarea::TextArea::new(
             entry.body.split('\n').map(|s| s.to_string()).collect(),
         );
@@ -34,7 +32,6 @@ pub fn edit_focused_entry(app: &mut AppState) {
 pub fn editor_key(app: &mut AppState, k: crossterm::event::KeyEvent) {
     let input = tui_textarea::Input::from(crossterm::event::Event::Key(k));
     app.modals.journal_textarea.input(input);
-    app.modals.journal_editor_buf = app.modals.journal_textarea.lines().join("\n");
 }
 
 pub fn next_entry(app: &mut AppState) {
@@ -52,7 +49,6 @@ pub fn prev_entry(app: &mut AppState) {
 
 pub fn cancel_entry(app: &mut AppState) {
     app.modals.journal_editor_open = false;
-    app.modals.journal_editor_buf.clear();
     app.modals.journal_textarea = tui_textarea::TextArea::default();
     app.modals.journal_editor_entry_id = None;
     app.ui.mode = Mode::Normal;

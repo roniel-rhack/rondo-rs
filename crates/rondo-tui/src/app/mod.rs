@@ -340,8 +340,6 @@ impl AppState {
                     self.modals.note_textarea.insert_str(&text);
                 } else if self.modals.journal_editor_open {
                     self.modals.journal_textarea.insert_str(&text);
-                    self.modals.journal_editor_buf =
-                        self.modals.journal_textarea.lines().join("\n");
                 } else {
                     // Single-line surfaces: keep the first line only and
                     // strip trailing newlines so the modal doesn't break.
@@ -960,7 +958,6 @@ impl AppState {
         let body = self.modals.journal_textarea.lines().join("\n");
         let editing_id = self.modals.journal_editor_entry_id.take();
         self.modals.journal_editor_open = false;
-        self.modals.journal_editor_buf.clear();
         self.modals.journal_textarea = tui_textarea::TextArea::default();
         self.ui.mode = Mode::Normal;
         if body.trim().is_empty() {

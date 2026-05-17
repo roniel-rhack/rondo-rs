@@ -51,6 +51,23 @@ cargo run -p rondo-tui -- --reduced-motion --no-color
 - Plugin DSL types must survive `serde_json` round-trip.
 - All state under `~/.rondo-rs/` (DB, backups, logs, lock, plugins, sync, config).
 
+## Branching (gitflow)
+
+All branches follow gitflow naming. Never push work to ad-hoc names
+like `claude/*` or `wip/*` — rename before opening a PR.
+
+| Prefix | Use for | Base | Merges into |
+|---|---|---|---|
+| `feature/<slug>` | New functionality, additive changes | `main` | `main` |
+| `fix/<slug>` | Non-urgent bug fixes | `main` | `main` |
+| `hotfix/<slug>` | Urgent prod-bound fixes | `main` | `main` (+ tag) |
+| `release/<version>` | Release prep (version bump, changelog) | `main` | `main` (+ tag) |
+| `chore/<slug>` | Tooling, CI, docs, deps — no behavior change | `main` | `main` |
+
+Slug rules: lowercase, kebab-case, short (`feature/ci-github-actions`,
+not `feature/Add-GitHub-Actions-CI-Workflow`). One PR per branch. Delete
+the branch on merge.
+
 ## Architecture decisions (short)
 
 1. **Component free-fn** `draw(app, f, rect)` over a trait — simpler, no dynamic dispatch.

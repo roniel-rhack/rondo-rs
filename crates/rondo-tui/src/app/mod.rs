@@ -157,6 +157,7 @@ impl AppState {
             || handlers::pomodoro::handle(self, &action)
             || handlers::task::handle(self, &action)
             || handlers::subtask::handle(self, &action)
+            || handlers::dep::handle(self, &action)
         {
             if let Some(next) = follow_up.take() {
                 self.update(next);
@@ -323,78 +324,7 @@ impl AppState {
             }
             // Task delete + edit title handled in `handlers::task`.
             // Subtask add handled in `handlers::subtask`.
-            Action::RequestAddDependency => {
-                if !self.writable {
-                    self.toast(ro_msg("dep"));
-                } else if self.data.selected_task_id().is_some() {
-                    self.modals.dep_overlay_buf.clear();
-                    self.modals.dep_overlay_open = true;
-                    self.modals.dep_overlay_mode = crate::app::modals_state::DepOverlayMode::Add;
-                    self.ui.mode = Mode::Insert;
-                }
-            }
-            Action::SubmitAddDependency(buf) => {
-                let parsed = buf.trim().parse::<i64>();
-                match (parsed, self.data.selected_task_id()) {
-                    (Ok(blocker), Some(task_id)) if blocker > 0 && blocker != task_id => {
-                        match self.data.store.add_dependency(task_id, blocker) {
-                            Ok(()) => {
-                                self.undo
-                                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
-                                        rondo_core::domain::task::UndoKind::AddDep {
-                                            task_id,
-                                            blocker_id: blocker,
-                                        },
-                                    ));
-                                self.refresh_tasks();
-                                self.toast(format!("dep added: #{} blocks #{}", blocker, task_id));
-                            }
-                            Err(rondo_core::error::Error::CycleDetected(a, b)) => {
-                                self.toast(format!("can't add: would create cycle #{a} → #{b}"));
-                            }
-                            Err(e) => self.toast(format!("dep add failed: {}", e)),
-                        }
-                    }
-                    (Ok(_), _) => self.toast("dep: invalid id"),
-                    (Err(_), _) => self.toast("dep: enter a numeric task id"),
-                }
-                self.modals.dep_overlay_open = false;
-                self.modals.dep_overlay_buf.clear();
-                self.ui.mode = Mode::Normal;
-            }
-            Action::SubmitRemoveDependency(buf) => {
-                let parsed = buf.trim().parse::<i64>();
-                match (parsed, self.data.selected_task_id()) {
-                    (Ok(blocker), Some(task_id)) => {
-                        match self.data.store.remove_dependency(task_id, blocker) {
-                            Ok(()) => {
-                                self.undo
-                                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
-                                        rondo_core::domain::task::UndoKind::RemoveDep {
-                                            task_id,
-                                            blocker_id: blocker,
-                                        },
-                                    ));
-                                self.refresh_tasks();
-                                self.toast(format!("dep removed: #{}", blocker));
-                            }
-                            Err(e) => self.toast(format!("dep remove failed: {}", e)),
-                        }
-                    }
-                    _ => self.toast("dep: enter a numeric task id"),
-                }
-                self.modals.dep_overlay_open = false;
-                self.modals.dep_overlay_buf.clear();
-                self.ui.mode = Mode::Normal;
-            }
-            Action::CancelDepOverlay => {
-                self.modals.dep_overlay_open = false;
-                self.modals.dep_overlay_buf.clear();
-                self.ui.mode = Mode::Normal;
-            }
-            Action::ToggleDepOverlayMode => {
-                // handled inside ModalsState::update already
-            }
+            // Dependency add/remove/cancel handled in `handlers::dep`.
             // Edit-description handled in `handlers::task`.
 
             // Subtask edit/delete handled in `handlers::subtask`.

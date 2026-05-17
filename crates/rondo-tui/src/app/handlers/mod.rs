@@ -9,6 +9,7 @@
 //! module corresponds to a *domain* (journal entries, subtasks,
 //! dependencies, …), keeping related state mutations together.
 
+pub mod dep;
 pub mod journal;
 pub mod pomodoro;
 pub mod subtask;

@@ -129,18 +129,16 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         inner_width,
         t,
     );
+    lines.push(Line::raw(""));
     if has_desc {
         for l in markdown::render(desc_body, t).lines {
-            let mut spans = vec![Span::styled(
-                "▏ ",
-                Style::default().fg(t.border_inactive),
-            )];
+            let mut spans = vec![Span::raw("    ")];
             spans.extend(l.spans);
             lines.push(Line::from(spans));
         }
     } else {
         lines.push(Line::from(vec![
-            Span::styled("▏ ", Style::default().fg(t.border_inactive)),
+            Span::raw("    "),
             Span::styled("(sin descripción)  ", t.muted()),
             Span::styled("E", t.kbd()),
             Span::styled(" para añadir", t.muted()),

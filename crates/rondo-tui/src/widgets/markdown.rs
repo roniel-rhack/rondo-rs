@@ -172,10 +172,8 @@ pub fn render(md: &str, theme: &Theme) -> Text<'static> {
                     buf.push(Span::styled("▏ ", Style::default().fg(theme.accent)));
                 }
             }
-            Event::Start(Tag::Paragraph) => {
-                if in_blockquote {
-                    buf.push(Span::styled("▏ ", Style::default().fg(theme.accent)));
-                }
+            Event::Start(Tag::Paragraph) if in_blockquote => {
+                buf.push(Span::styled("▏ ", Style::default().fg(theme.accent)));
             }
             Event::End(TagEnd::Paragraph) => {
                 flush_buf(&mut buf, &mut lines);

@@ -121,7 +121,11 @@ fn ambiguous_prefix_toasts_matches() {
     assert!(app.modals.plugin_page.is_none());
     let msg = app.status_msg.as_deref().unwrap_or("");
     assert!(msg.starts_with("ambiguous:"), "got: {}", msg);
-    assert!(msg.contains("focus"), "expected matches in toast, got: {}", msg);
+    assert!(
+        msg.contains("focus"),
+        "expected matches in toast, got: {}",
+        msg
+    );
 }
 
 #[test]

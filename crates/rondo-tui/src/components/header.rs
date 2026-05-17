@@ -1,5 +1,4 @@
 use crate::app::AppState;
-use chrono::Local;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
@@ -58,7 +57,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
 fn telemetry(app: &AppState) -> Vec<Span<'static>> {
     let t = &app.theme;
-    let now = Local::now();
+    let now = crate::clock::now();
     let time = now.format("%H:%M:%S").to_string();
     let today = now.date_naive();
     let due_today = app

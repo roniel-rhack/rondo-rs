@@ -3,7 +3,6 @@ use crate::filter::{Filter, NAV_BLOCK_LEN, SIDEBAR_ITEMS};
 use crate::focus::Pane;
 use crate::theme::Theme;
 use crate::widgets::bracket_panel::BracketPanel;
-use chrono::Local;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
@@ -177,6 +176,5 @@ fn compute_counts(app: &AppState) -> Counts {
     }
     // Status field is referenced only to ensure the trait is in scope.
     let _ = Status::Pending;
-    let _ = Local::now();
     Counts { by_filter }
 }

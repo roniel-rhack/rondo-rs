@@ -1,7 +1,7 @@
 use crate::app::AppState;
 use crate::theme::Theme;
 use crate::widgets::bracket_panel::BracketPanel;
-use chrono::{Duration, Local};
+use chrono::Duration;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
@@ -95,7 +95,7 @@ fn draw_donut(app: &AppState, f: &mut Frame<'_>, area: Rect) {
         .iter()
         .filter(|x| x.status == Status::Pending)
         .count();
-    let today = Local::now().date_naive();
+    let today = crate::clock::today();
     let overdue = app
         .data
         .tasks
@@ -155,7 +155,7 @@ fn draw_bars_7d(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let inner = panel.inner(area);
     panel.render(area, f.buffer_mut());
 
-    let today = Local::now().date_naive();
+    let today = crate::clock::today();
     let mut counts = [0usize; 7];
     for task in &app.data.tasks {
         if let Some(d) = task.due_date {
@@ -242,7 +242,7 @@ fn draw_distribution(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
     let mut lines: Vec<Line> = Vec::new();
     for (i, (tag, count)) in entries.iter().enumerate() {
-        let pct = if total == 0 { 0 } else { count * 100 / total };
+        let pct = (count * 100).checked_div(total).unwrap_or(0);
         let filled = (bar_max * pct / 100).max(1);
         let empty = bar_max.saturating_sub(filled);
         let color = palette[i % palette.len()];
@@ -265,7 +265,7 @@ fn draw_sync(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let inner = panel.inner(area);
     panel.render(area, f.buffer_mut());
 
-    let now = Local::now();
+    let now = crate::clock::now();
     let lines = vec![
         Line::from(vec![
             Span::styled(" ESTADO     ", t.muted()),

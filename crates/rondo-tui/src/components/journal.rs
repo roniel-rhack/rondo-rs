@@ -205,7 +205,7 @@ pub fn draw_editor_overlay(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
 }
 
 fn smart_date_label(date: NaiveDate) -> String {
-    let today = Local::now().date_naive();
+    let today = crate::clock::today();
     let delta = (today - date).num_days();
     match delta {
         0 => "Today".to_string(),

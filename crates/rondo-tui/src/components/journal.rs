@@ -1,4 +1,7 @@
-use crate::{app::AppState, widgets::markdown};
+use crate::{
+    app::AppState,
+    widgets::{empty, markdown},
+};
 use chrono::{Local, NaiveDate};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -14,7 +17,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         let lines = vec![
             Line::raw(""),
             Line::raw(""),
-            Line::from(Span::styled("  No journal entries yet", t.muted())),
+            empty::line("journal", "i", "to add", t),
             Line::raw(""),
             Line::from(vec![
                 Span::raw("  "),
@@ -81,10 +84,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
         )));
         content_lines.push(Line::raw(""));
         if app.data.journal_entries.is_empty() {
-            content_lines.push(Line::from(Span::styled(
-                "  (no entries this day)",
-                Style::default().fg(t.fg_muted),
-            )));
+            content_lines.push(empty::line("journal", "i", "to add", t));
         }
         let body_width = chunks[1].width.saturating_sub(4) as usize;
         let cursor_idx = app
@@ -132,10 +132,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
             }
         }
     } else {
-        content_lines.push(Line::from(Span::styled(
-            "No journal entries",
-            Style::default().fg(t.fg_muted),
-        )));
+        content_lines.push(empty::line("journal", "i", "to add", t));
     }
     f.render_widget(
         Paragraph::new(content_lines)

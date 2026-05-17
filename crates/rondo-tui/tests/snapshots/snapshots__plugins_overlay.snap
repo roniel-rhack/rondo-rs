@@ -21,7 +21,7 @@ expression: s
 "│                        │┃│                                                                                    │                          │"
 "│                        │┃│ CLI: rondo-tui plugins list / info <id> / install <path> / remove <id>             │                          │"
 "│                        │┃│ Esc cerrar                                                                         │───────────────────────   │"
-"│                        │┃│                                                                                    │adir                      │"
+"│                        │┃│                                                                                    │                          │"
 "│                        │┃│                                                                                    │                          │"
 "│                        │┃│                                                                                    │───────────────────────   │"
 "│                        │┃│                                                                                    │                          │"

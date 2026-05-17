@@ -6,7 +6,7 @@ expression: s
 "┌─ navegación ───────────┐╭ Journal ───────────────────────────────────────────────────────────────────────────────────╮"
 "│  [i] ◉ INBOX       3   ││                                                                                            │"
 "│  [t] ◷ HOY         1   ││                                                                                            │"
-"│  [p] ⏵ PRÓXIMAS    2   ││  No journal entries yet                                                                    │"
+"│  [p] ⏵ PRÓXIMAS    2   ││  (empty)  i to add                                                                         │"
 "│  [A] ◇ TODAS       4   ││                                                                                            │"
 "└────────────────────────┘│  ? for help                                                                                │"
 "┌─ filtros rápidos ──────┐│                                                                                            │"

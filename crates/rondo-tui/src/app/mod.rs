@@ -9,6 +9,7 @@ pub use modals_state::ModalsState;
 pub use ui_state::{FlashTarget, UiState, FLASH_DURATION_MS};
 
 use crate::action::{Action, Page};
+use crate::clock::{Clock, SystemClock};
 use crate::filter::Filter;
 use crate::focus::{DetailSection, Mode, Pane};
 use crate::theme::Theme;
@@ -31,6 +32,10 @@ pub struct AppState {
     /// True when the underlying store was opened RW (so we can persist mutations).
     pub writable: bool,
     pub undo: undo::UndoStack,
+    /// Source of "now" for render-time date/time formatting. Production
+    /// uses [`SystemClock`]; tests inject `FixedClock` so snapshots and
+    /// date assertions are deterministic.
+    pub clock: Arc<dyn Clock>,
 }
 
 impl AppState {
@@ -42,6 +47,15 @@ impl AppState {
         store: Arc<rondo_core::store::sqlite::SqliteStore>,
         writable: bool,
     ) -> Result<Self> {
+        Self::with_writable_and_clock(store, writable, Arc::new(SystemClock))
+    }
+
+    /// Full constructor for tests that need a deterministic clock.
+    pub fn with_writable_and_clock(
+        store: Arc<rondo_core::store::sqlite::SqliteStore>,
+        writable: bool,
+        clock: Arc<dyn Clock>,
+    ) -> Result<Self> {
         let mut plugins = PluginRegistry::new();
         plugins.register(Box::new(crate::plugins::builtin::bell::BellPlugin));
         plugins.register(Box::new(
@@ -51,7 +65,7 @@ impl AppState {
             crate::plugins::builtin::analytics::AnalyticsPlugin,
         ));
         Ok(Self {
-            data: DataState::new(store)?,
+            data: DataState::new(store, Arc::clone(&clock))?,
             ui: UiState::default(),
             modals: ModalsState::default(),
             fx: crate::fx::FxManager::new(),
@@ -62,6 +76,7 @@ impl AppState {
             status_msg: None,
             writable,
             undo: undo::UndoStack::default(),
+            clock,
         })
     }
 

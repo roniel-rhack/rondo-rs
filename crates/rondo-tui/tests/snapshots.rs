@@ -1,7 +1,8 @@
+use chrono::{TimeZone, Utc};
 use insta::assert_snapshot;
 use ratatui::{backend::TestBackend, Terminal};
 use rondo_core::store::sqlite::SqliteStore;
-use rondo_tui::{action::Page, app::AppState, components, filter};
+use rondo_tui::{action::Page, app::AppState, clock::FixedClock, components, filter};
 use std::sync::Arc;
 
 fn fixture_store() -> Arc<SqliteStore> {
@@ -21,17 +22,25 @@ fn fixture_store() -> Arc<SqliteStore> {
     Arc::new(SqliteStore::open_readonly(tmp.path()).unwrap())
 }
 
+/// Pinned clock so date strings (today's date, "in 2d" badges) are
+/// deterministic across snapshot runs and across machines.
+fn fixed_clock() -> Arc<FixedClock> {
+    Arc::new(FixedClock::new(
+        Utc.with_ymd_and_hms(2026, 5, 17, 10, 0, 0).unwrap(),
+    ))
+}
+
 fn snapshot(_name: &str, width: u16, height: u16, mutate: impl FnOnce(&mut AppState)) -> String {
-    let mut app = AppState::new(fixture_store()).unwrap();
+    let mut app = AppState::with_writable_and_clock(fixture_store(), false, fixed_clock()).unwrap();
     mutate(&mut app);
     let backend = TestBackend::new(width, height);
     let mut term = Terminal::new(backend).unwrap();
     term.draw(|f| components::root::draw(&mut app, f)).unwrap();
     let raw = term.backend().to_string();
-    // Redact wall-clock timestamps so snapshots are stable across runs.
-    // Order matters: longer pattern first (HH:MM:SS), then plain HH:MM, then
-    // single-digit-hour fragments (`6:02`) that leak through when an overlay
-    // clips the dashboard's sync widget.
+    // The clock is pinned, but `pomodoro_started` (from `Instant::now()`)
+    // and other monotonic clock readings can still leak HH:MM:SS strings
+    // into the buffer. Keep the time-of-day redaction for those paths;
+    // the `today()` date string no longer needs redaction.
     let re_hms = regex::Regex::new(r"\d{2}:\d{2}:\d{2}").unwrap();
     let stage1 = re_hms.replace_all(&raw, "HH:MM:SS").to_string();
     let re_hm = regex::Regex::new(r"\b\d{2}:\d{2}\b").unwrap();

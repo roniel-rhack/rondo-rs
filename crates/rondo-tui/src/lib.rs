@@ -2,6 +2,7 @@ pub mod a11y;
 pub mod action;
 pub mod app;
 pub mod cli;
+pub mod clock;
 pub mod components;
 pub mod event;
 pub mod filter;

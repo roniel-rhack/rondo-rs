@@ -25,7 +25,7 @@ fn isolated_home() -> tempfile::TempDir {
 fn delete_with_read_only_flag_errors() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -39,7 +39,7 @@ fn delete_with_read_only_flag_errors() {
 fn delete_with_write_succeeds() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -52,7 +52,7 @@ fn delete_with_write_succeeds() {
 fn journal_list_runs() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -65,7 +65,7 @@ fn journal_list_runs() {
 fn journal_add_requires_write() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -80,7 +80,7 @@ fn journal_add_requires_write() {
 fn journal_add_with_write_succeeds() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -96,7 +96,7 @@ fn journal_add_with_write_succeeds() {
 fn focus_stats_runs() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -109,7 +109,7 @@ fn focus_stats_runs() {
 fn focus_start_with_write() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -122,7 +122,7 @@ fn focus_start_with_write() {
 fn stats_json_parses() {
     let db = make_db();
     let home = isolated_home();
-    let out = Command::cargo_bin("rondo-tui")
+    let out = Command::cargo_bin("rondo-rs")
         .unwrap()
         .env("HOME", home.path())
         .arg("--db")
@@ -146,7 +146,7 @@ fn stats_json_parses() {
 fn recur_preview_runs() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -157,27 +157,27 @@ fn recur_preview_runs() {
 
 #[test]
 fn completion_emits_bash() {
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.arg("completion").arg("bash");
     cmd.assert()
         .success()
-        .stdout(predicate::str::contains("rondo-tui"));
+        .stdout(predicate::str::contains("rondo-rs"));
 }
 
 #[test]
 fn completion_emits_zsh() {
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.arg("completion").arg("zsh");
     cmd.assert()
         .success()
-        .stdout(predicate::str::contains("rondo-tui"));
+        .stdout(predicate::str::contains("rondo-rs"));
 }
 
 #[test]
 fn batch_processes_ndjson() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -194,7 +194,7 @@ fn batch_processes_ndjson() {
 fn batch_json_summary() {
     let db = make_db();
     let home = isolated_home();
-    let out = Command::cargo_bin("rondo-tui")
+    let out = Command::cargo_bin("rondo-rs")
         .unwrap()
         .env("HOME", home.path())
         .arg("--db")
@@ -214,7 +214,7 @@ fn batch_json_summary() {
 fn dep_add_requires_write() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -230,7 +230,7 @@ fn dep_add_requires_write() {
 fn dep_add_creates_dependency() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -245,7 +245,7 @@ fn dep_add_creates_dependency() {
 fn dep_remove_idempotent() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -260,7 +260,7 @@ fn dep_remove_idempotent() {
 fn tag_add_works() {
     let db = make_db();
     let home = isolated_home();
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
@@ -275,7 +275,7 @@ fn tag_add_works() {
 fn tag_remove_works() {
     let db = make_db();
     let home = isolated_home();
-    Command::cargo_bin("rondo-tui")
+    Command::cargo_bin("rondo-rs")
         .unwrap()
         .env("HOME", home.path())
         .arg("--db")
@@ -286,7 +286,7 @@ fn tag_remove_works() {
         .arg("tmp")
         .assert()
         .success();
-    Command::cargo_bin("rondo-tui")
+    Command::cargo_bin("rondo-rs")
         .unwrap()
         .env("HOME", home.path())
         .arg("--db")

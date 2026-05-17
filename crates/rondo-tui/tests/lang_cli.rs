@@ -12,11 +12,11 @@ fn isolated() -> TempDir {
     tempfile::tempdir().unwrap()
 }
 
-/// Build a `rondo-tui` invocation with `HOME` and `RONDO_CONFIG` pointed at
+/// Build a `rondo-rs` invocation with `HOME` and `RONDO_CONFIG` pointed at
 /// the isolated tempdir so neither the lang directory nor the saved config
 /// touches the developer's machine.
 fn bin(home: &TempDir) -> Command {
-    let mut cmd = Command::cargo_bin("rondo-tui").unwrap();
+    let mut cmd = Command::cargo_bin("rondo-rs").unwrap();
     cmd.env("HOME", home.path())
         .env("RONDO_CONFIG", home.path().join("config.toml"));
     cmd

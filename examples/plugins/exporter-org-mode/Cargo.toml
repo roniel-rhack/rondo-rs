@@ -11,7 +11,7 @@ edition = "2021"
 
 # Sample plugin showing the `Capability::Exporter` contract: the manifest
 # carries `[exporter] format_id = "org"` and the host routes
-# `rondo-tui export --format org` to this module's `export` entrypoint.
+# `rondo-rs export --format org` to this module's `export` entrypoint.
 
 [dependencies]
 rondo-plugin-api = { path = "../../../crates/rondo-plugin-api" }

@@ -24,7 +24,7 @@ fn isolated_home() -> tempfile::TempDir {
 }
 
 fn rondo() -> Command {
-    Command::cargo_bin("rondo-tui").unwrap()
+    Command::cargo_bin("rondo-rs").unwrap()
 }
 
 #[test]

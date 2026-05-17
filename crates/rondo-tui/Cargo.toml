@@ -4,14 +4,14 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-default-run = "rondo-tui"
+default-run = "rondo-rs"
 
 [lib]
 path = "src/lib.rs"
 bench = false
 
 [[bin]]
-name = "rondo-tui"
+name = "rondo-rs"
 path = "src/main.rs"
 bench = false
 

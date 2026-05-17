@@ -1,5 +1,5 @@
-//! CLI subcommand dispatch. When `rondo-tui` is invoked with a subcommand
-//! (e.g. `rondo-tui list`), we run a one-shot CLI path and exit instead of
+//! CLI subcommand dispatch. When `rondo-rs` is invoked with a subcommand
+//! (e.g. `rondo-rs list`), we run a one-shot CLI path and exit instead of
 //! launching the TUI. Mutation commands (`add`, `done`) require `--write`
 //! and follow the same backup + lock-acquire dance as the TUI startup.
 

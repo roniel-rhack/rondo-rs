@@ -159,7 +159,7 @@ fn sort_overlay_key(ev: Event) -> Option<Action> {
     };
     Some(match k.code {
         KeyCode::Esc => Action::CloseSortOverlay,
-        KeyCode::Char(c) if c.is_ascii_digit() => {
+        KeyCode::Char(c) if matches!(c, '1'..='5') => {
             let idx = (c as u8).saturating_sub(b'1') as usize;
             let order = SortOrder::ALL.get(idx).copied()?;
             Action::SetSortOrder(order)

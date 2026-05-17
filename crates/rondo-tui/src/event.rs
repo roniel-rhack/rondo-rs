@@ -463,7 +463,9 @@ fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
         KeyCode::Char('k') | KeyCode::Up => Action::PrevItem,
         KeyCode::Char('i') if on_journal => Action::JournalStartEntry,
         KeyCode::Char('H') if on_journal => Action::JournalToggleHidden,
-        KeyCode::Char('D') if on_journal => Action::JournalDeleteEntry,
+        // Note: `D` is NOT a journal alias for `d`. Lowercase `d` deletes the
+        // focused entry; uppercase `D` is reserved for future destructive
+        // bulk actions on journal data.
         KeyCode::Char('D') if !on_journal && !in_sidebar && !in_visual => {
             Action::RequestEditDueDate
         }

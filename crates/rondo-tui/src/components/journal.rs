@@ -71,19 +71,39 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
                 Style::default().fg(t.fg_muted),
             )));
         }
-        for entry in &app.data.journal_entries {
-            content_lines.push(Line::from(Span::styled(
-                entry
-                    .created_at
-                    .with_timezone(&Local)
-                    .format("  %H:%M  ")
-                    .to_string(),
-                Style::default().fg(t.fg_muted).add_modifier(Modifier::BOLD),
-            )));
-            for l in markdown::render(&entry.body, t).lines {
-                content_lines.push(l);
+        let body_width = chunks[1].width.saturating_sub(4) as usize;
+        for (i, entry) in app.data.journal_entries.iter().enumerate() {
+            if i > 0 {
+                content_lines.push(Line::raw(""));
+                content_lines.push(Line::from(Span::styled(
+                    "╌".repeat(body_width.min(60)),
+                    Style::default().fg(t.border_inactive),
+                )));
+                content_lines.push(Line::raw(""));
             }
+            content_lines.push(Line::from(vec![
+                Span::styled("  ◷ ", Style::default().fg(t.accent)),
+                Span::styled(
+                    entry
+                        .created_at
+                        .with_timezone(&Local)
+                        .format("%H:%M")
+                        .to_string(),
+                    Style::default()
+                        .fg(t.accent)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!("  · #{}", entry.id),
+                    Style::default().fg(t.fg_muted),
+                ),
+            ]));
             content_lines.push(Line::raw(""));
+            for l in markdown::render(&entry.body, t).lines {
+                let mut spans = vec![Span::raw("  ")];
+                spans.extend(l.spans);
+                content_lines.push(Line::from(spans));
+            }
         }
     } else {
         content_lines.push(Line::from(Span::styled(

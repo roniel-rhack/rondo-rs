@@ -73,6 +73,14 @@ fn filter_suggestions(buf: &str) -> Vec<&'static Suggestion> {
             desc: "start focus session overlay",
         },
         Suggestion {
+            cmd: "plugins",
+            desc: "list installed plugins + capabilities",
+        },
+        Suggestion {
+            cmd: "help",
+            desc: "open key-bindings reference",
+        },
+        Suggestion {
             cmd: "quit",
             desc: "exit rondo-tui",
         },

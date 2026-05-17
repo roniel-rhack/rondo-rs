@@ -33,4 +33,4 @@ expression: s
 "│   ○    2  Pendient ││   16   17   18   19   20   21  ││                                  ││         ⌬                │"
 "│   !    0  Vencidas ││                                ││                                  ││                          │"
 "└────────────────────┘└────────────────────────────────┘└──────────────────────────────────┘└──────────────────────────┘"
-" [NOR]  [a → add] [A → + subtarea] [B → + dep] [v → select] [f<l> → filtro]  · ? more                                   "
+" [NOR]  [i → nueva entrada] [j/k → navegar día] [g/G → primer/último] [H → toggle hidden] [D → delete entry]  · ? more  "

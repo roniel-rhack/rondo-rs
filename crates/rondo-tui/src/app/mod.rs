@@ -118,6 +118,13 @@ impl AppState {
             self.ui.leader_goto = false;
         }
 
+        // Auto-dismiss the quick-actions overlay whenever a key dispatched
+        // from it opens a different modal or triggers a stateful change.
+        // Keeps it from sitting visually behind every subsequent overlay.
+        if self.modals.quick_actions_open && action_dismisses_quick_actions(&action) {
+            self.modals.quick_actions_open = false;
+        }
+
         // Route to substate handlers first; they own the pure mutations.
         let mut follow_up = self.ui.update(action.clone());
         if follow_up.is_none() {
@@ -514,7 +521,9 @@ impl AppState {
                 }
             }
             Action::EscapeContext => {
-                if self.modals.help_open {
+                if self.modals.plugins_overlay_open {
+                    self.modals.plugins_overlay_open = false;
+                } else if self.modals.help_open {
                     self.modals.help_open = false;
                 } else if self.modals.confirm_delete_open {
                     self.modals.confirm_delete_open = false;
@@ -958,6 +967,8 @@ impl AppState {
                     self.persist_pomodoro_start();
                 }
             }
+            "plugins" => self.modals.plugins_overlay_open = true,
+            "help" => self.modals.help_open = true,
             "quit" => self.should_quit = true,
             "" => {}
             other => self.status_msg = Some(format!("unknown: {}", other)),
@@ -1064,6 +1075,30 @@ pub struct QuickAddInput {
     pub tags: Vec<String>,
     pub priority: Option<rondo_core::domain::task::Priority>,
     pub due: Option<String>,
+}
+
+/// True for actions emitted from the quick-actions grid that should also
+/// close the grid (since they open a new modal / change focus). Keeps a
+/// fresh overlay from sitting behind every subsequent modal.
+fn action_dismisses_quick_actions(a: &Action) -> bool {
+    matches!(
+        a,
+        Action::OpenQuickAdd
+            | Action::RequestEditTitle
+            | Action::RequestDeleteTask
+            | Action::RequestAddSubtask
+            | Action::RequestAddDependency
+            | Action::ToggleSelected
+            | Action::EnterVisual
+            | Action::TogglePomodoro
+            | Action::OpenSearch
+            | Action::OpenCommandPalette
+            | Action::OpenSortOverlay
+            | Action::LeaderGoto
+            | Action::Undo
+            | Action::ToggleHelp
+            | Action::TogglePage(_)
+    )
 }
 
 /// Parse quick-add syntax: `title with words #tag1 #tag2 !p3 due:tmrw`.

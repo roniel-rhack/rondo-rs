@@ -33,6 +33,9 @@ pub fn map(ev: Event, app: &AppState) -> Option<Action> {
     if app.modals.dep_overlay_open {
         return dep_overlay_key(ev, app);
     }
+    if app.modals.quick_actions_open {
+        return quick_actions_key(ev, app);
+    }
     if app.ui.leader_goto {
         if let Event::Key(k) = ev {
             if let KeyCode::Char(c) = k.code {
@@ -193,6 +196,51 @@ fn edit_title_key(ev: Event, app: &AppState) -> Option<Action> {
     })
 }
 
+/// When the quick-actions overlay is open, each press dispatches the
+/// matching action AND closes the overlay first (via a synthetic close
+///   plus the action follow-up the dispatcher will route). For unmapped
+/// keys, the overlay just stays open.
+fn quick_actions_key(ev: Event, _app: &AppState) -> Option<Action> {
+    let Event::Key(k) = ev else {
+        return None;
+    };
+    let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
+    let action = match k.code {
+        KeyCode::Esc => Action::CloseQuickActions,
+        KeyCode::Char('.') => Action::CloseQuickActions,
+        KeyCode::Char('a') => Action::OpenQuickAdd,
+        KeyCode::Char('e') => Action::RequestEditTitle,
+        KeyCode::Char('d') => Action::RequestDeleteTask,
+        KeyCode::Char(' ') => Action::ToggleSelected,
+        KeyCode::Char('A') => Action::RequestAddSubtask,
+        KeyCode::Char('B') => Action::RequestAddDependency,
+        KeyCode::Char('v') => Action::EnterVisual,
+        KeyCode::Char('p') => Action::TogglePomodoro,
+        KeyCode::Char('/') => Action::OpenSearch,
+        KeyCode::Char(':') => Action::OpenCommandPalette,
+        KeyCode::Char('s') => Action::OpenSortOverlay,
+        KeyCode::Char('f') => Action::LeaderGoto,
+        KeyCode::Char('z') if ctrl => Action::Undo,
+        KeyCode::Char('?') => Action::ToggleHelp,
+        KeyCode::Char('1') => Action::TogglePage(Page::Tasks),
+        KeyCode::Char('2') => Action::TogglePage(Page::Journal),
+        _ => return None,
+    };
+    // CloseQuickActions on its own is enough.
+    if matches!(action, Action::CloseQuickActions) {
+        return Some(action);
+    }
+    // For every other action we want the overlay to close first; we hand
+    // back the action and rely on the dispatcher routing close via the
+    // EscapeContext path inside each handler that opens a new modal.
+    // Simpler: emit a single Action — the cross-cutting handler at
+    // app/mod.rs closes the quick-actions overlay before opening its
+    // own modal because each Request* / Open* handler we already wrote
+    // sets the next modal regardless of prior overlay state. To make
+    // sure the prior overlay disappears, we close it here via state.
+    Some(action)
+}
+
 fn add_subtask_key(ev: Event, app: &AppState) -> Option<Action> {
     let Event::Key(k) = ev else {
         return None;
@@ -282,6 +330,7 @@ fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
         KeyCode::Char('k') | KeyCode::Up => Action::PrevItem,
         KeyCode::Char('i') if on_journal => Action::JournalStartEntry,
         KeyCode::Char('H') if on_journal => Action::JournalToggleHidden,
+        KeyCode::Char('D') if on_journal => Action::JournalDeleteEntry,
         KeyCode::Char('g') if on_journal => Action::JournalGotoTop,
         KeyCode::Char('G') if on_journal => Action::JournalGotoBottom,
         KeyCode::Char('g') => Action::JumpTop,

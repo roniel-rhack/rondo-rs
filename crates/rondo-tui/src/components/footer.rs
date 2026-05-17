@@ -93,6 +93,22 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
             (":", "cmd"),
         ];
     }
+    if app.modals.journal_editor_open {
+        return vec![
+            ("Ctrl+S", "save (markdown)"),
+            ("Enter", "newline"),
+            ("Esc", "cancel"),
+        ];
+    }
+    if app.ui.page == crate::action::Page::Journal {
+        return vec![
+            ("i", "nueva entrada"),
+            ("j/k", "navegar día"),
+            ("g/G", "primer/último"),
+            ("H", "toggle hidden"),
+            ("D", "delete entry"),
+        ];
+    }
     match app.ui.focus.pane {
         Pane::Sidebar => vec![
             ("j/k", "move"),

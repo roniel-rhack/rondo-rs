@@ -36,6 +36,7 @@ pub struct ModalsState {
     pub dep_overlay_open: bool,
     pub dep_overlay_buf: String,
     pub dep_overlay_mode: DepOverlayMode,
+    pub plugins_overlay_open: bool,
 }
 
 impl Default for ModalsState {
@@ -65,6 +66,7 @@ impl Default for ModalsState {
             dep_overlay_open: false,
             dep_overlay_buf: String::new(),
             dep_overlay_mode: DepOverlayMode::Add,
+            plugins_overlay_open: false,
         }
     }
 }
@@ -84,6 +86,7 @@ impl ModalsState {
             || self.edit_title_open
             || self.add_subtask_open
             || self.dep_overlay_open
+            || self.plugins_overlay_open
     }
 
     /// Pure modal mutations that don't need cross-substate access.

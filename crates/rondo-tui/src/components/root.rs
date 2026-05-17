@@ -52,7 +52,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
         components::help::draw(app, f, centered(60, 40, area));
     }
     if app.modals.quick_actions_open {
-        components::quick_actions::draw(app, f, centered(72, 7, area));
+        components::quick_actions::draw(app, f, centered(100, 8, area));
     }
     if app.modals.sort_overlay_open {
         let h = crate::app::ui_state::SortOrder::ALL.len() as u16 + 2;
@@ -69,6 +69,9 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
     }
     if app.modals.dep_overlay_open {
         components::dep_overlay::draw(app, f, centered(70, 8, area));
+    }
+    if app.modals.plugins_overlay_open {
+        components::plugins_overlay::draw(app, f, centered(86, 40, area));
     }
 
     // Run live effects after all widgets have painted; effects mutate cells in

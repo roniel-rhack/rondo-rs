@@ -9,22 +9,28 @@ use ratatui::{
 
 const GRID: &[&[(&str, &str)]] = &[
     &[
-        ("E", "Editar tarea"),
-        ("N", "Nueva tarea"),
-        ("T", "Etiquetas"),
-        ("S", "Cambiar estado"),
+        ("a", "nueva tarea"),
+        ("e", "editar título"),
+        ("d", "eliminar"),
+        ("space", "toggle estado"),
     ],
     &[
-        ("P", "Prioridad"),
-        ("A", "Asignar"),
-        ("D", "Fecha límite"),
-        ("X", "Eliminar"),
+        ("A", "+ subtarea"),
+        ("B", "+ dependencia"),
+        ("v", "seleccionar múltiple"),
+        ("p", "pomodoro"),
     ],
     &[
-        ("V", "Ver calendario"),
-        ("G", "Grafo dependencias"),
-        ("R", "Recurrente"),
-        (".", "Más acciones"),
+        ("/", "buscar"),
+        (":", "comando"),
+        ("s", "ordenar"),
+        ("f<l>", "filtro rápido"),
+    ],
+    &[
+        ("Ctrl+Z", "deshacer"),
+        ("?", "ayuda"),
+        ("1/2", "tasks/journal"),
+        ("Esc", "cerrar overlay"),
     ],
 ];
 

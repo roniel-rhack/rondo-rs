@@ -401,6 +401,94 @@ impl AppState {
                 self.modals.edit_title_buf.clear();
                 self.ui.mode = Mode::Normal;
             }
+            Action::RequestAddSubtask => {
+                if !self.writable {
+                    self.toast("subtask: read-only (start with --write)");
+                } else if self.data.selected_task_id().is_some() {
+                    self.modals.add_subtask_buf.clear();
+                    self.modals.add_subtask_open = true;
+                    self.ui.mode = Mode::Insert;
+                }
+            }
+            Action::SubmitAddSubtask(title) => {
+                let trimmed = title.trim().to_string();
+                if !trimmed.is_empty() {
+                    if let Some(task_id) = self.data.selected_task_id() {
+                        match self.data.store.add_subtask(task_id, &trimmed) {
+                            Ok((_id, snap)) => {
+                                self.undo.push(snap);
+                                self.data.refresh_tasks();
+                                self.toast("subtask added");
+                            }
+                            Err(e) => self.toast(format!("subtask failed: {}", e)),
+                        }
+                    }
+                }
+                self.modals.add_subtask_open = false;
+                self.modals.add_subtask_buf.clear();
+                self.ui.mode = Mode::Normal;
+            }
+            Action::CancelAddSubtask => {
+                self.modals.add_subtask_open = false;
+                self.modals.add_subtask_buf.clear();
+                self.ui.mode = Mode::Normal;
+            }
+            Action::RequestAddDependency => {
+                if !self.writable {
+                    self.toast("dep: read-only (start with --write)");
+                } else if self.data.selected_task_id().is_some() {
+                    self.modals.dep_overlay_buf.clear();
+                    self.modals.dep_overlay_open = true;
+                    self.modals.dep_overlay_mode =
+                        crate::app::modals_state::DepOverlayMode::Add;
+                    self.ui.mode = Mode::Insert;
+                }
+            }
+            Action::SubmitAddDependency(buf) => {
+                let parsed = buf.trim().parse::<i64>();
+                match (parsed, self.data.selected_task_id()) {
+                    (Ok(blocker), Some(task_id)) if blocker > 0 && blocker != task_id => {
+                        match self.data.store.add_dependency(task_id, blocker) {
+                            Ok(()) => {
+                                self.data.refresh_tasks();
+                                self.toast(format!("dep added: #{} blocks #{}", blocker, task_id));
+                            }
+                            Err(e) => self.toast(format!("dep add failed: {}", e)),
+                        }
+                    }
+                    (Ok(_), _) => self.toast("dep: invalid id"),
+                    (Err(_), _) => self.toast("dep: enter a numeric task id"),
+                }
+                self.modals.dep_overlay_open = false;
+                self.modals.dep_overlay_buf.clear();
+                self.ui.mode = Mode::Normal;
+            }
+            Action::SubmitRemoveDependency(buf) => {
+                let parsed = buf.trim().parse::<i64>();
+                match (parsed, self.data.selected_task_id()) {
+                    (Ok(blocker), Some(task_id)) => {
+                        match self.data.store.remove_dependency(task_id, blocker) {
+                            Ok(()) => {
+                                self.data.refresh_tasks();
+                                self.toast(format!("dep removed: #{}", blocker));
+                            }
+                            Err(e) => self.toast(format!("dep remove failed: {}", e)),
+                        }
+                    }
+                    _ => self.toast("dep: enter a numeric task id"),
+                }
+                self.modals.dep_overlay_open = false;
+                self.modals.dep_overlay_buf.clear();
+                self.ui.mode = Mode::Normal;
+            }
+            Action::CancelDepOverlay => {
+                self.modals.dep_overlay_open = false;
+                self.modals.dep_overlay_buf.clear();
+                self.ui.mode = Mode::Normal;
+            }
+            Action::ToggleDepOverlayMode => {
+                // handled inside ModalsState::update already
+            }
             Action::Undo => {
                 if !self.writable {
                     self.toast("undo: read-only");
@@ -433,6 +521,14 @@ impl AppState {
                 } else if self.modals.edit_title_open {
                     self.modals.edit_title_open = false;
                     self.modals.edit_title_buf.clear();
+                    self.ui.mode = Mode::Normal;
+                } else if self.modals.add_subtask_open {
+                    self.modals.add_subtask_open = false;
+                    self.modals.add_subtask_buf.clear();
+                    self.ui.mode = Mode::Normal;
+                } else if self.modals.dep_overlay_open {
+                    self.modals.dep_overlay_open = false;
+                    self.modals.dep_overlay_buf.clear();
                     self.ui.mode = Mode::Normal;
                 } else if self.modals.sort_overlay_open {
                     self.modals.sort_overlay_open = false;

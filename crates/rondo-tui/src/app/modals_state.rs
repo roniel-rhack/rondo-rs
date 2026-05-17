@@ -2,6 +2,12 @@ use crate::action::Action;
 use std::time::{Duration, Instant};
 use throbber_widgets_tui::ThrobberState;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DepOverlayMode {
+    Add,
+    Remove,
+}
+
 /// Modal/overlay UI state and associated buffers.
 pub struct ModalsState {
     pub pomodoro_open: bool,
@@ -25,6 +31,11 @@ pub struct ModalsState {
     pub confirm_delete_open: bool,
     pub edit_title_open: bool,
     pub edit_title_buf: String,
+    pub add_subtask_open: bool,
+    pub add_subtask_buf: String,
+    pub dep_overlay_open: bool,
+    pub dep_overlay_buf: String,
+    pub dep_overlay_mode: DepOverlayMode,
 }
 
 impl Default for ModalsState {
@@ -49,6 +60,11 @@ impl Default for ModalsState {
             confirm_delete_open: false,
             edit_title_open: false,
             edit_title_buf: String::new(),
+            add_subtask_open: false,
+            add_subtask_buf: String::new(),
+            dep_overlay_open: false,
+            dep_overlay_buf: String::new(),
+            dep_overlay_mode: DepOverlayMode::Add,
         }
     }
 }
@@ -66,6 +82,8 @@ impl ModalsState {
             || self.sort_overlay_open
             || self.confirm_delete_open
             || self.edit_title_open
+            || self.add_subtask_open
+            || self.dep_overlay_open
     }
 
     /// Pure modal mutations that don't need cross-substate access.
@@ -130,6 +148,31 @@ impl ModalsState {
             }
             Action::EditTitleInput(s) => {
                 self.edit_title_buf = s;
+                None
+            }
+            Action::AddSubtaskInput(s) => {
+                self.add_subtask_buf = s;
+                None
+            }
+            Action::CancelAddSubtask => {
+                self.add_subtask_open = false;
+                self.add_subtask_buf.clear();
+                None
+            }
+            Action::DepOverlayInput(s) => {
+                self.dep_overlay_buf = s;
+                None
+            }
+            Action::CancelDepOverlay => {
+                self.dep_overlay_open = false;
+                self.dep_overlay_buf.clear();
+                None
+            }
+            Action::ToggleDepOverlayMode => {
+                self.dep_overlay_mode = match self.dep_overlay_mode {
+                    DepOverlayMode::Add => DepOverlayMode::Remove,
+                    DepOverlayMode::Remove => DepOverlayMode::Add,
+                };
                 None
             }
             Action::OpenSortOverlay => {

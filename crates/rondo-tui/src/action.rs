@@ -76,6 +76,18 @@ pub enum Action {
     CancelEditTitle,
     ToggleFocusedSubtask,
 
+    RequestAddSubtask,
+    AddSubtaskInput(String),
+    SubmitAddSubtask(String),
+    CancelAddSubtask,
+
+    RequestAddDependency,
+    DepOverlayInput(String),
+    SubmitAddDependency(String),
+    SubmitRemoveDependency(String),
+    ToggleDepOverlayMode,
+    CancelDepOverlay,
+
     Undo,
 
     Error(String),

@@ -64,6 +64,12 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>) {
     if app.modals.confirm_delete_open {
         components::confirm::draw(app, f, centered(60, 7, area));
     }
+    if app.modals.add_subtask_open {
+        components::add_subtask::draw(app, f, centered(70, 6, area));
+    }
+    if app.modals.dep_overlay_open {
+        components::dep_overlay::draw(app, f, centered(70, 8, area));
+    }
 
     // Run live effects after all widgets have painted; effects mutate cells in
     // place to produce fades/sweeps/dissolves.

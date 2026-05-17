@@ -27,6 +27,12 @@ pub fn map(ev: Event, app: &AppState) -> Option<Action> {
     if app.modals.edit_title_open {
         return edit_title_key(ev, app);
     }
+    if app.modals.add_subtask_open {
+        return add_subtask_key(ev, app);
+    }
+    if app.modals.dep_overlay_open {
+        return dep_overlay_key(ev, app);
+    }
     if app.ui.leader_goto {
         if let Event::Key(k) = ev {
             if let KeyCode::Char(c) = k.code {
@@ -187,6 +193,58 @@ fn edit_title_key(ev: Event, app: &AppState) -> Option<Action> {
     })
 }
 
+fn add_subtask_key(ev: Event, app: &AppState) -> Option<Action> {
+    let Event::Key(k) = ev else {
+        return None;
+    };
+    let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
+    Some(match k.code {
+        KeyCode::Esc => Action::CancelAddSubtask,
+        KeyCode::Enter => Action::SubmitAddSubtask(app.modals.add_subtask_buf.clone()),
+        KeyCode::Char('s') if ctrl => Action::SubmitAddSubtask(app.modals.add_subtask_buf.clone()),
+        KeyCode::Backspace => Action::AddSubtaskInput({
+            let mut s = app.modals.add_subtask_buf.clone();
+            s.pop();
+            s
+        }),
+        KeyCode::Char(c) => Action::AddSubtaskInput({
+            let mut s = app.modals.add_subtask_buf.clone();
+            s.push(c);
+            s
+        }),
+        _ => return None,
+    })
+}
+
+fn dep_overlay_key(ev: Event, app: &AppState) -> Option<Action> {
+    use crate::app::modals_state::DepOverlayMode;
+    let Event::Key(k) = ev else {
+        return None;
+    };
+    let submit = || match app.modals.dep_overlay_mode {
+        DepOverlayMode::Add => Action::SubmitAddDependency(app.modals.dep_overlay_buf.clone()),
+        DepOverlayMode::Remove => {
+            Action::SubmitRemoveDependency(app.modals.dep_overlay_buf.clone())
+        }
+    };
+    Some(match k.code {
+        KeyCode::Esc => Action::CancelDepOverlay,
+        KeyCode::Tab => Action::ToggleDepOverlayMode,
+        KeyCode::Enter => submit(),
+        KeyCode::Backspace => Action::DepOverlayInput({
+            let mut s = app.modals.dep_overlay_buf.clone();
+            s.pop();
+            s
+        }),
+        KeyCode::Char(c) if c.is_ascii_digit() => Action::DepOverlayInput({
+            let mut s = app.modals.dep_overlay_buf.clone();
+            s.push(c);
+            s
+        }),
+        _ => return None,
+    })
+}
+
 fn quick_add_key(ev: Event, app: &AppState) -> Option<Action> {
     let Event::Key(k) = ev else {
         return None;
@@ -239,6 +297,8 @@ fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
         KeyCode::Char('d') if !in_visual && !in_sidebar => Action::RequestDeleteTask,
         KeyCode::Char('e') if !in_sidebar => Action::RequestEditTitle,
         KeyCode::Char('P') if in_visual => Action::BulkPriority,
+        KeyCode::Char('A') if !in_visual && !in_sidebar => Action::RequestAddSubtask,
+        KeyCode::Char('B') if !in_visual && !in_sidebar => Action::RequestAddDependency,
         KeyCode::Char('1') => Action::TogglePage(Page::Tasks),
         KeyCode::Char('2') => Action::TogglePage(Page::Journal),
         KeyCode::Char('p') if !in_visual => Action::TogglePomodoro,

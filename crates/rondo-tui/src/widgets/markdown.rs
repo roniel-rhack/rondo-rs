@@ -29,9 +29,7 @@ pub fn render(md: &str, theme: &Theme) -> Text<'static> {
         }
     };
 
-    let indent = |depth: usize| -> Span<'static> {
-        Span::raw("  ".repeat(depth))
-    };
+    let indent = |depth: usize| -> Span<'static> { Span::raw("  ".repeat(depth)) };
 
     let heading_style = |lvl: u8, theme: &Theme| -> Style {
         match lvl {
@@ -42,7 +40,9 @@ pub fn render(md: &str, theme: &Theme) -> Text<'static> {
                 .fg(theme.fg)
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED | Modifier::DIM),
             3 => Style::default().fg(theme.warn).add_modifier(Modifier::BOLD),
-            4 => Style::default().fg(theme.warn).add_modifier(Modifier::BOLD | Modifier::DIM),
+            4 => Style::default()
+                .fg(theme.warn)
+                .add_modifier(Modifier::BOLD | Modifier::DIM),
             _ => Style::default()
                 .fg(theme.fg_muted)
                 .add_modifier(Modifier::BOLD),
@@ -116,9 +116,7 @@ pub fn render(md: &str, theme: &Theme) -> Text<'static> {
             }
             Event::Start(Tag::Link { .. }) => {
                 link_text_buf = Some(String::new());
-                style = style
-                    .fg(theme.accent)
-                    .add_modifier(Modifier::UNDERLINED);
+                style = style.fg(theme.accent).add_modifier(Modifier::UNDERLINED);
             }
             Event::End(TagEnd::Link) => {
                 if let Some(t) = link_text_buf.take() {
@@ -171,18 +169,12 @@ pub fn render(md: &str, theme: &Theme) -> Text<'static> {
             Event::SoftBreak | Event::HardBreak => {
                 flush_buf(&mut buf, &mut lines);
                 if in_blockquote {
-                    buf.push(Span::styled(
-                        "▏ ",
-                        Style::default().fg(theme.accent),
-                    ));
+                    buf.push(Span::styled("▏ ", Style::default().fg(theme.accent)));
                 }
             }
             Event::Start(Tag::Paragraph) => {
                 if in_blockquote {
-                    buf.push(Span::styled(
-                        "▏ ",
-                        Style::default().fg(theme.accent),
-                    ));
+                    buf.push(Span::styled("▏ ", Style::default().fg(theme.accent)));
                 }
             }
             Event::End(TagEnd::Paragraph) => {

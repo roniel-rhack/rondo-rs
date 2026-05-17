@@ -61,10 +61,7 @@ pub fn draw(app: &mut AppState, f: &mut Frame<'_>, area: Rect) {
             ]))
         })
         .collect();
-    let days_active = matches!(
-        app.ui.journal_pane,
-        crate::app::ui_state::JournalPane::Days
-    );
+    let days_active = matches!(app.ui.journal_pane, crate::app::ui_state::JournalPane::Days);
     let entries_active = !days_active;
     let list = List::new(items).block(t.panel("Days", days_active));
     f.render_stateful_widget(list, chunks[0], &mut app.data.journal_list_state);

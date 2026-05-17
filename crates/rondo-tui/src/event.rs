@@ -447,7 +447,9 @@ fn key_to_action(k: KeyEvent, app: &AppState) -> Option<Action> {
         KeyCode::Char('P') if in_visual => Action::BulkPriority,
         KeyCode::Char('A') if on_journal => Action::JournalStartEntry,
         KeyCode::Char('A') if !in_visual && !in_sidebar => Action::RequestAddSubtask,
-        KeyCode::Char('B') if !on_journal && !in_visual && !in_sidebar => Action::RequestAddDependency,
+        KeyCode::Char('B') if !on_journal && !in_visual && !in_sidebar => {
+            Action::RequestAddDependency
+        }
         KeyCode::Char('1') if in_detail => Action::JumpDetailSection(0),
         KeyCode::Char('2') if in_detail => Action::JumpDetailSection(1),
         KeyCode::Char('3') if in_detail => Action::JumpDetailSection(2),

@@ -17,10 +17,7 @@ fn policy_blocks_mutation_access_without_grant() {
 #[test]
 fn policy_allows_after_grant() {
     let mut granted: HashMap<String, Vec<String>> = HashMap::new();
-    granted.insert(
-        "scary-plugin".into(),
-        vec!["mutation_access".into()],
-    );
+    granted.insert("scary-plugin".into(), vec!["mutation_access".into()]);
     let policy = Policy::from_config(&granted);
     let caps = vec![Capability::MutationAccess(MutationScope::Tasks)];
     assert!(policy.missing_for("scary-plugin", &caps).is_empty());

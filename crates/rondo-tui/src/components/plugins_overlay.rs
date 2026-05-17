@@ -20,32 +20,22 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     let mut lines: Vec<Line> = Vec::new();
     lines.push(Line::from(Span::styled(
         " built-in (in-process)",
-        Style::default()
-            .fg(t.accent)
-            .add_modifier(Modifier::BOLD),
+        Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
     )));
     lines.push(Line::raw(""));
     for manifest in app.plugins.iter_manifests() {
         let id = manifest.id.clone();
         let name = manifest.name.clone();
         let version = manifest.version.clone();
-        let caps = format!(
-            "{:?}",
-            manifest.capabilities
-        );
+        let caps = format!("{:?}", manifest.capabilities);
         lines.push(Line::from(vec![
             Span::raw("  "),
             Span::styled(
                 format!("[{}]", id),
-                Style::default()
-                    .fg(t.accent)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
             ),
             Span::styled(format!("  {}", name), Style::default().fg(t.fg)),
-            Span::styled(
-                format!("  v{}", version),
-                Style::default().fg(t.fg_muted),
-            ),
+            Span::styled(format!("  v{}", version), Style::default().fg(t.fg_muted)),
         ]));
         lines.push(Line::from(vec![
             Span::raw("    "),
@@ -57,9 +47,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     lines.push(Line::raw(""));
     lines.push(Line::from(Span::styled(
         " external (WASM)",
-        Style::default()
-            .fg(t.accent)
-            .add_modifier(Modifier::BOLD),
+        Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
     )));
     lines.push(Line::raw(""));
     let plugins_dir = std::env::var("HOME")
@@ -94,9 +82,7 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
                 Span::raw("  "),
                 Span::styled(
                     format!("[{}]", id),
-                    Style::default()
-                        .fg(t.warn)
-                        .add_modifier(Modifier::BOLD),
+                    Style::default().fg(t.warn).add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(
                     format!("  {}", p.display()),

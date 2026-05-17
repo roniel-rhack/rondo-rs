@@ -44,7 +44,9 @@ impl AppState {
         plugins.register(Box::new(
             crate::plugins::builtin::dep_graph::DepGraphPlugin::new(Arc::clone(&store)),
         ));
-        plugins.register(Box::new(crate::plugins::builtin::analytics::AnalyticsPlugin));
+        plugins.register(Box::new(
+            crate::plugins::builtin::analytics::AnalyticsPlugin,
+        ));
         Ok(Self {
             data: DataState::new(store)?,
             ui: UiState::default(),
@@ -190,10 +192,11 @@ impl AppState {
                         let mut ok = 0usize;
                         let mut err: Option<String> = None;
                         for id in &ids {
-                            match self.data.store.set_status(
-                                *id,
-                                rondo_core::domain::task::Status::Done,
-                            ) {
+                            match self
+                                .data
+                                .store
+                                .set_status(*id, rondo_core::domain::task::Status::Done)
+                            {
                                 Ok(snap) => {
                                     self.undo.push(snap);
                                     ok += 1;
@@ -488,8 +491,7 @@ impl AppState {
                 } else if self.data.selected_task_id().is_some() {
                     self.modals.dep_overlay_buf.clear();
                     self.modals.dep_overlay_open = true;
-                    self.modals.dep_overlay_mode =
-                        crate::app::modals_state::DepOverlayMode::Add;
+                    self.modals.dep_overlay_mode = crate::app::modals_state::DepOverlayMode::Add;
                     self.ui.mode = Mode::Insert;
                 }
             }
@@ -845,10 +847,8 @@ impl AppState {
                 if let Some(id) = self.modals.plugin_page.clone() {
                     let ctx = rondo_plugin_api::PluginContext::new(&id);
                     if let Some(plugin) = self.plugins.get_mut(&id) {
-                        let _ = plugin.handle(
-                            rondo_plugin_api::PluginAction::KeyPress { key },
-                            &ctx,
-                        );
+                        let _ =
+                            plugin.handle(rondo_plugin_api::PluginAction::KeyPress { key }, &ctx);
                     }
                 }
             }
@@ -972,7 +972,10 @@ impl AppState {
     /// beyond the initial set, time logs, and notes attached to the
     /// original are NOT restored — only the core task plus initial
     /// tags from `NewTask`. Dependency edges are also lost.
-    fn apply_undo(&mut self, snap: rondo_core::domain::task::UndoSnapshot) -> rondo_core::Result<()> {
+    fn apply_undo(
+        &mut self,
+        snap: rondo_core::domain::task::UndoSnapshot,
+    ) -> rondo_core::Result<()> {
         use rondo_core::domain::task::{NewTask, TaskPatch, UndoKind};
         let kind = snap.kind.clone();
         match kind {
@@ -1465,7 +1468,11 @@ impl AppState {
         let note_id = note_clone.id;
         // Capture all entries before deletion so undo can fully restore them
         // (delete_note cascades through the FK).
-        let entries = self.data.store.entries_for_note(note_id).unwrap_or_default();
+        let entries = self
+            .data
+            .store
+            .entries_for_note(note_id)
+            .unwrap_or_default();
         match self.data.store.delete_note(note_id) {
             Ok(_) => {
                 self.undo

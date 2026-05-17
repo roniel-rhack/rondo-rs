@@ -79,16 +79,14 @@ impl Plugin for CalendarPlugin {
             .flatten();
         blocks.push(Block::Divider);
         let date_label = self.cursor.format("%A, %B %-d, %Y").to_string();
-        blocks.push(Block::Spans(vec![
-            PSpan {
-                text: format!("▌ {}", date_label),
-                style: Some(TextStyle {
-                    fg: Some(ColorToken::Accent),
-                    bold: true,
-                    ..Default::default()
-                }),
-            },
-        ]));
+        blocks.push(Block::Spans(vec![PSpan {
+            text: format!("▌ {}", date_label),
+            style: Some(TextStyle {
+                fg: Some(ColorToken::Accent),
+                bold: true,
+                ..Default::default()
+            }),
+        }]));
         if let Some(note) = preview_note {
             if let Ok(entries) = self.store.entries_for_note(note.id) {
                 if entries.is_empty() {
@@ -201,9 +199,7 @@ fn shift_month(d: NaiveDate, delta: i32) -> NaiveDate {
 }
 
 fn render_month(cursor: NaiveDate, dates: &HashSet<NaiveDate>) -> Vec<Block> {
-    let first = cursor
-        .with_day(1)
-        .expect("day 1 is valid for any month");
+    let first = cursor.with_day(1).expect("day 1 is valid for any month");
     let month_name = first.format("%B %Y").to_string();
     let mut blocks = vec![
         Block::Heading {
@@ -319,9 +315,7 @@ mod tests {
         let v = r.view.expect("Show should return a view");
         assert!(matches!(v.kind, ViewKind::Page));
         assert!(
-            v.blocks
-                .iter()
-                .any(|b| matches!(b, Block::Heading { .. })),
+            v.blocks.iter().any(|b| matches!(b, Block::Heading { .. })),
             "calendar page should start with a month heading"
         );
     }

@@ -104,10 +104,7 @@ fn hints(app: &AppState) -> Vec<(&'static str, &'static str)> {
         ];
     }
     if app.ui.page == crate::action::Page::Journal {
-        let in_days = matches!(
-            app.ui.journal_pane,
-            crate::app::ui_state::JournalPane::Days
-        );
+        let in_days = matches!(app.ui.journal_pane, crate::app::ui_state::JournalPane::Days);
         if in_days {
             return vec![
                 ("h/l", "días ↔ entries"),

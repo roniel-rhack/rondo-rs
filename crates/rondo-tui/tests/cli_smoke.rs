@@ -50,7 +50,11 @@ fn list_json() {
         .arg("--filter")
         .arg("all");
     let out = cmd.output().unwrap();
-    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let s = String::from_utf8_lossy(&out.stdout);
     let _: serde_json::Value = serde_json::from_str(&s).expect("valid json");
 }
@@ -83,13 +87,16 @@ fn export_ndjson_one_line_per_task() {
         .arg("--format")
         .arg("ndjson");
     let out = cmd.output().unwrap();
-    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let s = String::from_utf8_lossy(&out.stdout);
     let lines: Vec<&str> = s.lines().collect();
     assert!(!lines.is_empty());
     for line in lines {
-        let _: serde_json::Value =
-            serde_json::from_str(line).expect("each line valid json");
+        let _: serde_json::Value = serde_json::from_str(line).expect("each line valid json");
     }
 }
 
@@ -115,7 +122,6 @@ fn add_with_write_creates_task() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        
         .arg("add")
         .arg("CLI added");
     cmd.assert().success();
@@ -139,7 +145,6 @@ fn done_marks_task() {
     cmd.env("HOME", home.path())
         .arg("--db")
         .arg(db.path())
-        
         .arg("done")
         .arg("3");
     cmd.assert().success();

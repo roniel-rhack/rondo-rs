@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use rondo_tui::{
-    a11y, action::Action, app::AppState, cli, components, event as ev, fx::FxManager,
-    theme::Theme, tui,
+    a11y, action::Action, app::AppState, cli, components, event as ev, fx::FxManager, theme::Theme,
+    tui,
 };
 
 #[derive(Parser)]

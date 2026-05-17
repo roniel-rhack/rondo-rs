@@ -50,10 +50,7 @@ impl Policy {
 
 fn needs_grant(c: &Capability) -> bool {
     use Capability::*;
-    matches!(
-        c,
-        MutationAccess(_) | Syncer | Notifier(_) | CliSubcommand
-    )
+    matches!(c, MutationAccess(_) | Syncer | Notifier(_) | CliSubcommand)
 }
 
 fn capability_token(c: &Capability) -> String {
@@ -82,10 +79,7 @@ mod tests {
     #[test]
     fn empty_grants_block_mutation() {
         let p = Policy::default();
-        let miss = p.missing_for(
-            "x",
-            &[Capability::MutationAccess(MutationScope::Tasks)],
-        );
+        let miss = p.missing_for("x", &[Capability::MutationAccess(MutationScope::Tasks)]);
         assert_eq!(miss, vec!["mutation_access".to_string()]);
     }
 
@@ -94,10 +88,7 @@ mod tests {
         let mut map = HashMap::new();
         map.insert("x".to_string(), vec!["mutation_access".to_string()]);
         let p = Policy::from_config(&map);
-        let miss = p.missing_for(
-            "x",
-            &[Capability::MutationAccess(MutationScope::Tasks)],
-        );
+        let miss = p.missing_for("x", &[Capability::MutationAccess(MutationScope::Tasks)]);
         assert!(miss.is_empty());
     }
 

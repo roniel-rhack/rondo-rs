@@ -232,8 +232,8 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
     }
 
     // ─── DEPENDENCIES ───────────────────────────────────────
-    let deps_section_active = app.ui.focus.pane == Pane::Detail
-        && app.ui.focus.section == DetailSection::Dependencies;
+    let deps_section_active =
+        app.ui.focus.pane == Pane::Detail && app.ui.focus.section == DetailSection::Dependencies;
     let has_deps = task.is_blocked() || !task.blocks_ids.is_empty();
     lines.push(Line::raw(""));
     section_header(

@@ -71,10 +71,8 @@ pub fn render(view: &ViewSpec, theme: &Theme) -> Vec<Line<'static>> {
                 )));
             }
             Block::Spans(parts) => {
-                let spans: Vec<Span<'static>> = parts
-                    .iter()
-                    .map(|p| render_span(p, theme))
-                    .collect();
+                let spans: Vec<Span<'static>> =
+                    parts.iter().map(|p| render_span(p, theme)).collect();
                 out.push(Line::from(spans));
             }
         }

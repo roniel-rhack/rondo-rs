@@ -116,14 +116,22 @@ pub fn highlight_line(line: Line<'static>, needle: &str, theme: &Theme) -> Line<
             let is_hl = match_set.contains(&char_idx);
             char_idx += 1;
             if buf_hl != Some(is_hl) && !buf.is_empty() {
-                let style = if buf_hl == Some(true) { hl_style } else { base_style };
+                let style = if buf_hl == Some(true) {
+                    hl_style
+                } else {
+                    base_style
+                };
                 out_spans.push(Span::styled(std::mem::take(&mut buf), style));
             }
             buf.push(ch);
             buf_hl = Some(is_hl);
         }
         if !buf.is_empty() {
-            let style = if buf_hl == Some(true) { hl_style } else { base_style };
+            let style = if buf_hl == Some(true) {
+                hl_style
+            } else {
+                base_style
+            };
             out_spans.push(Span::styled(buf, style));
         }
     }

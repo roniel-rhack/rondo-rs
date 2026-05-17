@@ -24,6 +24,10 @@ pub struct AppState {
     pub modals: ModalsState,
     pub fx: crate::fx::FxManager,
     pub plugins: PluginRegistry,
+    /// External WASM plugins loaded from `~/.rondo-rs/plugins/`. Empty
+    /// until `main::load_external_plugins` runs at startup. Queried
+    /// alongside `plugins` by the command palette and `handle_command`.
+    pub external: rondo_plugin_host::PluginHost,
     pub theme: Theme,
     /// Active UI language (Phase 1: header/sidebar/footer/task_list strings).
     pub lang: rondo_core::config::Lang,
@@ -70,6 +74,7 @@ impl AppState {
             modals: ModalsState::default(),
             fx: crate::fx::FxManager::new(),
             plugins,
+            external: rondo_plugin_host::PluginHost::new(),
             theme: Theme::dark(),
             lang: rondo_core::config::Lang::default(),
             should_quit: false,
@@ -1087,6 +1092,12 @@ impl AppState {
     fn handle_command(&mut self, cmd: String) {
         self.modals.command_palette_open = false;
         let trimmed = cmd.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+        // Configurable preambles handled before prefix resolution so
+        // `:theme <name>` and `:group <name>` work without colliding with
+        // single-word plugin commands.
         if let Some(rest) = trimmed.strip_prefix("theme ") {
             self.switch_theme(rest.trim());
             return;
@@ -1103,7 +1114,24 @@ impl AppState {
             self.toast("usage: :group priority|status|due|none".to_string());
             return;
         }
-        match trimmed {
+        let resolved = match self.resolve_command_prefix(trimmed) {
+            CommandResolution::Exact(s) | CommandResolution::UniquePrefix(s) => s,
+            CommandResolution::Ambiguous(matches) => {
+                self.status_msg = Some(format!(
+                    "ambiguous: {} (matches: {})",
+                    trimmed,
+                    matches.join(", ")
+                ));
+                return;
+            }
+            CommandResolution::None => {
+                if !self.try_invoke_plugin_command(trimmed) {
+                    self.status_msg = Some(format!("unknown: {}", trimmed));
+                }
+                return;
+            }
+        };
+        match resolved.as_str() {
             "tasks" => self.ui.page = Page::Tasks,
             "journal" => self.ui.page = Page::Journal,
             "pomodoro" => {
@@ -1121,8 +1149,144 @@ impl AppState {
             "deps" | "dep-graph" => self.open_plugin_page("builtin.dep-graph"),
             "analytics" => self.open_plugin_page("builtin.analytics"),
             "quit" => self.should_quit = true,
-            "" => {}
-            other => self.status_msg = Some(format!("unknown: {}", other)),
+            other => {
+                if !self.try_invoke_plugin_command(other) {
+                    self.status_msg = Some(format!("unknown: {}", other));
+                }
+            }
+        }
+    }
+
+    /// Enumerate every command name the palette knows about: hardcoded
+    /// builtins plus every plugin's `[cli].name` and `id` (in-process and
+    /// external). Used by `resolve_command_prefix` to expand a typed prefix
+    /// to a unique canonical command name.
+    fn known_command_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = [
+            "tasks",
+            "journal",
+            "pomodoro",
+            "plugins",
+            "help",
+            "calendar",
+            "focus",
+            "focus-page",
+            "deps",
+            "dep-graph",
+            "analytics",
+            "quit",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        for m in self.plugins.iter_manifests() {
+            if let Some(cli) = m.cli.as_ref() {
+                names.push(cli.name.clone());
+            }
+            names.push(m.id.clone());
+        }
+        for m in self.external.manifests() {
+            if let Some(n) = m.command_name() {
+                names.push(n.to_string());
+            }
+            names.push(m.id.clone());
+        }
+        names.sort();
+        names.dedup();
+        names
+    }
+
+    /// Map a typed string to a canonical command. Exact match wins; if no
+    /// exact match exists, a prefix that uniquely identifies one command is
+    /// promoted. Multiple prefix matches → `Ambiguous`; zero → `None`.
+    fn resolve_command_prefix(&self, input: &str) -> CommandResolution {
+        let all = self.known_command_names();
+        if all.iter().any(|n| n == input) {
+            return CommandResolution::Exact(input.to_string());
+        }
+        let matches: Vec<String> = all.into_iter().filter(|n| n.starts_with(input)).collect();
+        match matches.len() {
+            0 => CommandResolution::None,
+            1 => CommandResolution::UniquePrefix(matches.into_iter().next().unwrap()),
+            _ => CommandResolution::Ambiguous(matches),
+        }
+    }
+
+    /// Resolve `cmd` against in-process + external plugins, dispatch
+    /// `PluginAction::Show`, and route the returned `ViewSpec` to the
+    /// appropriate modal slot. Returns `true` when a plugin handled the
+    /// command.
+    fn try_invoke_plugin_command(&mut self, cmd: &str) -> bool {
+        let in_proc_id = self
+            .plugins
+            .iter_manifests()
+            .find(|m| m.id == cmd || m.cli.as_ref().map(|c| c.name.as_str()) == Some(cmd))
+            .map(|m| m.id.clone());
+        if let Some(id) = in_proc_id {
+            self.invoke_in_process_plugin(&id);
+            return true;
+        }
+        if let Some(id) = self.external.resolve_command(cmd) {
+            self.invoke_external_plugin(&id);
+            return true;
+        }
+        false
+    }
+
+    fn invoke_in_process_plugin(&mut self, id: &str) {
+        let ctx = rondo_plugin_api::PluginContext::new(id);
+        let Some(r) = self
+            .plugins
+            .get_mut(id)
+            .map(|p| p.handle(rondo_plugin_api::PluginAction::Show, &ctx))
+        else {
+            self.toast(format!("plugin not registered: {}", id));
+            return;
+        };
+        let notify_msg = r.follow_up.iter().find_map(|fa| match fa {
+            rondo_plugin_api::PluginAction::Notify { message, .. } => Some(message.clone()),
+            _ => None,
+        });
+        self.route_show_view(id, r.view, notify_msg);
+    }
+
+    fn invoke_external_plugin(&mut self, id: &str) {
+        let result = self
+            .external
+            .dispatch_one(id, &rondo_plugin_api::PluginAction::Show);
+        let Some(r) = result else {
+            self.toast(format!("plugin `{}` failed (see logs)", id));
+            return;
+        };
+        let view = r.view;
+        let notify_msg = r.follow_up.iter().find_map(|fa| match fa {
+            rondo_plugin_api::PluginAction::Notify { message, .. } => Some(message.clone()),
+            _ => None,
+        });
+        self.route_show_view(id, view, notify_msg);
+    }
+
+    /// Route a `Show` response into the right modal slot based on
+    /// `ViewKind`. Overlay → `plugin_overlay`, Page → reuse the existing
+    /// full-screen `plugin_page` path, no view → toast.
+    fn route_show_view(
+        &mut self,
+        id: &str,
+        view: Option<rondo_plugin_api::ViewSpec>,
+        notify_msg: Option<String>,
+    ) {
+        match view {
+            Some(v) if v.kind == rondo_plugin_api::ViewKind::Overlay => {
+                self.modals.plugin_overlay = Some((id.to_string(), v));
+            }
+            Some(v) if v.kind == rondo_plugin_api::ViewKind::Page => {
+                self.modals.plugin_page = Some(id.to_string());
+                let _ = v;
+            }
+            _ => {
+                let msg = notify_msg.unwrap_or_else(|| format!("plugin `{}` invoked", id));
+                self.toast(msg);
+            }
         }
     }
 
@@ -1257,6 +1421,16 @@ impl AppState {
             }
         }
     }
+}
+
+/// Outcome of typing a string into the command palette. `Ambiguous` keeps
+/// the candidate list so the user gets a hint instead of a silent failure.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CommandResolution {
+    Exact(String),
+    UniquePrefix(String),
+    Ambiguous(Vec<String>),
+    None,
 }
 
 #[derive(Debug, Default)]

@@ -17,7 +17,7 @@ expression: s
 "│  [n] # SIN ETIQUETA 1  │┃│                                                                                    │───────────────────────   │"
 "│  [c] ✓ COMPLETADAS 1   │┃│ external (WASM)                                                                    │                          │"
 "│                        │┃│                                                                                    │ spec done.               │"
-"│                        │┃│  [quote-of-the-day]  /Users/roniel/.rondo-rs/plugins/quote-of-the-day              │                          │"
+"│                        │┃│  (none installed in /Users/roniel/.rondo-rs/plugins)                               │                          │"
 "│                        │┃│                                                                                    │                          │"
 "│                        │┃│ CLI: rondo-tui plugins list / info <id> / install <path> / remove <id>             │                          │"
 "│                        │┃│ Esc cerrar                                                                         │───────────────────────   │"

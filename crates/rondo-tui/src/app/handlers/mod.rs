@@ -11,3 +11,4 @@
 
 pub mod journal;
 pub mod pomodoro;
+pub mod task;

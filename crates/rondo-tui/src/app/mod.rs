@@ -153,7 +153,9 @@ impl AppState {
         // Extracted domain handlers. Each `handle()` returns true if it
         // consumed the action; the main match below is skipped in that
         // case (still running the follow-up tail).
-        if handlers::journal::handle(self, &action) || handlers::pomodoro::handle(self, &action)
+        if handlers::journal::handle(self, &action)
+            || handlers::pomodoro::handle(self, &action)
+            || handlers::task::handle(self, &action)
         {
             if let Some(next) = follow_up.take() {
                 self.update(next);
@@ -318,63 +320,7 @@ impl AppState {
                 self.modals.sort_overlay_open = false;
                 self.toast(format!("sort: {}", order.label()));
             }
-            Action::RequestDeleteTask => {
-                if !self.writable {
-                    self.toast(ro_msg("delete"));
-                } else if self.data.selected_task_id().is_some() {
-                    self.modals.confirm_delete_open = true;
-                }
-            }
-            Action::ConfirmDeleteTask => {
-                self.modals.confirm_delete_open = false;
-                if let Some(id) = self.data.selected_task_id() {
-                    match self.data.store.delete_task(id) {
-                        Ok(snap) => {
-                            self.undo.push(snap);
-                            self.refresh_tasks();
-                            self.toast("task deleted");
-                        }
-                        Err(e) => self.toast(format!("delete failed: {}", e)),
-                    }
-                }
-            }
-            Action::CancelDelete => self.modals.confirm_delete_open = false,
-            Action::RequestEditTitle => {
-                if !self.writable {
-                    self.toast(ro_msg("edit"));
-                } else if let Some(t) = self.data.selected_task() {
-                    self.modals.edit_title_buf = t.title.clone();
-                    self.modals.edit_title_open = true;
-                    self.ui.mode = Mode::Insert;
-                }
-            }
-            Action::SubmitEditTitle(new_title) => {
-                let trimmed = new_title.trim().to_string();
-                if !trimmed.is_empty() {
-                    if let Some(id) = self.data.selected_task_id() {
-                        let patch = rondo_core::domain::task::TaskPatch {
-                            title: Some(trimmed),
-                            ..Default::default()
-                        };
-                        match self.data.store.update_task(id, patch) {
-                            Ok(snap) => {
-                                self.undo.push(snap);
-                                self.refresh_tasks();
-                                self.toast("title updated");
-                            }
-                            Err(e) => self.toast(format!("update failed: {}", e)),
-                        }
-                    }
-                }
-                self.modals.edit_title_open = false;
-                self.modals.edit_title_buf.clear();
-                self.ui.mode = Mode::Normal;
-            }
-            Action::CancelEditTitle => {
-                self.modals.edit_title_open = false;
-                self.modals.edit_title_buf.clear();
-                self.ui.mode = Mode::Normal;
-            }
+            // Task delete + edit title handled in `handlers::task`.
             Action::RequestAddSubtask => {
                 if !self.writable {
                     self.toast(ro_msg("subtask"));
@@ -479,52 +425,7 @@ impl AppState {
             Action::ToggleDepOverlayMode => {
                 // handled inside ModalsState::update already
             }
-            Action::RequestEditDescription => {
-                if !self.writable {
-                    self.toast(ro_msg("description"));
-                } else if let Some(task) = self.data.selected_task() {
-                    let body = task.description.clone().unwrap_or_default();
-                    self.modals.description_textarea = tui_textarea::TextArea::new(
-                        body.split('\n').map(|s| s.to_string()).collect(),
-                    );
-                    self.modals.description_task_id = Some(task.id);
-                    self.modals.description_editor_open = true;
-                    self.ui.mode = Mode::Insert;
-                }
-            }
-            Action::DescriptionEditorKey(k) => {
-                self.modals
-                    .description_textarea
-                    .input(tui_textarea::Input::from(crossterm::event::Event::Key(k)));
-            }
-            Action::SubmitEditDescription => {
-                let body = self.modals.description_textarea.lines().join("\n");
-                let task_id = self.modals.description_task_id;
-                self.modals.description_editor_open = false;
-                self.modals.description_textarea = tui_textarea::TextArea::default();
-                self.modals.description_task_id = None;
-                self.ui.mode = Mode::Normal;
-                if let Some(id) = task_id {
-                    let patch = rondo_core::domain::task::TaskPatch {
-                        description: Some(if body.is_empty() { None } else { Some(body) }),
-                        ..Default::default()
-                    };
-                    match self.data.store.update_task(id, patch) {
-                        Ok(snap) => {
-                            self.undo.push(snap);
-                            self.refresh_tasks();
-                            self.toast("description updated");
-                        }
-                        Err(e) => self.toast(format!("update failed: {}", e)),
-                    }
-                }
-            }
-            Action::CancelEditDescription => {
-                self.modals.description_editor_open = false;
-                self.modals.description_textarea = tui_textarea::TextArea::default();
-                self.modals.description_task_id = None;
-                self.ui.mode = Mode::Normal;
-            }
+            // Edit-description handled in `handlers::task`.
 
             Action::RequestEditFocusedSubtask => {
                 if !self.writable {
@@ -1628,7 +1529,7 @@ fn action_dismisses_quick_actions(a: &Action) -> bool {
 /// Build the toast string shown when an action is rejected because the store was
 /// opened read-only. The binary has no `--write` flag; the only way to mutate is
 /// to relaunch without `--read-only`.
-fn ro_msg(action: &str) -> String {
+pub(crate) fn ro_msg(action: &str) -> String {
     format!("{action}: read-only mode (restart without --read-only)")
 }
 

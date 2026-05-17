@@ -1,3 +1,4 @@
+use crate::domain::journal::{Entry, Note};
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -186,16 +187,46 @@ pub struct TaskPatch {
     pub recur_interval: Option<i64>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum UndoKind {
     Create,
     Update,
     Delete,
     SetStatus,
     AddSubtask,
+    /// Legacy variant — kept for back-compat with `store.toggle_subtask` which
+    /// still emits it. New TUI-side toggles use [`UndoKind::SubtaskToggle`] so
+    /// the undo doesn't rely on diffing two task snapshots.
     ToggleSubtask,
     AddTag,
     RemoveTag,
+    /// Dependency edge `task_id` ← `blocker_id` was added; undo removes it.
+    AddDep { task_id: i64, blocker_id: i64 },
+    /// Dependency edge `task_id` ← `blocker_id` was removed; undo re-adds it.
+    RemoveDep { task_id: i64, blocker_id: i64 },
+    /// Subtask was deleted; undo re-creates it (original id is lost but title +
+    /// completion state are preserved).
+    DeleteSubtask { task_id: i64, subtask: Subtask },
+    /// Explicit subtask toggle that doesn't rely on diffing.
+    SubtaskToggle {
+        task_id: i64,
+        subtask_id: i64,
+        before: bool,
+    },
+    /// Task note was added; undo deletes the created note row.
+    AddNote { task_id: i64, note_id: i64 },
+    /// Task note body was edited; undo restores the previous body.
+    UpdateNote {
+        task_id: i64,
+        note_id: i64,
+        before: String,
+    },
+    /// Task note was deleted; undo re-creates it (original id is lost).
+    DeleteNote { task_id: i64, note: TaskNote },
+    /// Journal entry deleted; undo recreates it on the same note id.
+    JournalDeleteEntry { entry: Entry },
+    /// Journal day (note) deleted; undo recreates the day note and its entries.
+    JournalDeleteDay { note: Note, entries: Vec<Entry> },
 }
 
 #[derive(Debug, Clone)]
@@ -203,6 +234,19 @@ pub struct UndoSnapshot {
     pub kind: UndoKind,
     pub task_before: Option<Task>,
     pub created_id: Option<i64>,
+}
+
+impl UndoSnapshot {
+    /// Convenience: build a snapshot that only carries a `UndoKind` payload —
+    /// used by handlers that don't need the legacy `task_before`/`created_id`
+    /// fields (dep edges, note CRUD, journal deletes, explicit subtask toggle).
+    pub fn from_kind(kind: UndoKind) -> Self {
+        Self {
+            kind,
+            task_before: None,
+            created_id: None,
+        }
+    }
 }
 
 #[cfg(test)]

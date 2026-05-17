@@ -499,8 +499,18 @@ impl AppState {
                     (Ok(blocker), Some(task_id)) if blocker > 0 && blocker != task_id => {
                         match self.data.store.add_dependency(task_id, blocker) {
                             Ok(()) => {
+                                self.undo
+                                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
+                                        rondo_core::domain::task::UndoKind::AddDep {
+                                            task_id,
+                                            blocker_id: blocker,
+                                        },
+                                    ));
                                 self.data.refresh_tasks();
                                 self.toast(format!("dep added: #{} blocks #{}", blocker, task_id));
+                            }
+                            Err(rondo_core::error::Error::CycleDetected(a, b)) => {
+                                self.toast(format!("can't add: would create cycle #{a} → #{b}"));
                             }
                             Err(e) => self.toast(format!("dep add failed: {}", e)),
                         }
@@ -518,6 +528,13 @@ impl AppState {
                     (Ok(blocker), Some(task_id)) => {
                         match self.data.store.remove_dependency(task_id, blocker) {
                             Ok(()) => {
+                                self.undo
+                                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
+                                        rondo_core::domain::task::UndoKind::RemoveDep {
+                                            task_id,
+                                            blocker_id: blocker,
+                                        },
+                                    ));
                                 self.data.refresh_tasks();
                                 self.toast(format!("dep removed: #{}", blocker));
                             }
@@ -627,9 +644,18 @@ impl AppState {
                     self.toast("subtask: read-only");
                 } else if let Some(task) = self.data.selected_task() {
                     if let Some(sub) = task.subtasks.get(self.ui.focus.section_item) {
+                        let sub_clone = sub.clone();
                         let sub_id = sub.id;
+                        let task_id = task.id;
                         match self.data.store.delete_subtask(sub_id) {
                             Ok(_) => {
+                                self.undo
+                                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
+                                        rondo_core::domain::task::UndoKind::DeleteSubtask {
+                                            task_id,
+                                            subtask: sub_clone,
+                                        },
+                                    ));
                                 self.data.refresh_tasks();
                                 let total = self
                                     .data
@@ -678,9 +704,18 @@ impl AppState {
                     self.toast("note: read-only");
                 } else if let Some(task) = self.data.selected_task() {
                     if let Some(note) = task.notes.get(self.ui.focus.section_item) {
+                        let note_clone = note.clone();
+                        let task_id = task.id;
                         let note_id = note.id;
                         match self.data.store.delete_task_note(note_id) {
                             Ok(_) => {
+                                self.undo
+                                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
+                                        rondo_core::domain::task::UndoKind::DeleteNote {
+                                            task_id,
+                                            note: note_clone,
+                                        },
+                                    ));
                                 self.data.refresh_tasks();
                                 let total = self
                                     .data
@@ -714,25 +749,49 @@ impl AppState {
                 if body.trim().is_empty() {
                     return;
                 }
-                let result = match (editing, task_id) {
-                    (Some(id), _) => self
-                        .data
-                        .store
-                        .update_task_note(id, &body)
-                        .map(|_| "note updated".to_string()),
-                    (None, Some(tid)) => self
-                        .data
-                        .store
-                        .add_task_note(tid, &body)
-                        .map(|_| "note added".to_string()),
-                    _ => return,
-                };
-                match result {
-                    Ok(msg) => {
-                        self.data.refresh_tasks();
-                        self.toast(msg);
+                match (editing, task_id) {
+                    (Some(note_id), Some(tid)) => {
+                        // Capture the before-body so undo can restore exactly
+                        // what was there before this edit.
+                        let before_body = self
+                            .data
+                            .selected_task()
+                            .and_then(|t| t.notes.iter().find(|n| n.id == note_id))
+                            .map(|n| n.body.clone());
+                        match self.data.store.update_task_note(note_id, &body) {
+                            Ok(_) => {
+                                if let Some(before) = before_body {
+                                    self.undo.push(
+                                        rondo_core::domain::task::UndoSnapshot::from_kind(
+                                            rondo_core::domain::task::UndoKind::UpdateNote {
+                                                task_id: tid,
+                                                note_id,
+                                                before,
+                                            },
+                                        ),
+                                    );
+                                }
+                                self.data.refresh_tasks();
+                                self.toast("note updated");
+                            }
+                            Err(e) => self.toast(format!("note failed: {}", e)),
+                        }
                     }
-                    Err(e) => self.toast(format!("note failed: {}", e)),
+                    (None, Some(tid)) => match self.data.store.add_task_note(tid, &body) {
+                        Ok(note_id) => {
+                            self.undo
+                                .push(rondo_core::domain::task::UndoSnapshot::from_kind(
+                                    rondo_core::domain::task::UndoKind::AddNote {
+                                        task_id: tid,
+                                        note_id,
+                                    },
+                                ));
+                            self.data.refresh_tasks();
+                            self.toast("note added");
+                        }
+                        Err(e) => self.toast(format!("note failed: {}", e)),
+                    },
+                    _ => {}
                 }
             }
             Action::CancelNote => {
@@ -800,10 +859,19 @@ impl AppState {
                     match self.undo.pop() {
                         None => self.toast("nothing to undo"),
                         Some(snap) => {
+                            let touches_journal = matches!(
+                                snap.kind,
+                                rondo_core::domain::task::UndoKind::JournalDeleteEntry { .. }
+                                    | rondo_core::domain::task::UndoKind::JournalDeleteDay { .. }
+                            );
                             if let Err(e) = self.apply_undo(snap) {
                                 self.toast(format!("undo failed: {}", e));
                             } else {
                                 self.data.refresh_tasks();
+                                if touches_journal {
+                                    self.data.refresh_journal_notes();
+                                    self.data.reload_journal_entries();
+                                }
                                 self.toast("undone");
                             }
                         }
@@ -906,7 +974,8 @@ impl AppState {
     /// tags from `NewTask`. Dependency edges are also lost.
     fn apply_undo(&mut self, snap: rondo_core::domain::task::UndoSnapshot) -> rondo_core::Result<()> {
         use rondo_core::domain::task::{NewTask, TaskPatch, UndoKind};
-        match snap.kind {
+        let kind = snap.kind.clone();
+        match kind {
             UndoKind::Create => {
                 if let Some(id) = snap.created_id {
                     self.data.store.delete_task(id)?;
@@ -983,6 +1052,43 @@ impl AppState {
                         }
                     }
                 }
+            }
+            UndoKind::AddDep {
+                task_id,
+                blocker_id,
+            } => {
+                self.data.store.remove_dependency(task_id, blocker_id)?;
+            }
+            UndoKind::RemoveDep {
+                task_id,
+                blocker_id,
+            } => {
+                self.data.store.add_dependency(task_id, blocker_id)?;
+            }
+            UndoKind::DeleteSubtask { subtask, .. } => {
+                self.data.store.restore_subtask(&subtask)?;
+            }
+            UndoKind::SubtaskToggle {
+                subtask_id, before, ..
+            } => {
+                self.data.store.set_subtask_completed(subtask_id, before)?;
+            }
+            UndoKind::AddNote { note_id, .. } => {
+                self.data.store.delete_task_note(note_id)?;
+            }
+            UndoKind::UpdateNote {
+                note_id, before, ..
+            } => {
+                self.data.store.update_task_note(note_id, &before)?;
+            }
+            UndoKind::DeleteNote { note, .. } => {
+                self.data.store.restore_task_note(&note)?;
+            }
+            UndoKind::JournalDeleteEntry { entry } => {
+                self.data.store.restore_journal_entry(&entry)?;
+            }
+            UndoKind::JournalDeleteDay { note, entries } => {
+                self.data.store.restore_journal_day(&note, &entries)?;
             }
         }
         Ok(())
@@ -1203,17 +1309,28 @@ impl AppState {
     /// `writable`; otherwise mutates the in-memory copy and toasts.
     fn toggle_focused_subtask(&mut self) {
         let item_idx = self.ui.focus.section_item;
-        let subtask_id = match self.data.tasks.get(self.data.selected_task) {
+        let (task_id, subtask_id, before_done) = match self.data.tasks.get(self.data.selected_task)
+        {
             Some(t) => match t.subtasks.get(item_idx) {
-                Some(s) => s.id,
+                Some(s) => (t.id, s.id, s.completed),
                 None => return,
             },
             None => return,
         };
         if self.writable {
             match self.data.store.toggle_subtask(subtask_id) {
-                Ok((_, snap)) => {
-                    self.undo.push(snap);
+                Ok((_, _legacy_snap)) => {
+                    // Push an explicit-state snapshot instead of the legacy
+                    // diff-based one so undo doesn't get confused if another
+                    // subtask changes between toggle and undo.
+                    self.undo
+                        .push(rondo_core::domain::task::UndoSnapshot::from_kind(
+                            rondo_core::domain::task::UndoKind::SubtaskToggle {
+                                task_id,
+                                subtask_id,
+                                before: before_done,
+                            },
+                        ));
                     self.data.refresh_tasks();
                     self.ui.flash = Some((FlashTarget::Subtask(subtask_id), Instant::now()));
                     self.toast(format!("subtask #{} toggled", subtask_id));
@@ -1344,9 +1461,20 @@ impl AppState {
             .data
             .selected_journal
             .min(self.data.journal_notes.len() - 1);
-        let note_id = self.data.journal_notes[idx].id;
+        let note_clone = self.data.journal_notes[idx].clone();
+        let note_id = note_clone.id;
+        // Capture all entries before deletion so undo can fully restore them
+        // (delete_note cascades through the FK).
+        let entries = self.data.store.entries_for_note(note_id).unwrap_or_default();
         match self.data.store.delete_note(note_id) {
             Ok(_) => {
+                self.undo
+                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
+                        rondo_core::domain::task::UndoKind::JournalDeleteDay {
+                            note: note_clone,
+                            entries,
+                        },
+                    ));
                 self.data.refresh_journal_notes();
                 if self.data.selected_journal >= self.data.journal_notes.len()
                     && !self.data.journal_notes.is_empty()
@@ -1371,9 +1499,16 @@ impl AppState {
             .data
             .selected_journal_entry
             .min(self.data.journal_entries.len() - 1);
-        let entry_id = self.data.journal_entries[idx].id;
+        let entry_clone = self.data.journal_entries[idx].clone();
+        let entry_id = entry_clone.id;
         match self.data.store.delete_entry(entry_id) {
             Ok(_) => {
+                self.undo
+                    .push(rondo_core::domain::task::UndoSnapshot::from_kind(
+                        rondo_core::domain::task::UndoKind::JournalDeleteEntry {
+                            entry: entry_clone,
+                        },
+                    ));
                 self.data.reload_journal_entries();
                 if self.data.selected_journal_entry >= self.data.journal_entries.len()
                     && !self.data.journal_entries.is_empty()

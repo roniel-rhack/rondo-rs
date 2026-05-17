@@ -24,7 +24,7 @@ fn create_task_returns_id_and_undo() {
     let before_count = store.list_tasks().unwrap().len();
     let (id, undo) = store.create_task(NewTask::quick("new")).unwrap();
     assert!(id > 0);
-    assert_eq!(undo.kind, UndoKind::Create);
+    assert!(matches!(undo.kind, UndoKind::Create));
     assert_eq!(undo.created_id, Some(id));
     assert!(undo.task_before.is_none());
     assert_eq!(store.list_tasks().unwrap().len(), before_count + 1);
@@ -39,7 +39,7 @@ fn update_task_captures_before_state() {
         ..Default::default()
     };
     let undo = store.update_task(before.id, patch).unwrap();
-    assert_eq!(undo.kind, UndoKind::Update);
+    assert!(matches!(undo.kind, UndoKind::Update));
     assert_eq!(undo.task_before.as_ref().unwrap().title, before.title);
     let after = store.task_by_id(before.id).unwrap();
     assert_eq!(after.title, "NEW TITLE");
@@ -50,7 +50,7 @@ fn delete_task_returns_full_snapshot() {
     let (_f, store) = fixture_db();
     let target = store.list_tasks().unwrap().into_iter().next().unwrap();
     let undo = store.delete_task(target.id).unwrap();
-    assert_eq!(undo.kind, UndoKind::Delete);
+    assert!(matches!(undo.kind, UndoKind::Delete));
     assert_eq!(undo.task_before.as_ref().unwrap().id, target.id);
     assert!(store.task_by_id(target.id).is_err());
 }
@@ -74,7 +74,7 @@ fn subtask_lifecycle() {
     let (_f, store) = fixture_db();
     let task = store.list_tasks().unwrap().into_iter().next().unwrap();
     let (sid, undo) = store.add_subtask(task.id, "new sub").unwrap();
-    assert_eq!(undo.kind, UndoKind::AddSubtask);
+    assert!(matches!(undo.kind, UndoKind::AddSubtask));
     let after = store.task_by_id(task.id).unwrap();
     assert!(after.subtasks.iter().any(|s| s.id == sid));
     let (now_completed, _) = store.toggle_subtask(sid).unwrap();

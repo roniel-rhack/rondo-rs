@@ -57,6 +57,27 @@ mod tests {
     }
 
     #[test]
+    fn payload_variants_round_trip() {
+        // Smoke check that the new payload-bearing variants survive a
+        // push/pop without losing their data.
+        let mut s = UndoStack::default();
+        s.push(snap(UndoKind::AddDep {
+            task_id: 1,
+            blocker_id: 2,
+        }));
+        match s.pop().unwrap().kind {
+            UndoKind::AddDep {
+                task_id,
+                blocker_id,
+            } => {
+                assert_eq!(task_id, 1);
+                assert_eq!(blocker_id, 2);
+            }
+            _ => panic!("expected AddDep"),
+        }
+    }
+
+    #[test]
     fn cap_drops_oldest() {
         let mut s = UndoStack::default();
         for _ in 0..(CAP + 5) {

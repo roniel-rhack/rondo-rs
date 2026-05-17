@@ -14,8 +14,11 @@ pub fn draw(app: &AppState, f: &mut Frame<'_>, area: Rect) {
 
     let mut spans: Vec<Span<'static>> = Vec::new();
     spans.push(Span::raw(" "));
+    let undo_depth = app.undo.len();
     let mode_label = if mode == Mode::Visual && !app.ui.selection.is_empty() {
         format!("[VIS·{}]", app.ui.selection.len())
+    } else if undo_depth > 0 {
+        format!("[{}·{}]", mode.tag(), undo_depth)
     } else {
         format!("[{}]", mode.tag())
     };

@@ -10,7 +10,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.83"
+rust-version = "1.90"
 authors = ["Roniel <roniel.rack@gmail.com>"]
 license = "MIT"
 repository = "https://github.com/roniel-rhack/rondo-rs"

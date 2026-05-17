@@ -1,4 +1,5 @@
 pub mod data_state;
+pub mod handlers;
 pub mod modals_state;
 pub mod ui_state;
 pub mod undo;
@@ -147,6 +148,16 @@ impl AppState {
         }
         if follow_up.is_none() {
             follow_up = self.data.update(action.clone());
+        }
+
+        // Extracted domain handlers. Each `handle()` returns true if it
+        // consumed the action; the match below is then a no-op for that
+        // arm (the unmatched `_ => {}` branch).
+        if handlers::journal::handle(self, &action) {
+            if let Some(next) = follow_up.take() {
+                self.update(next);
+            }
+            return;
         }
 
         // Cross-cutting actions handled here (need access to multiple substates,
@@ -321,89 +332,7 @@ impl AppState {
                 self.finalize_pomodoro_close();
             }
             Action::SubmitCommand(cmd) => self.handle_command(cmd),
-            Action::JournalStartEntry => {
-                if self.ui.page == Page::Journal {
-                    self.modals.journal_editor_open = true;
-                    self.modals.journal_editor_buf.clear();
-                    self.modals.journal_textarea = tui_textarea::TextArea::default();
-                    self.modals.journal_editor_entry_id = None;
-                    self.ui.mode = Mode::Insert;
-                }
-            }
-            Action::JournalEditFocusedEntry => {
-                if self.ui.page == Page::Journal && !self.data.journal_entries.is_empty() {
-                    let idx = self
-                        .data
-                        .selected_journal_entry
-                        .min(self.data.journal_entries.len() - 1);
-                    let entry = &self.data.journal_entries[idx];
-                    self.modals.journal_editor_buf = entry.body.clone();
-                    self.modals.journal_textarea = tui_textarea::TextArea::new(
-                        entry.body.split('\n').map(|s| s.to_string()).collect(),
-                    );
-                    self.modals.journal_editor_entry_id = Some(entry.id);
-                    self.modals.journal_editor_open = true;
-                    self.ui.mode = Mode::Insert;
-                }
-            }
-            Action::JournalEditorKey(k) => {
-                let input = tui_textarea::Input::from(crossterm::event::Event::Key(k));
-                self.modals.journal_textarea.input(input);
-                self.modals.journal_editor_buf = self.modals.journal_textarea.lines().join("\n");
-            }
-            Action::JournalNextEntry => {
-                let n = self.data.journal_entries.len();
-                if n > 0 {
-                    self.data.selected_journal_entry =
-                        (self.data.selected_journal_entry + 1).min(n - 1);
-                }
-            }
-            Action::JournalPrevEntry => {
-                if self.data.selected_journal_entry > 0 {
-                    self.data.selected_journal_entry -= 1;
-                }
-            }
-            Action::JournalSubmitEntry => self.submit_journal_entry(),
-            Action::JournalCancelEntry => {
-                self.modals.journal_editor_open = false;
-                self.modals.journal_editor_buf.clear();
-                self.modals.journal_textarea = tui_textarea::TextArea::default();
-                self.modals.journal_editor_entry_id = None;
-                self.ui.mode = Mode::Normal;
-            }
-            Action::JournalDeleteDay => {
-                self.delete_focused_journal_day();
-            }
-            Action::JournalToggleHidden => {
-                self.data.journal_show_hidden = !self.data.journal_show_hidden;
-                self.data.refresh_journal_notes();
-                let label = if self.data.journal_show_hidden {
-                    "showing hidden"
-                } else {
-                    "hiding hidden"
-                };
-                self.toast(format!("journal: {}", label));
-            }
-            Action::JournalGotoTop => {
-                if self.ui.page == Page::Journal && !self.data.journal_notes.is_empty() {
-                    self.data.selected_journal = 0;
-                    self.data.journal_list_state.select(Some(0));
-                    self.data.reload_journal_entries();
-                }
-            }
-            Action::JournalGotoBottom => {
-                if self.ui.page == Page::Journal && !self.data.journal_notes.is_empty() {
-                    let last = self.data.journal_notes.len() - 1;
-                    self.data.selected_journal = last;
-                    self.data.journal_list_state.select(Some(last));
-                    self.data.reload_journal_entries();
-                }
-            }
-            Action::JournalDeleteEntry => {
-                self.delete_focused_journal_entry();
-            }
-            Action::JournalNextDay => self.move_journal_day(1),
-            Action::JournalPrevDay => self.move_journal_day(-1),
+            // Journal* actions handled in `handlers::journal` (dispatched above).
             Action::SetSortOrder(order) => {
                 self.ui.sort_order = order;
                 self.modals.sort_overlay_open = false;
@@ -1205,7 +1134,7 @@ impl AppState {
         }
     }
 
-    fn move_journal_day(&mut self, delta: i32) {
+    pub(crate) fn move_journal_day(&mut self, delta: i32) {
         if self.data.journal_notes.is_empty() {
             return;
         }
@@ -1441,7 +1370,7 @@ impl AppState {
         }
     }
 
-    fn submit_journal_entry(&mut self) {
+    pub(crate) fn submit_journal_entry(&mut self) {
         let body = self.modals.journal_textarea.lines().join("\n");
         let editing_id = self.modals.journal_editor_entry_id.take();
         self.modals.journal_editor_open = false;
@@ -1479,7 +1408,7 @@ impl AppState {
         }
     }
 
-    fn delete_focused_journal_day(&mut self) {
+    pub(crate) fn delete_focused_journal_day(&mut self) {
         if self.data.journal_notes.is_empty() {
             return;
         }
@@ -1521,7 +1450,7 @@ impl AppState {
         }
     }
 
-    fn delete_focused_journal_entry(&mut self) {
+    pub(crate) fn delete_focused_journal_entry(&mut self) {
         if self.data.journal_entries.is_empty() {
             return;
         }

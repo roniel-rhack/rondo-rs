@@ -533,12 +533,16 @@ fn would_create_cycle(conn: &Connection, task_id: i64, blocked_by: i64) -> Resul
 }
 
 fn row_to_task_shallow(r: &Row<'_>) -> rusqlite::Result<Task> {
+    let task_id: i64 = r.get(0)?;
     let metadata_json: String = r.get(9)?;
-    let metadata = serde_json::from_str(&metadata_json).unwrap_or_default();
+    let metadata = serde_json::from_str(&metadata_json).unwrap_or_else(|e| {
+        tracing::warn!(task_id, error = ?e, "corrupt metadata json, defaulting to empty");
+        Default::default()
+    });
     let due_str: Option<String> = r.get(5)?;
     let created_str: String = r.get(6)?;
     Ok(Task {
-        id: r.get(0)?,
+        id: task_id,
         title: r.get(1)?,
         description: r.get(2)?,
         status: Status::from_db(r.get(3)?),

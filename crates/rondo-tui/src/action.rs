@@ -124,6 +124,13 @@ pub enum Action {
     SubmitNote,
     CancelNote,
 
+    RequestEditDueDate,
+    EditDueDateInput(String),
+    /// `None` clears the date; `Some(date)` sets it. Empty string in
+    /// custom-input mode falls through to a no-op + toast.
+    SubmitDueDate(Option<chrono::NaiveDate>),
+    CancelEditDueDate,
+
     Undo,
 
     Error(String),

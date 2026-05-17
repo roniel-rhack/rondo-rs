@@ -2,6 +2,7 @@ pub mod add_subtask;
 pub mod command_palette;
 pub mod confirm;
 pub mod dep_overlay;
+pub mod edit_due_date;
 pub mod edit_subtask;
 pub mod edit_title;
 pub mod filter_strip;

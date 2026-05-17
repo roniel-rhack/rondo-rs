@@ -27,6 +27,19 @@ pub enum Command {
     },
     /// Mark a task as done by id
     Done { id: i64 },
+    /// Set or clear a task's due date.
+    ///
+    /// `--clear` removes the date. Otherwise pass a value parseable by the
+    /// quick-add `due:` token (`today`, `tmrw`, `next-week`, ISO `YYYY-MM-DD`).
+    Due {
+        id: i64,
+        /// Date value (alias or `YYYY-MM-DD`). Required unless `--clear`.
+        #[arg(default_value = "")]
+        date: String,
+        /// Clear the due date instead of setting one.
+        #[arg(long)]
+        clear: bool,
+    },
     /// Export tasks as markdown/json/ndjson
     Export {
         /// Format: md|json|ndjson
@@ -140,6 +153,7 @@ pub fn run(cmd: Command, opts: &CliOpts, db_path: &Path) -> Result<()> {
         Command::Add { title } => cli_add(db_path, opts, title),
         Command::List { filter } => cli_list(db_path, opts, &filter),
         Command::Done { id } => cli_done(db_path, opts, id),
+        Command::Due { id, date, clear } => cli_due(db_path, opts, id, &date, clear),
         Command::Export { format } => cli_export(db_path, opts, &format),
         Command::Plugins { action } => cli_plugins(opts, action),
         Command::Delete { id } => cli_delete(db_path, opts, id),
@@ -246,6 +260,38 @@ fn cli_done(db_path: &Path, opts: &CliOpts, id: i64) -> Result<()> {
         println!("{}", serde_json::json!({ "id": id, "status": "Done" }));
     } else {
         println!("task {id} done");
+    }
+    Ok(())
+}
+
+fn cli_due(db_path: &Path, opts: &CliOpts, id: i64, date: &str, clear: bool) -> Result<()> {
+    require_write(opts, "due")?;
+    let parsed = if clear {
+        None
+    } else {
+        let s = date.trim();
+        if s.is_empty() {
+            return Err(eyre!("due: pass a date value or --clear"));
+        }
+        match crate::app::parse_due(s) {
+            Some(d) => Some(d),
+            None => return Err(eyre!("due: invalid date '{}'", s)),
+        }
+    };
+    let (store, _guard) = open_rw_store(db_path)?;
+    let patch = rondo_core::domain::task::TaskPatch {
+        due_date: Some(parsed),
+        ..Default::default()
+    };
+    store.update_task(id, patch)?;
+    if opts.json {
+        let s = parsed.map(|d| d.format("%Y-%m-%d").to_string());
+        println!("{}", serde_json::json!({ "id": id, "due_date": s }));
+    } else {
+        match parsed {
+            Some(d) => println!("task {id} due {}", d.format("%Y-%m-%d")),
+            None => println!("task {id} due cleared"),
+        }
     }
     Ok(())
 }

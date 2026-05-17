@@ -161,6 +161,7 @@ impl AppState {
             || handlers::subtask::handle(self, &action)
             || handlers::dep::handle(self, &action)
             || handlers::note::handle(self, &action)
+            || handlers::due_date::handle(self, &action)
         {
             if let Some(next) = follow_up.take() {
                 self.update(next);

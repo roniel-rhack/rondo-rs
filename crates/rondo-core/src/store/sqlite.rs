@@ -12,6 +12,24 @@ use rusqlite::{params, Connection, OpenFlags, Row};
 use std::path::Path;
 use std::sync::Mutex;
 
+/// Maximum byte length for free-form text fields stored in the DB. These
+/// are upper bounds against accidental or malicious giant inputs (paste
+/// loops, runaway scripts) rather than a UX hint — normal use is well
+/// below these caps. Validated at the store boundary so every caller
+/// (TUI, CLI, plugins, future RPC) is covered.
+const MAX_TITLE: usize = 500;
+const MAX_DESC: usize = 50_000;
+const MAX_NOTE: usize = 50_000;
+const MAX_JOURNAL: usize = 100_000;
+const MAX_TAG: usize = 64;
+
+fn check_len(field: &'static str, value: &str, max: usize) -> Result<()> {
+    if value.len() > max {
+        return Err(crate::error::Error::InputTooLong { field, max });
+    }
+    Ok(())
+}
+
 pub struct SqliteStore {
     pub(super) conn: Mutex<Connection>,
 }
@@ -82,6 +100,13 @@ impl SqliteStore {
     }
 
     pub fn create_task(&self, input: NewTask) -> Result<(i64, UndoSnapshot)> {
+        check_len("title", &input.title, MAX_TITLE)?;
+        if let Some(desc) = input.description.as_deref() {
+            check_len("description", desc, MAX_DESC)?;
+        }
+        for tag in &input.tags {
+            check_len("tag", tag, MAX_TAG)?;
+        }
         let due = input.due_date.map(|d| d.format("%Y-%m-%d").to_string());
         let created_at = Utc::now().to_rfc3339();
         let mut conn = self.conn.lock().unwrap();
@@ -115,6 +140,12 @@ impl SqliteStore {
     }
 
     pub fn update_task(&self, id: i64, patch: TaskPatch) -> Result<UndoSnapshot> {
+        if let Some(title) = patch.title.as_deref() {
+            check_len("title", title, MAX_TITLE)?;
+        }
+        if let Some(Some(desc)) = patch.description.as_ref() {
+            check_len("description", desc, MAX_DESC)?;
+        }
         let before = self.task_by_id(id)?;
         let mut conn = self.conn.lock().unwrap();
         let tx = conn.transaction()?;
@@ -181,6 +212,7 @@ impl SqliteStore {
     }
 
     pub fn add_subtask(&self, task_id: i64, title: &str) -> Result<(i64, UndoSnapshot)> {
+        check_len("subtask title", title, MAX_TITLE)?;
         let before = self.task_by_id(task_id)?;
         let mut conn = self.conn.lock().unwrap();
         let tx = conn.transaction()?;
@@ -212,12 +244,14 @@ impl SqliteStore {
     }
 
     pub fn update_subtask_title(&self, id: i64, title: &str) -> Result<()> {
+        check_len("subtask title", title, MAX_TITLE)?;
         let conn = self.conn.lock().unwrap();
         conn.execute(super::queries::UPDATE_SUBTASK_TITLE, params![title, id])?;
         Ok(())
     }
 
     pub fn add_task_note(&self, task_id: i64, body: &str) -> Result<i64> {
+        check_len("note", body, MAX_NOTE)?;
         let conn = self.conn.lock().unwrap();
         let now = Utc::now().to_rfc3339();
         conn.execute(
@@ -228,6 +262,7 @@ impl SqliteStore {
     }
 
     pub fn update_task_note(&self, id: i64, body: &str) -> Result<()> {
+        check_len("note", body, MAX_NOTE)?;
         let conn = self.conn.lock().unwrap();
         conn.execute(super::queries::UPDATE_TASK_NOTE, params![body, id])?;
         Ok(())
@@ -269,6 +304,7 @@ impl SqliteStore {
     }
 
     pub fn add_tag(&self, task_id: i64, name: &str) -> Result<UndoSnapshot> {
+        check_len("tag", name, MAX_TAG)?;
         let before = self.task_by_id(task_id)?;
         let mut conn = self.conn.lock().unwrap();
         let tx = conn.transaction()?;
@@ -438,6 +474,7 @@ impl SqliteStore {
     }
 
     pub fn add_journal_entry(&self, note_id: i64, body: &str) -> Result<i64> {
+        check_len("journal entry", body, MAX_JOURNAL)?;
         let conn = self.conn.lock().unwrap();
         let now = Utc::now().to_rfc3339();
         let tx = conn.unchecked_transaction()?;
@@ -480,6 +517,7 @@ impl SqliteStore {
     /// Replace the body text of an existing journal entry. Also bumps the
     /// parent note's `updated_at`. Inside a single transaction.
     pub fn update_journal_entry(&self, entry_id: i64, body: &str) -> Result<()> {
+        check_len("journal entry", body, MAX_JOURNAL)?;
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction()?;
         let note_id: i64 = tx.query_row(

@@ -14,6 +14,8 @@ pub enum Error {
     CycleDetected(i64, i64),
     #[error("could not parse datetime: {0:?}")]
     ParseDate(String),
+    #[error("{field} exceeds maximum length of {max} characters")]
+    InputTooLong { field: &'static str, max: usize },
     #[error("cycle-detection traversal exceeded maximum depth")]
     CycleDepthExceeded,
 }

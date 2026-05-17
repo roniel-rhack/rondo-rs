@@ -123,15 +123,19 @@ fn render_items(
     query: Option<&str>,
     scroll_offset: usize,
 ) -> Vec<ListItem<'static>> {
-    let selected_pos = app.data.task_list_state.selected();
+    // Derive selected slice-position from the *selected task index* against
+    // the current `visible` ordering rather than from `task_list_state`'s
+    // cached slice index. Fixes selection drifting when search/sort reorders
+    // the visible slice without a `move_selection` in between.
+    let selected_task_idx = app.data.selected_task;
     let last_idx = visible.len().saturating_sub(1);
     let mut engine_borrow = query.map(|_| app.data.search_engine.borrow_mut());
     visible
         .iter()
         .enumerate()
         .map(|(pos, &idx)| {
-            let absolute_pos = scroll_offset + pos;
-            let is_selected = Some(absolute_pos) == selected_pos;
+            let _ = scroll_offset;
+            let is_selected = idx == selected_task_idx;
             let is_last = pos == last_idx;
             build_row(
                 &app.data.tasks[idx],

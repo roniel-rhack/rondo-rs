@@ -112,6 +112,19 @@ impl AppState {
         self.ui.expire_flash();
     }
 
+    /// Reload the task list from the store, preserving the current
+    /// selection by id when possible. Sync's `data.selected_task` back
+    /// to whatever row currently holds `ui.selected_task_id`.
+    pub fn refresh_tasks(&mut self) {
+        self.data
+            .refresh_tasks_keeping_id(self.ui.selected_task_id);
+        if let Some(t) = self.data.tasks.get(self.data.selected_task) {
+            self.ui.selected_task_id = Some(t.id);
+        } else {
+            self.ui.selected_task_id = None;
+        }
+    }
+
     pub fn update(&mut self, action: Action) {
         // Clear pending leader on any action other than the leader itself.
         if !matches!(action, Action::LeaderGoto) {
@@ -201,7 +214,7 @@ impl AppState {
                                 Err(e) => err = Some(format!("{}", e)),
                             }
                         }
-                        self.data.refresh_tasks();
+                        self.refresh_tasks();
                         if let Some(first) = ids.first() {
                             self.ui.flash = Some((FlashTarget::Task(*first), Instant::now()));
                         }
@@ -406,7 +419,7 @@ impl AppState {
                     match self.data.store.delete_task(id) {
                         Ok(snap) => {
                             self.undo.push(snap);
-                            self.data.refresh_tasks();
+                            self.refresh_tasks();
                             self.toast("task deleted");
                         }
                         Err(e) => self.toast(format!("delete failed: {}", e)),
@@ -434,7 +447,7 @@ impl AppState {
                         match self.data.store.update_task(id, patch) {
                             Ok(snap) => {
                                 self.undo.push(snap);
-                                self.data.refresh_tasks();
+                                self.refresh_tasks();
                                 self.toast("title updated");
                             }
                             Err(e) => self.toast(format!("update failed: {}", e)),
@@ -466,7 +479,7 @@ impl AppState {
                         match self.data.store.add_subtask(task_id, &trimmed) {
                             Ok((_id, snap)) => {
                                 self.undo.push(snap);
-                                self.data.refresh_tasks();
+                                self.refresh_tasks();
                                 self.toast("subtask added");
                             }
                             Err(e) => self.toast(format!("subtask failed: {}", e)),
@@ -499,7 +512,7 @@ impl AppState {
                     (Ok(blocker), Some(task_id)) if blocker > 0 && blocker != task_id => {
                         match self.data.store.add_dependency(task_id, blocker) {
                             Ok(()) => {
-                                self.data.refresh_tasks();
+                                self.refresh_tasks();
                                 self.toast(format!("dep added: #{} blocks #{}", blocker, task_id));
                             }
                             Err(e) => self.toast(format!("dep add failed: {}", e)),
@@ -518,7 +531,7 @@ impl AppState {
                     (Ok(blocker), Some(task_id)) => {
                         match self.data.store.remove_dependency(task_id, blocker) {
                             Ok(()) => {
-                                self.data.refresh_tasks();
+                                self.refresh_tasks();
                                 self.toast(format!("dep removed: #{}", blocker));
                             }
                             Err(e) => self.toast(format!("dep remove failed: {}", e)),
@@ -571,7 +584,7 @@ impl AppState {
                     match self.data.store.update_task(id, patch) {
                         Ok(snap) => {
                             self.undo.push(snap);
-                            self.data.refresh_tasks();
+                            self.refresh_tasks();
                             self.toast("description updated");
                         }
                         Err(e) => self.toast(format!("update failed: {}", e)),
@@ -608,7 +621,7 @@ impl AppState {
                     if let Some(id) = sub_id {
                         match self.data.store.update_subtask_title(id, &trimmed) {
                             Ok(_) => {
-                                self.data.refresh_tasks();
+                                self.refresh_tasks();
                                 self.toast("subtask renamed");
                             }
                             Err(e) => self.toast(format!("rename failed: {}", e)),
@@ -630,7 +643,7 @@ impl AppState {
                         let sub_id = sub.id;
                         match self.data.store.delete_subtask(sub_id) {
                             Ok(_) => {
-                                self.data.refresh_tasks();
+                                self.refresh_tasks();
                                 let total = self
                                     .data
                                     .selected_task()
@@ -681,7 +694,7 @@ impl AppState {
                         let note_id = note.id;
                         match self.data.store.delete_task_note(note_id) {
                             Ok(_) => {
-                                self.data.refresh_tasks();
+                                self.refresh_tasks();
                                 let total = self
                                     .data
                                     .selected_task()
@@ -729,7 +742,7 @@ impl AppState {
                 };
                 match result {
                     Ok(msg) => {
-                        self.data.refresh_tasks();
+                        self.refresh_tasks();
                         self.toast(msg);
                     }
                     Err(e) => self.toast(format!("note failed: {}", e)),
@@ -803,7 +816,7 @@ impl AppState {
                             if let Err(e) = self.apply_undo(snap) {
                                 self.toast(format!("undo failed: {}", e));
                             } else {
-                                self.data.refresh_tasks();
+                                self.refresh_tasks();
                                 self.toast("undone");
                             }
                         }
@@ -993,6 +1006,8 @@ impl AppState {
             Page::Tasks if !self.data.tasks.is_empty() => {
                 let prev = self.data.selected_task;
                 self.data.selected_task = idx.min(self.data.tasks.len() - 1);
+                self.ui.selected_task_id =
+                    self.data.tasks.get(self.data.selected_task).map(|t| t.id);
                 self.data
                     .task_list_state
                     .select(Some(self.data.selected_task));
@@ -1072,6 +1087,7 @@ impl AppState {
                 let new_task = visible[next];
                 let changed = new_task != self.data.selected_task;
                 self.data.selected_task = new_task;
+                self.ui.selected_task_id = self.data.tasks.get(new_task).map(|t| t.id);
                 // ListState position is relative to visible slice, not full tasks.
                 self.data.task_list_state.select(Some(next));
                 self.adjust_task_list_scroll(next, visible.len());
@@ -1207,7 +1223,7 @@ impl AppState {
             match self.data.store.toggle_subtask(subtask_id) {
                 Ok((_, snap)) => {
                     self.undo.push(snap);
-                    self.data.refresh_tasks();
+                    self.refresh_tasks();
                     self.ui.flash = Some((FlashTarget::Subtask(subtask_id), Instant::now()));
                     self.toast(format!("subtask #{} toggled", subtask_id));
                 }
@@ -1276,7 +1292,7 @@ impl AppState {
         match self.data.store.create_task(new_task) {
             Ok((_id, snap)) => {
                 self.undo.push(snap);
-                self.data.refresh_tasks();
+                self.refresh_tasks();
                 if self.ui.last_task_list_rect.width > 0 {
                     let eff = crate::fx::presets::quick_add_slide(self.theme.bg);
                     self.fx.spawn(

@@ -121,14 +121,28 @@ impl DataState {
     /// Reload tasks from the store. Used after mutations to keep the
     /// in-memory list in sync with persisted state.
     pub fn refresh_tasks(&mut self) {
+        self.refresh_tasks_keeping_id(None);
+    }
+
+    /// Reload tasks from the store and, when `keep_id` is provided, restore
+    /// `selected_task` to the row with that task id. Falls back to clamping
+    /// the previous index when the id is no longer present (e.g. deleted).
+    pub fn refresh_tasks_keeping_id(&mut self, keep_id: Option<i64>) {
         if let Ok(tasks) = self.store.list_tasks() {
             self.tasks = tasks;
         }
         if self.tasks.is_empty() {
             self.selected_task = 0;
             self.task_list_state.select(None);
-        } else if self.selected_task >= self.tasks.len() {
-            self.selected_task = self.tasks.len() - 1;
+        } else {
+            if let Some(id) = keep_id {
+                if let Some(pos) = self.tasks.iter().position(|t| t.id == id) {
+                    self.selected_task = pos;
+                }
+            }
+            if self.selected_task >= self.tasks.len() {
+                self.selected_task = self.tasks.len() - 1;
+            }
             self.task_list_state.select(Some(self.selected_task));
         }
         self.refresh_filter_counts();

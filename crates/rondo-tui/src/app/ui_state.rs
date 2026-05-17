@@ -70,6 +70,10 @@ pub struct UiState {
     /// First visible row in the task list. Updated by `move_selection`
     /// to keep the cursor inside the viewport, and clamped on resize.
     pub task_list_scroll: usize,
+    /// Selected task as a stable id. Survives `refresh_tasks` reordering
+    /// and search-induced re-sorts that would otherwise leave the index
+    /// pointing at a different row.
+    pub selected_task_id: Option<i64>,
 }
 
 impl Default for UiState {
@@ -92,6 +96,7 @@ impl Default for UiState {
             sort_order: SortOrder::default(),
             journal_pane: JournalPane::default(),
             task_list_scroll: 0,
+            selected_task_id: None,
         }
     }
 }

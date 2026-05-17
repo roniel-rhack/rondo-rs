@@ -1,10 +1,39 @@
+<div align="center">
+
 # rondo-rs
 
-A keyboard-driven terminal task manager + journal in Rust, with a plugin
-system that runs both in-process Rust plugins and external WASM modules.
+**A keyboard-driven terminal task manager + journal, written in Rust.**
 
-All state is contained under `~/.rondo-rs/`; nothing outside that directory
-is read or written.
+Tasks · subtasks · dependencies · journal · pomodoro · plugins (WASM) ·
+fuzzy search · 17-command CLI — all under a single `~/.rondo-rs/` root.
+
+![Rust](https://img.shields.io/badge/rust-1.83-orange?logo=rust)
+![License](https://img.shields.io/badge/license-MIT-blue)
+![Platform](https://img.shields.io/badge/platform-macOS%20·%20Linux-lightgrey)
+
+</div>
+
+![rondo-rs demo](assets/demo.gif)
+
+> Browse tasks · drill into the detail pane · quick-add with `#tag !p3 due:tmrw` ·
+> filter · fuzzy search · jump to the journal · open the analytics dashboard ·
+> launch the pomodoro overlay — all from the keyboard.
+
+---
+
+## Why rondo-rs?
+
+- **Terminal-native.** No Electron, no daemon, no cloud account. The whole
+  app is a single ~5 MB Rust binary; state is one SQLite file.
+- **Composable like Vim.** Section-scoped bindings: `e` edits the title in
+  Header, renames a subtask in Subtasks, opens an entry in Notes. Same
+  finger memory, different verbs depending on focus.
+- **Hackable.** Plugins ship as `.wasm` modules sandboxed by WASI. The
+  same view-DSL drives both in-process Rust plugins and external authors.
+- **Safe by default.** Every read/write open snapshots the DB to
+  `~/.rondo-rs/backups/` (30-day rotation); dangerous plugin capabilities
+  need an explicit grant in `config.toml`; `--read-only` mode for the
+  paranoid.
 
 ## Highlights
 
@@ -41,6 +70,25 @@ is read or written.
   goes into the description / journal / note editors at the cursor;
   single-line surfaces take the first line.
 
+## What the demo above shows
+
+1. **Detail pane.** `l` focuses it; `Tab` cycles Header → Subtasks →
+   Dependencies → Notes. Same key, different verbs depending on the
+   focused section.
+2. **Quick-add parser.** `a` opens the modal. `#tags`, `!p0..p3`,
+   `due:today|tmrw|2026-05-30` are parsed inline.
+3. **Filters + search.** `f<letter>` cycles status filters
+   (`i` inbox, `u` urgent, `o` overdue, `t` today, `A` all, …). `/` is
+   fuzzy with highlight in list and detail.
+4. **Journal.** `2` switches page. Each day is a markdown document with
+   multiple entries; `J/K` cycle days.
+5. **Plugins.** `:analytics`, `:calendar`, `:focus`, `:deps` open builtin
+   plugin pages. `p` raises the animated pomodoro overlay.
+
+The recording is reproducible — re-render with
+`./scripts/demo-seed.sh && vhs assets/tapes/demo.tape` against the seed
+in [`fixtures/demo-seed.sql`](fixtures/demo-seed.sql).
+
 ## Install
 
 Requires Rust 1.83 (toolchain pinned via `rust-toolchain.toml`).
@@ -52,7 +100,21 @@ cargo build --release
 ./target/release/rondo-tui
 ```
 
-First run creates `~/.rondo-rs/` and seeds the DB with sample tasks.
+First run creates `~/.rondo-rs/` and seeds the DB with a small set of
+sample tasks so the UI isn't empty. Wipe it any time with
+`rm ~/.rondo-rs/todo.db` — the next launch re-seeds.
+
+### Try it without touching your real data
+
+```bash
+./scripts/demo-seed.sh                                   # builds a throwaway HOME
+HOME="$PWD/.demo-home" ./target/release/rondo-tui        # launch against the demo seed
+```
+
+The seed in `fixtures/demo-seed.sql` is what the GIFs above were recorded
+against — 15 tasks with mixed status / priority / tags, dependency chain,
+subtasks, time logs, four days of journal entries, and 5 weeks of focus
+sessions for the heatmap.
 
 ## Configuration
 
@@ -347,6 +409,24 @@ Three sample plugins live in `examples/plugins/`:
 - [docs/plugins.md](docs/plugins.md) — author + install guide, capability
   cheat sheet, host↔plugin protocol.
 - [docs/dev.md](docs/dev.md) — conventions, file map, test commands.
+
+## Regenerating the demo GIF
+
+The recording in `assets/demo.gif` is produced by
+[vhs](https://github.com/charmbracelet/vhs) from
+[`assets/tapes/demo.tape`](assets/tapes/demo.tape) against the seed in
+`fixtures/demo-seed.sql`. To rebuild it locally:
+
+```bash
+cargo build --release -p rondo-tui
+brew install vhs                                  # or see vhs install docs
+./scripts/demo-seed.sh                            # rebuild .demo-home/
+vhs assets/tapes/demo.tape
+```
+
+The tape exports `HOME=$PWD/.demo-home` so your real `~/.rondo-rs/`
+state is never touched.
+
 ## License
 
 MIT. Personal project, no warranty.

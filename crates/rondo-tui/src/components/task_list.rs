@@ -119,17 +119,23 @@ fn draw_column_header(f: &mut Frame<'_>, area: Rect, t: &Theme) {
     f.render_widget(Paragraph::new(header), area);
 }
 
-fn render_items(
+/// Per-row data prepared for rendering. The `lines` are fully styled
+/// `Line<'static>` so the renderer just wraps them in `ListItem`s.
+pub(crate) struct TaskRow {
+    pub lines: Vec<Line<'static>>,
+    #[allow(dead_code)]
+    pub is_selected: bool,
+}
+
+/// Data-prep phase: walk `visible`, compute selection & last-row flags,
+/// borrow the search engine once, and produce a `TaskRow` per visible
+/// task. Keeps the render phase a thin `ListItem::new(row.lines)` loop.
+pub(crate) fn build_rows(
     app: &AppState,
     visible: &[usize],
     width: u16,
     query: Option<&str>,
-    scroll_offset: usize,
-) -> Vec<ListItem<'static>> {
-    // Derive selected slice-position from the *selected task index* against
-    // the current `visible` ordering rather than from `task_list_state`'s
-    // cached slice index. Fixes selection drifting when search/sort reorders
-    // the visible slice without a `move_selection` in between.
+) -> Vec<TaskRow> {
     let selected_task_idx = app.data.selected_task;
     let last_idx = visible.len().saturating_sub(1);
     let mut engine_borrow = query.map(|_| app.data.search_engine.borrow_mut());
@@ -137,10 +143,9 @@ fn render_items(
         .iter()
         .enumerate()
         .map(|(pos, &idx)| {
-            let _ = scroll_offset;
             let is_selected = idx == selected_task_idx;
             let is_last = pos == last_idx;
-            build_row(
+            let lines = build_row_lines(
                 &app.data.tasks[idx],
                 is_selected,
                 is_last,
@@ -149,13 +154,28 @@ fn render_items(
                 width,
                 query,
                 engine_borrow.as_deref_mut(),
-            )
+            );
+            TaskRow { lines, is_selected }
         })
         .collect()
 }
 
+fn render_items(
+    app: &AppState,
+    visible: &[usize],
+    width: u16,
+    query: Option<&str>,
+    scroll_offset: usize,
+) -> Vec<ListItem<'static>> {
+    let _ = scroll_offset;
+    build_rows(app, visible, width, query)
+        .into_iter()
+        .map(|r| ListItem::new(r.lines))
+        .collect()
+}
+
 #[allow(clippy::too_many_arguments)]
-fn build_row(
+fn build_row_lines(
     task: &Task,
     is_selected: bool,
     is_last: bool,
@@ -164,7 +184,7 @@ fn build_row(
     width: u16,
     query: Option<&str>,
     engine: Option<&mut crate::search::SearchEngine>,
-) -> ListItem<'static> {
+) -> Vec<Line<'static>> {
     let in_visual = app.ui.selection.contains(&task.id);
     let flashing = app.is_flashing(FlashTarget::Task(task.id));
     let gutter = || -> Span<'static> {
@@ -278,7 +298,7 @@ fn build_row(
         ]));
     }
 
-    ListItem::new(lines)
+    lines
 }
 
 fn draw_progress_bar(app: &AppState, f: &mut Frame<'_>, area: Rect, t: &Theme) {

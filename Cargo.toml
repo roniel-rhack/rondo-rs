@@ -34,3 +34,9 @@ tachyonfx = { version = "0.13", default-features = false, features = ["crossterm
 strum = { version = "0.26", features = ["derive"] }
 pulldown-cmark = "0.12"
 thiserror = "1"
+
+[patch.crates-io]
+# Temporary fork that bumps wasmtime 41 -> 44 on top of upstream PR
+# extism/extism#901. Drops once upstream publishes a release with
+# wasmtime >= 42.0.2 (closes Dependabot wasmtime CVEs).
+extism = { git = "https://github.com/roniel-rhack/extism", rev = "1ac2a4418035a95d132ae84aab11455cb26f801e" }

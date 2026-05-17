@@ -81,11 +81,16 @@ fn telemetry(app: &AppState) -> Vec<Span<'static>> {
     };
     let sep = || Span::styled(" · ", Style::default().fg(t.border_inactive));
 
+    let (rw_label, rw_color) = if app.writable {
+        ("RW", t.success)
+    } else {
+        ("RO", t.warn)
+    };
     vec![
-        Span::styled("⊙ ", Style::default().fg(t.success)),
+        Span::styled("⊙ ", Style::default().fg(rw_color)),
         Span::styled(
-            "ONLINE",
-            Style::default().fg(t.success).add_modifier(Modifier::BOLD),
+            rw_label,
+            Style::default().fg(rw_color).add_modifier(Modifier::BOLD),
         ),
         sep(),
         Span::styled(time, Style::default().fg(t.fg).add_modifier(Modifier::BOLD)),

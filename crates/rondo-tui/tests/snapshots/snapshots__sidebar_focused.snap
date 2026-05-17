@@ -2,7 +2,7 @@
 source: crates/rondo-tui/tests/snapshots.rs
 expression: s
 ---
-" ▌rondo v0.1.0                 // SISTEMA DE GESTIÓN DE TAREAS AVANZADO //                            ⊙ ONLINE · HH:MM:SS · ◷ 1/2 · P— · ☑3 "
+" ▌rondo v0.1.0                 // SISTEMA DE GESTIÓN DE TAREAS AVANZADO //                                ⊙ RO · HH:MM:SS · ◷ 1/2 · P— · ☑3 "
 "┏━ navegación ━━━━━━━━━━━┓┌─ inbox · 3 tareas ────────────────────────────────────┐┌─ detail · #4 ──────────────────────── pending · urg! ─┐"
 "┃  [i] ◉ INBOX       3   ┃│     ESTADO  PRI     TAREA                             ││                                                       │"
 "┃ ▌[t] ◷ HOY         1   ┃│ ▌ ▌ [ ]   ◖URG◗  Refactor pomodoro module   ◖in 1d◗   ││   TSK-0004    ◖URG◗   ◖pending◗                       │"

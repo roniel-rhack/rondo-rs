@@ -2,7 +2,7 @@
 source: crates/rondo-tui/tests/snapshots.rs
 expression: s
 ---
-" ▌rondo v0.1.0       // SISTEMA DE GESTIÓN DE TAREAS AVANZADO //                  ⊙ ONLINE · HH:MM:SS · ◷ 1/2 · P— · ☑3 "
+" ▌rondo v0.1.0       // SISTEMA DE GESTIÓN DE TAREAS AVANZADO //                      ⊙ RO · HH:MM:SS · ◷ 1/2 · P— · ☑3 "
 "┌─ navegación ───────────┐╭ Journal ───────────────────────────────────────────────────────────────────────────────────╮"
 "│  [i] ◉ INBOX       3   ││                                                                                            │"
 "│  [t] ◷ HOY         1   ││                                                                                            │"

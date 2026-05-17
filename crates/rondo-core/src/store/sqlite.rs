@@ -785,7 +785,8 @@ fn row_to_entry(r: &Row<'_>) -> rusqlite::Result<Entry> {
     })
 }
 
-fn parse_dt(s: &str) -> Result<DateTime<Utc>> {
+#[doc(hidden)]
+pub fn parse_dt(s: &str) -> Result<DateTime<Utc>> {
     if let Ok(d) = DateTime::parse_from_rfc3339(s) {
         return Ok(d.with_timezone(&Utc));
     }

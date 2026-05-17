@@ -5,6 +5,9 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
+[lib]
+bench = false
+
 [dependencies]
 rondo-core = { path = "../rondo-core" }
 rondo-plugin-api = { path = "../rondo-plugin-api" }

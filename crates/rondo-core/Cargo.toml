@@ -5,6 +5,9 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
+[lib]
+bench = false
+
 [dependencies]
 rusqlite = { workspace = true }
 serde = { workspace = true }
@@ -20,3 +23,9 @@ getrandom = "0.2"
 [dev-dependencies]
 tempfile = "3.10"
 filetime = "0.2"
+proptest = "1"
+criterion = "0.5"
+
+[[bench]]
+name = "store"
+harness = false

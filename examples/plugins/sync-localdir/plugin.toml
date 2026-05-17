@@ -2,7 +2,7 @@ id = "sync-localdir"
 name = "Local-directory backup syncer"
 version = "0.1.0"
 api = "0.1"
-capabilities = ["Syncer", "TickHandler"]
+capabilities = ["Syncer", "TickHandler", "CommandContributor"]
 
 [syncer]
 name = "localdir"
@@ -10,3 +10,7 @@ name = "localdir"
 [wasi]
 allowed_paths = ["~/.rondo-rs/sync/"]
 allowed_hosts = []
+
+[cli]
+name = "sync-now"
+args_spec = []

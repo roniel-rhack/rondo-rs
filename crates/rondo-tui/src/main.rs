@@ -132,6 +132,7 @@ fn main() -> Result<()> {
     app.lang = cfg.lang.name;
     app.fx = FxManager::new_with_options(reduced);
     register_builtin_plugins(&mut app);
+    load_external_plugins(&mut app);
     let mut terminal = tui::init()?;
     let result = run(&mut terminal, &mut app);
     tui::restore()?;
@@ -147,6 +148,23 @@ fn rondo_rs_dir() -> std::path::PathBuf {
 
 fn default_db_path() -> std::path::PathBuf {
     rondo_rs_dir().join("todo.db")
+}
+
+/// Scan `~/.rondo-rs/plugins/` for external WASM plugins and load each one
+/// into `app.external`. Failures are logged via `tracing` but never abort
+/// startup — a broken manifest must not lock the user out of the TUI.
+fn load_external_plugins(app: &mut AppState) {
+    let dir = rondo_rs_dir().join("plugins");
+    if !dir.exists() {
+        return;
+    }
+    match app.external.load_from_dir(&dir) {
+        Ok(ids) if !ids.is_empty() => {
+            tracing::info!("external plugins loaded: {:?}", ids);
+        }
+        Ok(_) => {}
+        Err(e) => tracing::warn!("failed to scan {}: {}", dir.display(), e),
+    }
 }
 
 fn register_builtin_plugins(app: &mut AppState) {

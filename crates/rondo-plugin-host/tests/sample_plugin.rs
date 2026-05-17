@@ -39,6 +39,12 @@ fn loads_quote_of_the_day_if_built() {
         loaded
     );
     assert!(host.get("quote-of-the-day").unwrap().has_wasm());
+    let manifest = &host.get("quote-of-the-day").unwrap().manifest;
+    assert_eq!(manifest.command_name(), Some("quote-of-the-day"));
+    assert_eq!(
+        host.resolve_command("quote-of-the-day").as_deref(),
+        Some("quote-of-the-day"),
+    );
 
     let results = host.dispatch(&PluginAction::Show);
     assert!(!results.is_empty(), "Show dispatch returned no results");

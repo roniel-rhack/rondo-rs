@@ -75,6 +75,11 @@ pub struct ModalsState {
     /// If `Some(id)`, render the named plugin's last `Show` response
     /// full-screen as a page overlay. Set via `:<plugin>` commands.
     pub plugin_page: Option<String>,
+    /// Cached overlay `ViewSpec` returned by an external/in-process plugin
+    /// whose `Show` response was a `ViewKind::Overlay`. The tuple is
+    /// `(plugin_id, view)`; rendering is a pure read of `view`, no further
+    /// dispatch happens until the user closes the overlay.
+    pub plugin_overlay: Option<(String, rondo_plugin_api::ViewSpec)>,
     pub description_editor_open: bool,
     pub description_textarea: tui_textarea::TextArea<'static>,
     pub description_task_id: Option<i64>,
@@ -126,6 +131,7 @@ impl Default for ModalsState {
             dep_overlay_cursor: 0,
             plugins_overlay_open: false,
             plugin_page: None,
+            plugin_overlay: None,
             description_editor_open: false,
             description_textarea: tui_textarea::TextArea::default(),
             description_task_id: None,
@@ -490,6 +496,7 @@ impl ModalsState {
             || self.dep_overlay_open
             || self.plugins_overlay_open
             || self.plugin_page.is_some()
+            || self.plugin_overlay.is_some()
             || self.description_editor_open
             || self.edit_subtask_open
             || self.note_editor_open

@@ -12,6 +12,7 @@ pub mod header;
 pub mod help;
 pub mod journal;
 pub mod multiline_editor;
+pub mod plugin_overlay;
 pub mod plugin_page;
 pub mod plugins_overlay;
 pub mod pomodoro;
